@@ -60,10 +60,9 @@ test("admin cria conta, recebe mensagem em tempo real e desativa sessão", async
     .filter({ hasText: "@" + username })
     .getByRole("button", { name: "Desativar" })
     .click();
-  await friend.reload();
   await expect(
     friend.getByRole("heading", { name: "Entre e fique à vontade." }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
   await context.close();
 });
 test("layout móvel mantém conversa e voz acessíveis", async ({ page }) => {

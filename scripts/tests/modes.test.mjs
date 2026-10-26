@@ -11,6 +11,7 @@ function fixture(fn) {
   fs.mkdirSync(path.join(cwd, "infra/compose/generated"), { recursive: true });
   for (const name of [
     "render-config.mjs",
+    "security-config.mjs",
     "network-config.mjs",
     "modes.sh",
     "configure.sh",
@@ -55,14 +56,14 @@ test("dev padrão gera credenciais privadas e anuncia loopback", () =>
     assert.equal(fs.statSync(path.join(cwd, ".env")).mode & 0o777, 0o600);
     assert.match(
       fs.readFileSync(
-        path.join(cwd, "infra/compose/generated/livekit.yaml"),
+        path.join(cwd, "infra/compose/generated/network/livekit.yaml"),
         "utf8",
       ),
       /node_ip: "127.0.0.1"/,
     );
     assert.equal(
       fs
-        .readFileSync(path.join(cwd, "infra/compose/generated/mode"), "utf8")
+        .readFileSync(path.join(cwd, "infra/compose/generated/network/mode"), "utf8")
         .trim(),
       "dev",
     );
@@ -107,7 +108,7 @@ for (const [previous, requested] of [
       }
       const before = fs.readFileSync(path.join(cwd, ".env"), "utf8");
       fs.writeFileSync(
-        path.join(cwd, "infra/compose/generated/mode"),
+        path.join(cwd, "infra/compose/generated/network/mode"),
         previous + "\n",
       );
       assert.equal(
@@ -121,7 +122,7 @@ for (const [previous, requested] of [
       assert.equal(fs.readFileSync(path.join(cwd, ".env"), "utf8"), before);
       assert.equal(
         fs
-          .readFileSync(path.join(cwd, "infra/compose/generated/mode"), "utf8")
+          .readFileSync(path.join(cwd, "infra/compose/generated/network/mode"), "utf8")
           .trim(),
         requested,
       );
@@ -129,7 +130,7 @@ for (const [previous, requested] of [
   );
 test("configure e check recusam mudar prd para dev sem tocar Docker", () =>
   fixture((cwd, env) => {
-    fs.writeFileSync(path.join(cwd, "infra/compose/generated/mode"), "prd\n");
+    fs.writeFileSync(path.join(cwd, "infra/compose/generated/network/mode"), "prd\n");
     for (const script of ["configure.sh", "check.sh"]) {
       assert.notEqual(
         spawnSync("bash", ["scripts/" + script], { cwd, env, stdio: "ignore" })

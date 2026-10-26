@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
+import { securityConfig } from "./security-config.mjs";
 import { publicIPv4, hostname, email, portSuffix } from "./network-config.mjs";
 const mode = process.argv[2] ?? "dev";
 if (!["dev", "prd"].includes(mode)) throw new Error("Modo deve ser dev ou prd");
@@ -35,8 +36,25 @@ const values = Object.fromEntries(
       return [l.slice(0, i), l.slice(i + 1)];
     }),
 );
+const networkFile = "infra/compose/generated/network/network.env";
+if (fs.existsSync(networkFile))
+  Object.assign(
+    values,
+    Object.fromEntries(
+      fs
+        .readFileSync(networkFile, "utf8")
+        .trim()
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((l) => {
+          const i = l.indexOf("=");
+          return [l.slice(0, i), l.slice(i + 1)];
+        }),
+    ),
+  );
+if (process.env.CHAT_HELPER !== "true") securityConfig(values);
 for (const key of [
-  "POSTGRES_PASSWORD",
+  ...(process.env.CHAT_HELPER === "true" ? [] : ["POSTGRES_PASSWORD"]),
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
 ])
@@ -85,9 +103,12 @@ if (mode === "prd") {
   )
     throw new Error("URLs devem corresponder aos domínios");
 }
-fs.mkdirSync("infra/compose/generated", { recursive: true, mode: 0o700 });
+fs.mkdirSync("infra/compose/generated/network", {
+  recursive: true,
+  mode: 0o700,
+});
 fs.writeFileSync(
-  "infra/compose/generated/livekit.yaml",
+  "infra/compose/generated/network/livekit.yaml",
   `port: 7880
 bind_addresses: ["0.0.0.0"]
 rtc:
@@ -97,6 +118,14 @@ rtc:
   node_ip: ${JSON.stringify(ip)}
   # Docker forwards media to eth0, never to the container loopback socket.
   enable_loopback_candidate: false
+# Enforced bounds in LiveKit v1.13.11. num_tracks/bytes_per_sec only affect
+# node allocation, so they are deliberately not presented as publisher caps.
+enable_data_tracks: false
+limit:
+  subscription_limit_video: 1
+  subscription_limit_audio: 16
+  signal_message_size_limit: 65536
+  max_api_request_body_size: 131072
 room:
   max_participants: 16
   empty_timeout: 60
@@ -110,8 +139,10 @@ logging:
 `,
   { mode: 0o600 },
 );
-fs.writeFileSync("infra/compose/generated/mode", mode + "\n", { mode: 0o600 });
-fs.chmodSync(".env", 0o600);
+fs.writeFileSync("infra/compose/generated/network/mode", mode + "\n", {
+  mode: 0o600,
+});
+if (process.env.CHAT_HELPER !== "true") fs.chmodSync(".env", 0o600);
 if (process.env.CHAT_TURN === "true") {
   const domain = values.TURN_DOMAIN;
   if (
@@ -124,7 +155,7 @@ if (process.env.CHAT_TURN === "true") {
     if (!fs.existsSync("infra/compose/generated/turn-certs/" + file))
       throw new Error("Certificado TURN ausente: " + file);
   fs.appendFileSync(
-    "infra/compose/generated/livekit.yaml",
+    "infra/compose/generated/network/livekit.yaml",
     `turn:
   enabled: true
   domain: ${JSON.stringify(domain)}

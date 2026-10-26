@@ -2,6 +2,8 @@
 services:
   edge:
     image: chat-friends-edge-duckdns
+    entrypoint: ["/usr/local/bin/duckdns-caddy"]
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
     build: ../caddy
     ports: !override ["443:443/tcp"]
     volumes:

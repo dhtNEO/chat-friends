@@ -12,7 +12,7 @@ Leia README e STATUS. Uma tarefa cloud já é isolada: use o checkout existente;
 
 Backend: `backend/` é um monólito por responsabilidade (Accounts, Chat, Media, Events). Migrações SQL em `backend/src/main/resources/db/migration`. Nunca altere uma migração já aplicada; crie a próxima versão. Frontend: `frontend/src`, API tipada, estado React e ciclo de vida LiveKit.
 
-Execução parcial: `./scripts/compose.sh up -d db livekit`. Para compilar apenas Java, use `docker run --rm -v "$PWD/backend:/src" -v friends-maven:/root/.m2 -w /src maven:3.9.11-eclipse-temurin-25 ./mvnw -B -ntp package -DskipTests`. Isso compila, **não valida os testes**. Para testes integrados use check.sh e seu banco separado. O frontend pode usar `docker run --rm -p 127.0.0.1:5173:5173 -v "$PWD/frontend:/src" -w /src node:24.14.0-alpine sh -c 'npm ci && npm run dev'`; ajuste o proxy Vite para um backend alcançável e APP_ORIGIN para a origem 5173 antes de testar WebSocket. O caminho padrão, totalmente validável, é Compose/Caddy na porta 8080.
+Execução parcial: `./scripts/compose.sh up -d db livekit`. Para compilar apenas Java, use `docker run --rm -v "$PWD/backend:/src" -v friends-maven:/root/.m2 -w /src maven:3.9.11-eclipse-temurin-25 ./mvnw -B -ntp package -DskipTests`. Isso compila, **não valida os testes**. Para testes integrados use check.sh e seu banco separado. O frontend pode usar `docker run --rm -p 127.0.0.1:5173:5173 -v "$PWD/frontend:/src" -w /src node:24.22.1-alpine sh -c 'npm ci && npm run dev'`; ajuste o proxy Vite para um backend alcançável e APP_ORIGIN para a origem 5173 antes de testar WebSocket. O caminho padrão, totalmente validável, é Compose/Caddy na porta 8080.
 
 ## Navegador
 

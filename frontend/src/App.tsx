@@ -6,9 +6,18 @@ import {
   type FormEvent,
 } from "react";
 import { api, login, type User, type Message } from "./api";
+import {
+  MfaGate,
+  AccountSecurity,
+  type SecurityState,
+} from "./AccountSecurity";
 import { Voice } from "./Voice";
 export default function App() {
-  const [me, setMe] = useState<{ user: User; spaceName: string } | null>(null),
+  const [me, setMe] = useState<{
+      user: User;
+      spaceName: string;
+      security: SecurityState;
+    } | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -21,10 +30,18 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
+    const expired = () => {
+      setMe(null);
+      setError("");
+    };
+    window.addEventListener("session-ended", expired);
     void load();
+    return () => window.removeEventListener("session-ended", expired);
   }, [load]);
   if (loading) return <main className="loading">Preparando o seu espaço…</main>;
   if (!me) return <Login onLogin={load} />;
+  if (me.security.mfaPending || me.security.enrollmentRequired)
+    return <MfaGate state={me.security} onDone={load} />;
   return (
     <Workspace
       me={me}
@@ -505,6 +522,7 @@ function Settings({
       <button className="text-button" onClick={onClose}>
         ← Voltar à conversa
       </button>
+      <AccountSecurity />
       <h2>{panel === "admin" ? "Gerenciar contas" : "Alterar minha senha"}</h2>
       <p className="muted">
         Senhas precisam ter pelo menos 12 caracteres (máximo de 72 bytes).

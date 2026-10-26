@@ -1098,3 +1098,7 @@ input[type="range"] {
     height: 34vh;
   }
 }
+
+.security-page { min-height: 100dvh; display: grid; place-items: center; padding: 1rem; }
+.security-page > section { width: min(100%, 36rem); }
+.mfa-secret { overflow-wrap: anywhere; user-select: all; }

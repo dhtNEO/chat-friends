@@ -13,13 +13,13 @@ duck_lock
 if [[ "$action" == update && -z "$(./scripts/compose.sh ps -q livekit)" ]]; then echo 'SFU parada; o agendador não inicia a stack automaticamente.' >&2; exit 1; fi
 if [[ "$action" == --start ]]; then decision=$(duck_node start); else decision=$(duck_node update); fi
 [[ "$decision" == restart || "$decision" == unchanged ]] || exit 1
-if [[ "$action" == --start ]]; then ./scripts/compose.sh up -d --build --wait --wait-timeout 240; fi
+if [[ "$action" == --start ]]; then ./scripts/compose.sh build; ./scripts/provision-db.sh; ./scripts/compose.sh up -d --no-build --wait --wait-timeout 240; fi
 if [[ "$decision" == restart ]]; then
   ./scripts/compose.sh up -d --no-deps --force-recreate livekit
-elif DUCKDNS_NETWORK=chat-friends_default duck_node commit; then
+elif DUCKDNS_NETWORK=chat-friends_control_net duck_node commit; then
   exit 0
 else
   echo 'SFU não saudável; tentando recriação.' >&2
   ./scripts/compose.sh up -d --no-deps --force-recreate livekit
 fi
-DUCKDNS_NETWORK=chat-friends_default duck_node commit
+DUCKDNS_NETWORK=chat-friends_control_net duck_node commit

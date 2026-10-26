@@ -12,10 +12,15 @@ export async function api<T = void>(
   if (method !== "GET" && !csrf) await refreshCsrf();
   const r = await fetch("/api" + path, {
     method,
+    keepalive: path === "/media/leave",
     headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!r.ok) {
+    if (r.status === 401) {
+      csrf = "";
+      window.dispatchEvent(new Event("session-ended"));
+    }
     let detail = "";
     try {
       detail = (await r.json()).error || "";

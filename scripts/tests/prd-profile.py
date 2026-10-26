@@ -27,7 +27,7 @@ for staging in ['false', 'true']:
         '-e', 'APP_DOMAIN=test-app.duckdns.org', '-e', 'MEDIA_DOMAIN=test-media.duckdns.org',
         '-e', 'ACME_EMAIL=test@example.org', '-e', 'ACME_CA=' + ca,
         '-v', str(root / 'infra/compose/Caddyfile.prd') + ':/etc/caddy/Caddyfile:ro',
-        'caddy:2.11.4-alpine', 'caddy', 'adapt', '--config', '/etc/caddy/Caddyfile', '--validate',
+        'caddy:2.11.7-alpine', 'caddy', 'adapt', '--config', '/etc/caddy/Caddyfile', '--validate',
     ], capture_output=True, check=True)
     assert json.loads(result.stdout)['apps']['http']['servers']
 print('prd: portas limitadas, ACME staging isolado e Caddy válido com CA de produção e staging.')

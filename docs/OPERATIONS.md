@@ -10,7 +10,7 @@ Limites atuais: 16 conexões de voz (abas contam), 4.000 unidades UTF-16/mensage
 
 Internet soma mais 128 MiB de limite para edge. Limites de contêiner são tetos, não reservas nem previsão de consumo. E2-medium é candidata de 4 GiB com CPU compartilhada; builds podem exceder recursos. Construa fora da VM pequena, transfira imagens da arquitetura certa. Use `COMPOSE_PARALLEL_LIMIT=1` quando necessário.
 
-Após queda/reinício: aguarde DB saudável/Flyway, confirme saúde, reabra frontend, teste chat e mídia. Sessões/mensagens persistem; sockets/chamadas não. A lease é reconciliada com participantes reais, órfãos são revogados. Falha de LiveKit não deve impedir histórico/chat; UI indica falha ao entrar. Mac suspenso perde chamadas; configure energia conscientemente e prefira cabo.
+Após queda/reinício: aguarde DB saudável e o job de migração durante atualizações, confirme saúde, reabra frontend, teste chat e mídia. Sessões/mensagens persistem; sockets/chamadas não. A lease é reconciliada com participantes reais, órfãos são revogados. Falha de LiveKit não deve impedir histórico/chat; UI indica falha ao entrar. Mac suspenso perde chamadas; configure energia conscientemente e prefira cabo.
 
 Manutenção: avise amigos; pare web/edge para bloquear novas escritas (backend não exposto); encerre chamadas; backup final. Veja MIGRATION. Não existe alta disponibilidade. Atualizações de dependências devem preservar verificações de assinatura/checksum/TLS e repetir suíte de riscos.
 
@@ -21,3 +21,5 @@ Manutenção: avise amigos; pare web/edge para bloquear novas escritas (backend 
 Para DuckDNS em prd, seguir [ativação e operação](DUCKDNS_SETUP.md): DNS-01, HTTPS/WSS :18443, atualização do IP, LaunchAgent e rollback. O job já instalado passa a usar prd após atualizar os scripts; não contém o modo antigo no plist. Diagnóstico interno não comprova WAN, e logs não devem conter token.
 
 Atualização de áudio: a migração Flyway V2 adiciona apenas o estado `deaf` às conexões de mídia. Fazer backup antes de atualizar; preferir rollback da aplicação com o esquema aditivo preservado, sem remover coluna ou volumes. Configurações pessoais de volume ficam no localStorage do navegador por conta, não no backup do banco.
+
+Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.

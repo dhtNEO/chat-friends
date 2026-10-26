@@ -9,6 +9,7 @@ import org.springframework.web.socket.config.annotation.*;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 @EnableWebSocket
 public class WebSockets implements WebSocketConfigurer {
   final Events events;

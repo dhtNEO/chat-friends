@@ -17,7 +17,9 @@ docker_path=$(command -v docker)
 [[ "$docker_path" == /* ]] || exit 1
 umask 077
 mkdir -p "$HOME/Library/LaunchAgents"
-"$docker_path" run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" -w /work node:24.14.0-alpine node scripts/duckdns-launchagent.mjs "$PWD" "$docker_path" > "$file.tmp"
+touch infra/compose/generated/duckdns/launchagent.log
+chmod 600 infra/compose/generated/duckdns/launchagent.log
+"$docker_path" run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" -w /work node:24.22.1-alpine node scripts/duckdns-launchagent.mjs "$PWD" "$docker_path" > "$file.tmp"
 plutil -lint "$file.tmp" >/dev/null
 launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
 mv "$file.tmp" "$file"

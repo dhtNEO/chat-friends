@@ -40,3 +40,18 @@ WebSocket `/ws`: sessão autenticada, `Origin` exatamente APP_ORIGIN. Cliente en
 As identidades de mídia são geradas pelo servidor e vinculadas à conta e sessão. Duas abas usam identidades diferentes; ocupam duas das 16 conexões. O cliente não escolhe sala, privilégios administrativos nem permissão de câmera.
 
 `micMuted` vem da publicação de microfone na SFU; `deaf` é estado declarado pelo cliente autenticado e pode levar até 5 s para aparecer nos outros clientes. Não é prova de que o dispositivo físico está sem som. Ganho de microfone e volumes de recepção ficam no cliente, não alteram os ajustes de outros usuários. `screen` informa tetos de até 1080p/30 fps/8 Mbps; resolução efetiva depende da captura e da conexão.
+
+## Autenticação adicional e sessões
+
+`GET /api/me` inclui `security: {mfaEnabled,mfaPending,enrollmentRequired}`. Enquanto houver segundo fator pendente/inscrição obrigatória, apenas me/CSRF/logout e endpoints MFA estão liberados; chat, WebSocket, administração e mídia continuam bloqueados.
+
+| Método/rota | Corpo / resposta |
+|---|---|
+| POST `/api/security/mfa/setup` | `{password}` → chave TOTP para inscrição manual; confirmar em até 10 min |
+| POST `/api/security/mfa/confirm` | `{code}` → `{recoveryCodes}` uma única vez; invalida outras sessões |
+| POST `/api/security/mfa/verify` | `{code}` TOTP ou recuperação; rotaciona ID de sessão |
+| POST `/api/security/reauth` | `{password,code?}`; MFA quando ativado; vale por 15 min |
+| GET `/api/security/sessions` | Sessões próprias: ID de gerenciamento (não cookie), datas e flag current |
+| DELETE `/api/security/sessions/{id}` | Revoga somente sessão da própria conta |
+
+Mantém CSRF para mutações. HTTP 428 em mutação administrativa exige confirmar identidade em Segurança e repetir a ação explicitamente. Login tem inatividade de 2 h e TTL absoluto de 8 h; replay TOTP/recuperação é recusado.

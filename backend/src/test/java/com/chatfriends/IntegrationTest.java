@@ -19,7 +19,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
-@SpringBootTest(properties = {"app.reconcile-initial-delay=600000"})
+@SpringBootTest(
+    properties = {
+      "app.reconcile-initial-delay=600000",
+      "app.mfa-key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    })
 @AutoConfigureMockMvc
 class IntegrationTest {
   @Autowired Accounts accounts;
@@ -27,9 +31,18 @@ class IntegrationTest {
   @Autowired Media media;
   @Autowired MockMvc mvc;
   @MockitoBean LiveKitGateway live;
+  @Autowired Events events;
+  @Autowired Mfa mfa;
+  @Autowired RequestBudget requestBudget;
 
   @BeforeEach
   void setup() {
+    media.invalidateState();
+    synchronized (requestBudget) {
+      ((Map<?, ?>)
+              org.springframework.test.util.ReflectionTestUtils.getField(requestBudget, "buckets"))
+          .clear();
+    }
     accounts.db.execute(
         "TRUNCATE messages,media_connections,accounts,rate_limits,spring_session CASCADE");
     accounts.db.execute("UPDATE screen_lease SET identity=NULL,lease_id=NULL,expires_at=NULL");
@@ -206,6 +219,7 @@ class IntegrationTest {
     assertEquals(
         Map.of("height", 1080, "bitrate", 8000000, "fps", 30),
         media.join(() -> "ana", request).get("screen"));
+    media.leave(() -> "ana", request, new Media.Connection("previous-tab"));
     media.height = 9000;
     media.bitrate = Integer.MAX_VALUE;
     media.fps = 120;
@@ -402,20 +416,232 @@ class IntegrationTest {
 
   @Test
   void nonAdminCannotManageAccountsAndDisabledCannotRead() throws Exception {
-    mvc.perform(
-            get("/api/admin/accounts")
-                .with(
-                    org.springframework.security.test.web.servlet.request
-                        .SecurityMockMvcRequestPostProcessors.user("ana")
-                        .roles("USER")))
-        .andExpect(status().isForbidden());
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    mvc.perform(get("/api/admin/accounts").cookie(cookie)).andExpect(status().isForbidden());
     accounts.db.update("update accounts set enabled=false where username='ana'");
-    mvc.perform(
-            get("/api/messages")
-                .with(
-                    org.springframework.security.test.web.servlet.request
-                        .SecurityMockMvcRequestPostProcessors.user("ana")
-                        .roles("USER")))
-        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isUnauthorized());
+  }
+
+  jakarta.servlet.http.Cookie loginCookie(String user, String password) throws Exception {
+    var csrf = mvc.perform(get("/api/csrf")).andExpect(status().isOk()).andReturn().getResponse();
+    String token =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .readTree(csrf.getContentAsString())
+            .get("token")
+            .asText();
+    var login =
+        mvc.perform(
+                post("/api/login")
+                    .cookie(csrf.getCookie("SESSION"))
+                    .header("X-CSRF-TOKEN", token)
+                    .param("username", user)
+                    .param("password", password))
+            .andExpect(status().isNoContent())
+            .andReturn()
+            .getResponse();
+    return login.getCookie("SESSION");
+  }
+
+  MockHttpSession authSession() {
+    var s = new MockHttpSession();
+    s.setAttribute(SessionSecurity.ISSUED, System.currentTimeMillis());
+    s.setAttribute(SessionSecurity.REAUTH, System.currentTimeMillis());
+    return s;
+  }
+
+  @Test
+  void replayDoesNotBroadcastAgain() throws Exception {
+    var socket = mock(org.springframework.web.socket.WebSocketSession.class);
+    when(socket.getId()).thenReturn("replay-test");
+    when(socket.getPrincipal()).thenReturn(() -> "ana");
+    events.sockets.put(socket.getId(), socket);
+    try {
+      var id = UUID.randomUUID();
+      for (int i = 0; i < 6; i++) chat.send("ana", id, "same");
+      verify(socket, times(1)).sendMessage(any());
+    } finally {
+      events.sockets.remove(socket.getId());
+    }
+  }
+
+  @Test
+  void expiredHeartbeatCannotReviveConnection() {
+    var q = connection("ana", "expired");
+    accounts.db.update(
+        "update media_connections set expires_at=now()-interval '1 second' where"
+            + " identity='expired'");
+    assertEquals(
+        401,
+        assertThrows(
+                ResponseStatusException.class,
+                () -> media.heartbeat(() -> "ana", q, new Media.Connection("expired")))
+            .getStatusCode()
+            .value());
+    assertFalse(media.validConnection("expired"));
+  }
+
+  @Test
+  void websocketQuotaRejectsFifthSocket() throws Exception {
+    List<org.springframework.web.socket.WebSocketSession> opened = new ArrayList<>();
+    try {
+      for (int i = 0; i < 5; i++) {
+        var s = mock(org.springframework.web.socket.WebSocketSession.class);
+        when(s.getId()).thenReturn("quota-" + i);
+        when(s.getPrincipal()).thenReturn(() -> "ana");
+        opened.add(s);
+        events.afterConnectionEstablished(s);
+      }
+      verify(opened.get(4)).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
+      assertEquals(4, events.sockets.size());
+    } finally {
+      for (var s : opened)
+        events.afterConnectionClosed(s, org.springframework.web.socket.CloseStatus.NORMAL);
+    }
+  }
+
+  @Test
+  void mfaEncryptsSecretsRejectsReplayAndConsumesRecovery() {
+    String secret = mfa.generate();
+    long now = java.time.Instant.now().getEpochSecond() / 30;
+    String code = Mfa.totp(secret, now);
+    var recovery = mfa.enroll("ana", secret, code);
+    assertEquals(8, recovery.size());
+    String stored =
+        accounts.db.queryForObject(
+            "select secret from account_mfa where account_id=?",
+            String.class,
+            accounts.get("ana").id());
+    assertNotEquals(secret, stored);
+    assertThrows(ResponseStatusException.class, () -> mfa.verify("ana", code));
+    mfa.verify("ana", recovery.getFirst());
+    assertThrows(ResponseStatusException.class, () -> mfa.verify("ana", recovery.getFirst()));
+    assertEquals(7, accounts.db.queryForObject("select count(*) from mfa_recovery", Integer.class));
+  }
+
+  @Test
+  void absoluteSessionExpiresDespiteRecentAccess() throws Exception {
+    var session = authSession();
+    session.setAttribute(SessionSecurity.ISSUED, System.currentTimeMillis() - 28801000L);
+    var q = new MockHttpServletRequest("GET", "/api/me");
+    q.setSession(session);
+    var response = new org.springframework.mock.web.MockHttpServletResponse();
+    assertFalse(new SessionSecurity(accounts, mfa, false, 28800).authorize(q, response, "ana"));
+    assertEquals(401, response.getStatus());
+  }
+
+  @Test
+  void passwordLoginWithMfaCannotReadBeforeSecondFactorAndRotatesSession() throws Exception {
+    String secret = mfa.generate();
+    var codes =
+        mfa.enroll("ana", secret, Mfa.totp(secret, java.time.Instant.now().getEpochSecond() / 30));
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    mvc.perform(get("/api/me").cookie(cookie))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.security.mfaPending").value(true));
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isForbidden());
+    var csrf = mvc.perform(get("/api/csrf").cookie(cookie)).andReturn().getResponse();
+    String token =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .readTree(csrf.getContentAsString())
+            .get("token")
+            .asText();
+    var verified =
+        mvc.perform(
+                post("/api/security/mfa/verify")
+                    .cookie(cookie)
+                    .header("X-CSRF-TOKEN", token)
+                    .contentType("application/json")
+                    .content("{\"code\":\"" + codes.getFirst() + "\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    var rotated = verified.getCookie("SESSION");
+    assertNotNull(rotated);
+    assertNotEquals(cookie.getValue(), rotated.getValue());
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/messages").cookie(rotated)).andExpect(status().isOk());
+  }
+
+  @Test
+  void leftParticipantDoesNotHoldTheAccountQuotaAndDelayedEventCannotKickActiveOne() {
+    connection("ana", "left");
+    when(live.participants()).thenReturn(List.of(participant("left", false)));
+    media.reconcile();
+    assertTrue(media.validConnection("left"));
+    media.departed("left");
+    assertTrue(media.validConnection("left"));
+    when(live.participants()).thenReturn(List.of());
+    media.reconcile();
+    assertFalse(media.validConnection("left"));
+    var q = connection("ana", "fast-left");
+    media.departed("fast-left");
+    assertFalse(media.validConnection("fast-left"));
+  }
+
+  @Test
+  void anonymousSessionBudgetPrecedesJdbcCreationEvenWithSpoofedHeaders() throws Exception {
+    int allowed = 0;
+    for (int i = 0; i < 60; i++) {
+      final int attempt = i;
+      var result =
+          mvc.perform(
+                  get("/api/csrf")
+                      .with(
+                          q -> {
+                            q.setRemoteAddr("203.0.113.254");
+                            q.addHeader("X-Forwarded-For", "192.0.2." + attempt);
+                            q.addHeader("X-Chat-Client-IP", "192.0.2." + attempt);
+                            return q;
+                          }))
+              .andReturn()
+              .getResponse();
+      if (result.getStatus() == 200) allowed++;
+      else assertEquals(429, result.getStatus());
+    }
+    assertEquals(40, allowed);
+    assertEquals(
+        40, accounts.db.queryForObject("select count(*) from spring_session", Integer.class));
+  }
+
+  @Test
+  void enrollmentSecretIsEncryptedEvenWhilePendingAndConfirmationRotatesSession() throws Exception {
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    var csrf = mvc.perform(get("/api/csrf").cookie(cookie)).andReturn().getResponse();
+    var json = new com.fasterxml.jackson.databind.ObjectMapper();
+    String token = json.readTree(csrf.getContentAsString()).get("token").asText();
+    var setup =
+        mvc.perform(
+                post("/api/security/mfa/setup")
+                    .cookie(cookie)
+                    .header("X-CSRF-TOKEN", token)
+                    .contentType("application/json")
+                    .content("{\"password\":\"test-only-password-ana\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    String secret = json.readTree(setup.getContentAsString()).get("secret").asText();
+    var stored =
+        accounts.db.queryForObject(
+            "select attribute_bytes from spring_session_attributes where"
+                + " attribute_name='mfa.pending'",
+            byte[].class);
+    assertFalse(new String(stored, java.nio.charset.StandardCharsets.ISO_8859_1).contains(secret));
+    String code = Mfa.totp(secret, java.time.Instant.now().getEpochSecond() / 30);
+    var confirmed =
+        mvc.perform(
+                post("/api/security/mfa/confirm")
+                    .cookie(cookie)
+                    .header("X-CSRF-TOKEN", token)
+                    .contentType("application/json")
+                    .content("{\"code\":\"" + code + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.recoveryCodes.length()").value(8))
+            .andReturn()
+            .getResponse();
+    var rotated = confirmed.getCookie("SESSION");
+    assertNotNull(rotated);
+    assertNotEquals(cookie.getValue(), rotated.getValue());
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/messages").cookie(rotated)).andExpect(status().isOk());
   }
 }

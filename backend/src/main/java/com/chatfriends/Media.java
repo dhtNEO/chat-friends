@@ -21,6 +21,12 @@ public class Media {
   final Accounts accounts;
   final LiveKitGateway live;
   final RateLimit rate;
+  volatile Map<String, Object> cachedState;
+  volatile long cachedAt;
+
+  void invalidateState() {
+    cachedState = null;
+  }
 
   @Value("${app.screen-bitrate}")
   int bitrate;
@@ -91,6 +97,7 @@ public class Media {
 
   @PostMapping("/join")
   public Map<String, Object> join(Principal p, HttpServletRequest q) {
+    invalidateState();
     var a = accounts.active(p.getName());
     if (!rate.allow("join:" + a.id(), 10, 60)) throw new ResponseStatusException(TOO_MANY_REQUESTS);
     return tx.execute(
@@ -100,6 +107,12 @@ public class Media {
           if (db.queryForObject(
                   "select count(*) from media_connections where expires_at>now()", Integer.class)
               >= 16) throw new ResponseStatusException(CONFLICT, "Sala cheia (16 conexões)");
+          if (db.queryForObject(
+                  "select count(*) from media_connections where account_id=? and expires_at>now()",
+                  Integer.class,
+                  a.id())
+              >= 2)
+            throw new ResponseStatusException(CONFLICT, "Máximo de duas conexões de voz por conta");
           String id = a.id() + ":" + UUID.randomUUID();
           db.update(
               "insert into media_connections(identity,account_id,session_id,expires_at)"
@@ -130,15 +143,18 @@ public class Media {
   @PostMapping("/heartbeat")
   public void heartbeat(Principal p, HttpServletRequest q, @RequestBody Connection b) {
     own(b.identity(), p, q);
-    db.update(
-        "update media_connections set expires_at=now()+interval '45 seconds' where identity=?",
-        b.identity());
+    if (db.update(
+            "update media_connections set expires_at=now()+interval '45 seconds' where identity=?"
+                + " and expires_at>now()",
+            b.identity())
+        != 1) throw new ResponseStatusException(UNAUTHORIZED);
   }
 
   public record AudioPreferences(String identity, boolean deaf) {}
 
   @PutMapping("/audio")
   public void audio(Principal p, HttpServletRequest q, @RequestBody AudioPreferences b) {
+    invalidateState();
     own(b.identity(), p, q);
     if (!validConnection(b.identity())) throw new ResponseStatusException(UNAUTHORIZED);
     db.update("update media_connections set deaf=? where identity=?", b.deaf(), b.identity());
@@ -146,47 +162,55 @@ public class Media {
 
   @PostMapping("/leave")
   public void leave(Principal p, HttpServletRequest q, @RequestBody Connection b) {
+    invalidateState();
     own(b.identity(), p, q);
     db.update("update media_connections set expires_at=now() where identity=?", b.identity());
     reconcile();
   }
 
   @GetMapping("/state")
-  public Map<String, Object> state() {
-    return tx.execute(
-        s -> {
-          lock();
-          reconcileLocked();
-          return Map.of(
-              "lease",
-              lease(),
-              "participants",
-              live.participants().stream()
-                  .filter(p -> validConnection(p.getIdentity()))
-                  .map(
-                      p ->
-                          Map.of(
-                              "identity",
-                              p.getIdentity(),
-                              "name",
-                              p.getName(),
-                              "micMuted",
-                              p.getTracksList().stream()
-                                  .noneMatch(
-                                      t ->
-                                          t.getSource() == TrackSource.MICROPHONE && !t.getMuted()),
-                              "deaf",
-                              Boolean.TRUE.equals(
-                                  db.queryForObject(
-                                      "select deaf from media_connections where identity=?",
-                                      Boolean.class,
-                                      p.getIdentity()))))
-                  .toList());
-        });
+  public synchronized Map<String, Object> state() {
+    if (cachedState != null && System.nanoTime() - cachedAt < 1000000000L) return cachedState;
+    var snapshot =
+        tx.execute(
+            s -> {
+              lock();
+              reconcileLocked();
+              return Map.of(
+                  "lease",
+                  lease(),
+                  "participants",
+                  live.participants().stream()
+                      .filter(p -> validConnection(p.getIdentity()))
+                      .map(
+                          p ->
+                              Map.of(
+                                  "identity",
+                                  p.getIdentity(),
+                                  "name",
+                                  p.getName(),
+                                  "micMuted",
+                                  p.getTracksList().stream()
+                                      .noneMatch(
+                                          t ->
+                                              t.getSource() == TrackSource.MICROPHONE
+                                                  && !t.getMuted()),
+                                  "deaf",
+                                  Boolean.TRUE.equals(
+                                      db.queryForObject(
+                                          "select deaf from media_connections where identity=?",
+                                          Boolean.class,
+                                          p.getIdentity()))))
+                      .toList());
+            });
+    cachedState = snapshot;
+    cachedAt = System.nanoTime();
+    return snapshot;
   }
 
   @PostMapping("/screen")
   public Lease acquire(Principal p, HttpServletRequest q, @RequestBody Connection b) {
+    invalidateState();
     own(b.identity(), p, q);
     return tx.execute(
         s -> {
@@ -232,6 +256,7 @@ public class Media {
 
   @DeleteMapping("/screen")
   public void release(Principal p, HttpServletRequest q, @RequestBody Renew b) {
+    invalidateState();
     own(b.identity(), p, q);
     tx.executeWithoutResult(
         s -> {
@@ -244,6 +269,7 @@ public class Media {
 
   @PostMapping("/screen/force-stop")
   public void force(Principal p) {
+    invalidateState();
     if (!accounts.active(p.getName()).admin()) throw new ResponseStatusException(FORBIDDEN);
     tx.executeWithoutResult(
         s -> {
@@ -261,6 +287,16 @@ public class Media {
 
   void reconcileLocked() {
     var participants = live.participants();
+    var identities = participants.stream().map(ParticipantInfo::getIdentity).toList();
+    for (String id : identities)
+      db.update("update media_connections set joined=true where identity=?", id);
+    var joined =
+        db.queryForList(
+            "select identity from media_connections where joined and expires_at>now()",
+            String.class);
+    for (String id : joined)
+      if (!identities.contains(id))
+        db.update("update media_connections set expires_at=now() where identity=?", id);
     var l = lease();
     String initialOwner = l.identity();
     if (l.identity() != null
@@ -272,6 +308,8 @@ public class Media {
     }
     for (var p : participants) {
       if (!validConnection(p.getIdentity())) {
+        db.update(
+            "update media_connections set expires_at=now() where identity=?", p.getIdentity());
         live.remove(p.getIdentity());
         continue;
       }
@@ -280,7 +318,15 @@ public class Media {
           p.getTracksList().stream().filter(t -> t.getSource() == TrackSource.SCREEN_SHARE).count();
       boolean elevated =
           p.getPermission().getCanPublishSourcesList().contains(TrackSource.SCREEN_SHARE);
-      if (screens > 1) {
+      long microphones =
+          p.getTracksList().stream().filter(t -> t.getSource() == TrackSource.MICROPHONE).count();
+      long screenAudio =
+          p.getTracksList().stream()
+              .filter(t -> t.getSource() == TrackSource.SCREEN_SHARE_AUDIO)
+              .count();
+      if (screens > 1 || microphones > 1 || screenAudio > 1 || p.getTracksCount() > 3) {
+        db.update(
+            "update media_connections set expires_at=now() where identity=?", p.getIdentity());
         live.remove(p.getIdentity());
         if (owner) clear(l);
         continue;
@@ -290,7 +336,20 @@ public class Media {
     db.update("delete from media_connections where expires_at<now()-interval '1 day'");
   }
 
+  public void departed(String identity) {
+    if (identity == null || identity.isBlank() || identity.length() > 128) return;
+    tx.executeWithoutResult(
+        s -> {
+          lock();
+          if (live.participants().stream().noneMatch(p -> p.getIdentity().equals(identity)))
+            db.update("update media_connections set expires_at=now() where identity=?", identity);
+          reconcileLocked();
+        });
+    invalidateState();
+  }
+
   public void removeUser(UUID id) {
+    invalidateState();
     db.update("update media_connections set expires_at=now() where account_id=?", id);
     reconcile();
   }

@@ -3,7 +3,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/modes.sh
 mode=$(chat_mode "${CHAT_MODE-dev}")
-args=(--env-file .env -f infra/compose/compose.yml)
+args=(--env-file .env)
+for file in infra/compose/generated/runtime.env infra/compose/generated/network/network.env; do
+  if [[ -f "$file" ]]; then args+=(--env-file "$file"); fi
+done
+args+=(-f infra/compose/compose.yml)
 if [[ "$mode" == prd ]]; then args+=(-f infra/compose/prd.yml); fi
 if [[ "$mode" == prd ]] && { [[ -f infra/compose/generated/duckdns/settings.json ]] || [[ "${CHAT_DUCKDNS_DNS01:-false}" == true ]]; }; then
   args+=(-f infra/compose/duckdns-dns01.yml)

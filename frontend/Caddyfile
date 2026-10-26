@@ -2,6 +2,9 @@
  admin off
 }
 :8080 {
+ @direct not header X-Chat-Proxy-Key {$APP_PROXY_KEY:disabled}
+ request_header @direct X-Chat-Client-IP {http.request.remote.host}
+ request_header X-Chat-Proxy-Key {$APP_PROXY_KEY:disabled}
  root * /srv
  encode zstd gzip
  header {
