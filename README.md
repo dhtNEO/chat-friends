@@ -44,6 +44,7 @@ Para rede privada sem domínio próprio: veja o [guia Tailscale](docs/TAILSCALE_
 | Uso | [USER_GUIDE](docs/USER_GUIDE.md) |
 | OrbStack e rede | [LOCAL_SETUP](docs/LOCAL_SETUP.md), [NETWORKING](docs/NETWORKING.md) |
 | Rede privada com amigos | [Configuração Tailscale](docs/TAILSCALE_SETUP.md), [decisão e plano](docs/TAILSCALE_PLAN.md) |
+| Acesso público com endereço gratuito — plano futuro | [DuckDNS, HTTPS e IPv4 público](docs/DUCKDNS_PLAN.md) |
 | Operação e dados | [OPERATIONS](docs/OPERATIONS.md), [BACKUP_RESTORE](docs/BACKUP_RESTORE.md) |
 | GCP e alternativas | [GCP_DEPLOY](docs/GCP_DEPLOY.md), [HOSTING_COSTS](docs/HOSTING_COSTS.md) |
 | Migração | [MIGRATION](docs/MIGRATION.md) |
