@@ -38,3 +38,5 @@ Os testes `frontend/tests/audio.spec.ts` usam fontes de áudio por oscilador e t
 Regressão de layout durante a transmissão: verificar 320×568, 390×844 e 768×1024, com recepção ligada e silenciada. O campo de mensagem não pode ultrapassar o painel de voz nem ser cortado pela área do chat. O chat móvel com transmissão cresce conforme a altura dos controles; a lista de mensagens mantém rolagem própria. A versão/fonte do browser pode alterar a quebra dos controles, portanto um único viewport com o Chromium do sistema não representa toda a matriz do CI.
 
 Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.
+
+O job de stack fixa Ubuntu 24.04 e usa o Google Chrome fornecido pelo runner via `CHROMIUM_PATH`, com as mesmas fontes sintéticas e assertivas completas. Isso evita uma segunda instalação de Chromium/dependências no host. Não desativa TLS, CSP nem testes de áudio/tela. A versão efetiva do Chrome é registrada pelo job.

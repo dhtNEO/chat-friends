@@ -1,7 +1,7 @@
 import fs from "node:fs";
 const file = process.argv[2],
   output = process.env.GITHUB_STEP_SUMMARY;
-if (!file || !output) process.exit(0);
+if (!file) process.exit(0);
 const clean = (text) =>
   String(text)
     .replace(/\x1b\[[0-9;]*m/g, "")
@@ -25,7 +25,14 @@ if (!fs.existsSync(file)) {
       .filter((l) => /error|failed|E:|space left|timed out|not found/i.test(l))
       .slice(-6))
       lines.push(clean(line).slice(0, 350));
-  fs.appendFileSync(output, lines.join("\n") + "\n");
+  if (output) if (output) fs.appendFileSync(output, lines.join("\n") + "\n");
+  const message = lines
+    .slice(2)
+    .join("; ")
+    .replace(/%/g, "%25")
+    .replace(/\r/g, "%0D")
+    .replace(/\n/g, "%0A");
+  console.log("::error title=Browser preparation::" + message);
   process.exit(0);
 }
 const report = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -55,4 +62,15 @@ function visit(suite) {
   for (const child of suite.suites ?? []) visit(child);
 }
 for (const suite of report.suites ?? []) visit(suite);
-fs.appendFileSync(output, lines.join("\n") + "\n");
+if (output) fs.appendFileSync(output, lines.join("\n") + "\n");
+
+if ((report.stats?.unexpected ?? 0) > 0)
+  console.log(
+    "::error title=Browser tests::" +
+      lines
+        .slice(2)
+        .join("; ")
+        .replace(/%/g, "%25")
+        .replace(/\r/g, "%0D")
+        .replace(/\n/g, "%0A"),
+  );

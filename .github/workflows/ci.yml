@@ -89,8 +89,10 @@ jobs:
           cd frontend
           echo "npm ci" > "$RUNNER_TEMP/browser-phase"
           npm ci
-          echo "Chromium installation" > "$RUNNER_TEMP/browser-phase"
-          timeout 300 npx playwright install --with-deps chromium > "$RUNNER_TEMP/browser-install.log" 2>&1
+          echo "Chrome preparation" > "$RUNNER_TEMP/browser-phase"
+          export CHROMIUM_PATH="$(command -v google-chrome || command -v google-chrome-stable)"
+          test -x "$CHROMIUM_PATH"
+          "$CHROMIUM_PATH" --version
           echo "browser tests" > "$RUNNER_TEMP/browser-phase"
           PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/browser-report.json" npm test -- --reporter=list,json
       - name: Browser diagnostics (redacted)
