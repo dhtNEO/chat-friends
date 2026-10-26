@@ -41,6 +41,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 | API e segurança | [API](docs/API.md), [SECURITY](docs/SECURITY.md) |
 | Uso | [USER_GUIDE](docs/USER_GUIDE.md) |
 | OrbStack e rede | [LOCAL_SETUP](docs/LOCAL_SETUP.md), [NETWORKING](docs/NETWORKING.md) |
+| Rede privada com amigos — plano futuro | [Comparação Tailscale/Cloudflare Mesh e plano Tailscale](docs/TAILSCALE_PLAN.md) |
 | Operação e dados | [OPERATIONS](docs/OPERATIONS.md), [BACKUP_RESTORE](docs/BACKUP_RESTORE.md) |
 | GCP e alternativas | [GCP_DEPLOY](docs/GCP_DEPLOY.md), [HOSTING_COSTS](docs/HOSTING_COSTS.md) |
 | Migração | [MIGRATION](docs/MIGRATION.md) |
