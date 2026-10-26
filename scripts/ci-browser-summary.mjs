@@ -1,14 +1,34 @@
 import fs from "node:fs";
 const file = process.argv[2],
   output = process.env.GITHUB_STEP_SUMMARY;
-if (!file || !fs.existsSync(file) || !output) process.exit(0);
-const report = JSON.parse(fs.readFileSync(file, "utf8"));
+if (!file || !output) process.exit(0);
 const clean = (text) =>
   String(text)
     .replace(/\x1b\[[0-9;]*m/g, "")
     .replace(/https?:\/\/[^\s"'<>]+/g, "[URL omitida]")
     .replace(/[A-Za-z0-9_-]{32,}/g, "[valor omitido]")
     .replace(/[<>]/g, "");
+if (!fs.existsSync(file)) {
+  const phase = process.argv[3],
+    log = process.argv[4];
+  const lines = [
+    "### Browser preparation",
+    "",
+    "Playwright não gerou relatório.",
+  ];
+  if (phase && fs.existsSync(phase))
+    lines.push("Fase: " + clean(fs.readFileSync(phase, "utf8").trim()));
+  if (log && fs.existsSync(log))
+    for (const line of fs
+      .readFileSync(log, "utf8")
+      .split("\n")
+      .filter((l) => /error|failed|E:|space left|timed out|not found/i.test(l))
+      .slice(-6))
+      lines.push(clean(line).slice(0, 350));
+  fs.appendFileSync(output, lines.join("\n") + "\n");
+  process.exit(0);
+}
+const report = JSON.parse(fs.readFileSync(file, "utf8"));
 const lines = [
   "### Browser tests",
   `Esperados: ${report.stats?.expected ?? 0}; inesperados: ${report.stats?.unexpected ?? 0}; instáveis: ${report.stats?.flaky ?? 0}.`,

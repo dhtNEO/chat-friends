@@ -55,7 +55,8 @@ jobs:
       - run: npm ci && npm run lint && npm run build && npm audit --omit=dev --audit-level=high
         working-directory: frontend
   stack:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,11 +70,14 @@ jobs:
       - run: python3 scripts/tests/prd-profile.py
       - run: python3 scripts/tests/dns01-https.py
       - run: ./scripts/compose.sh config -q && CHAT_MODE=prd ./scripts/compose.sh config -q
+      - name: Release build cache before browser dependencies
+        run: docker builder prune --force
       - name: Browser tests with disposable administrator
         shell: bash
         run: |
           set -euo pipefail
           umask 077
+          echo "administrator bootstrap" > "$RUNNER_TEMP/browser-phase"
           secret=$(mktemp "$PWD/infra/compose/generated/ci-admin.XXXXXX")
           trap 'rm -f "$secret"' EXIT
           openssl rand -hex 24 > "$secret"
@@ -83,12 +87,15 @@ jobs:
           export TEST_LIVEKIT_SECRET="$(node -e 'const fs=require("fs");process.stdout.write(fs.readFileSync(".env","utf8").split("\n").find(l=>l.startsWith("LIVEKIT_API_SECRET=")).slice(19))')"
           echo "::add-mask::$TEST_LIVEKIT_SECRET"
           cd frontend
+          echo "npm ci" > "$RUNNER_TEMP/browser-phase"
           npm ci
-          npx playwright install --with-deps chromium
+          echo "Chromium installation" > "$RUNNER_TEMP/browser-phase"
+          timeout 300 npx playwright install --with-deps chromium > "$RUNNER_TEMP/browser-install.log" 2>&1
+          echo "browser tests" > "$RUNNER_TEMP/browser-phase"
           PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/browser-report.json" npm test -- --reporter=list,json
       - name: Browser diagnostics (redacted)
         if: always()
-        run: node scripts/ci-browser-summary.mjs "$RUNNER_TEMP/browser-report.json"
+        run: node scripts/ci-browser-summary.mjs "$RUNNER_TEMP/browser-report.json" "$RUNNER_TEMP/browser-phase" "$RUNNER_TEMP/browser-install.log"
       - run: python3 scripts/tests/runtime-security.py && ./scripts/check-db-privileges.sh
       - run: ./scripts/test-backup.sh
       - name: Scan actual runtime images
