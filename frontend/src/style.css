@@ -1077,6 +1077,17 @@ input[type="range"] {
   margin-bottom: 14px;
 }
 @media (max-width: 800px) {
+  /* Wrapped stream controls have intrinsic height. Let the page grow instead
+     of clipping the composer inside the fixed-height chat viewport. */
+  .chat:has(#screen-stage:not(:empty)) {
+    height: auto;
+    min-height: 100dvh;
+  }
+  .chat:has(#screen-stage:not(:empty)) .messages {
+    flex: 1 0 160px;
+    min-height: 160px;
+    max-height: 40dvh;
+  }
   #screen-stage .screen {
     margin: 8px;
   }

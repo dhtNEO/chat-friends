@@ -9,6 +9,7 @@ O projeto possui somente **dev** (local, padrão) e **prd** (internet). A integr
 | Backend Java 25/Spring Boot 3.5.16, PostgreSQL separado | 17 testes de integração passaram, incluindo preferências de recepção por sessão, migração V2 e tetos Full HD |
 | Modos dev/prd | 22 testes Node, inspeção de portas Compose e migração de marcadores sem alterar `.env`; modos antigos recusados como entrada |
 | Frontend React/TypeScript/Vite | lint/build e 11 testes Playwright executados no runner Linux |
+| Layout móvel durante transmissão | sobreposição/corte reproduzidos antes da correção; testes passam em 320×568, 390×844 e 768×1024, com recepção ligada/silenciada |
 | Mídia sintética | medidores na saída real Web Audio verificam ganho/mudo/volumes por cliente e da transmissão; canvas recebido em 1920×1080, controles em tela cheia e layouts desktop/móvel testados |
 | ICE | STUN autenticado em UDP/TCP; problema de loopback do container corrigido sem alterar política gerenciada do Chromium |
 | Admissão de mídia | JWT elevado é reduzido a microfone na conexão; sessão expirada recusada |
@@ -20,6 +21,8 @@ O projeto possui somente **dev** (local, padrão) e **prd** (internet). A integr
 | Infraestrutura | Terraform fmt/init/validate passaram na implementação; nenhum apply ou contratação |
 
 A validação local usa mídia artificial e o browser pode escolher TCP sob a política gerenciada do runner. Não alteramos TLS/checksums/políticas para obter passe. Trivy com a base disponível não reportou HIGH/CRITICAL no módulo Go atualizado; isso não é auditoria exaustiva de imagens/transitivas nem garantia sobre advisories futuros. Downloads de dependências bloqueados no runner foram obtidos das fontes oficiais com hash idêntico ao lock e verificação completa dos módulos.
+
+A correção de layout foi validada localmente com Chromium 154.0.8037.57. O Playwright 1.64.1 do CI usa Chromium 156.0.8078.4; o download desse browser e a consulta à API de execuções GitHub foram bloqueados com HTTP 403 neste ambiente. Os 11 testes locais passaram; o resultado do GitHub Actions precisa ser confirmado na execução remota.
 
 ## Limites ainda abertos
 
