@@ -247,19 +247,57 @@ test("Full HD chega ao player; volume e mudo da transmissão controlam o som rea
     await expect(b.locator("#screen-stage .screen-expanded")).toBeVisible();
     await expect(b.getByLabel("Mensagem em geral")).toBeInViewport();
     await b.screenshot({ path: "test-results/transmission-desktop.png" });
+    // Screen controls wrap differently with viewport, fonts and receive state.
+    // Check both overlap and clipping; overflow:hidden must not hide the composer.
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+    ]) {
+      await b.setViewportSize(viewport);
+      for (const silenced of [false, true]) {
+        if (silenced)
+          await b
+            .getByRole("button", { name: "Silenciar áudio", exact: true })
+            .click();
+        await expect
+          .poll(
+            () =>
+              b.evaluate(() => {
+                const composer = document
+                  .querySelector(".composer")!
+                  .getBoundingClientRect();
+                const chat = document
+                  .querySelector(".chat")!
+                  .getBoundingClientRect();
+                const voice = document
+                  .querySelector(".right-panel")!
+                  .getBoundingClientRect();
+                return {
+                  horizontalOverflow:
+                    document.documentElement.scrollWidth > innerWidth,
+                  overlapsVoice: composer.bottom > voice.top,
+                  clippedByChat: composer.bottom > chat.bottom,
+                  composerCollapsed: composer.height <= 0,
+                };
+              }),
+            {
+              message: `Campo de mensagem acessível em ${viewport.width}×${viewport.height}, recepção silenciada=${silenced}`,
+            },
+          )
+          .toEqual({
+            horizontalOverflow: false,
+            overlapsVoice: false,
+            clippedByChat: false,
+            composerCollapsed: false,
+          });
+        if (silenced)
+          await b
+            .getByRole("button", { name: "Ouvir áudio", exact: true })
+            .click();
+      }
+    }
     await b.setViewportSize({ width: 390, height: 844 });
-    expect(
-      await b.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-    const mobileBounds = await b.evaluate(() => ({
-      composer: document.querySelector(".composer")!.getBoundingClientRect()
-        .bottom,
-      voice: document.querySelector(".right-panel")!.getBoundingClientRect()
-        .top,
-    }));
-    expect(mobileBounds.composer).toBeLessThanOrEqual(mobileBounds.voice);
     await b.screenshot({
       path: "test-results/transmission-mobile.png",
       fullPage: true,
