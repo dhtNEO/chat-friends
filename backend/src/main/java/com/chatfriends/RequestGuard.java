@@ -44,14 +44,20 @@ public class RequestGuard extends OncePerRequestFilter {
     if (path.startsWith("/api/") || path.equals("/ws") || path.startsWith("/rtc")) {
       boolean accepted = budget.allow("global", 12000, 60) && budget.allow("ip:" + ip, 1800, 60);
       if (q.getSession(false) == null
+          && !path.equals("/api/livekit/webhook")
           && (path.equals("/api/csrf")
               || Set.of("POST", "PUT", "PATCH", "DELETE").contains(q.getMethod())))
-        accepted &=
-            budget.allow("session:global", 240, 60) && budget.allow("session:" + ip, 40, 60);
+        accepted =
+            accepted
+                && budget.allow("session:" + ip, 40, 60)
+                && budget.allow("session:global", 240, 60);
       if (path.equals("/api/login") && q.getMethod().equals("POST"))
-        accepted &=
-            budget.allow("login:global", 300, 300) && budget.allow("loginip:" + ip, 100, 300);
-      if (path.equals("/api/livekit/admit")) accepted &= budget.allow("admission:" + ip, 300, 60);
+        accepted =
+            accepted
+                && budget.allow("loginip:" + ip, 100, 300)
+                && budget.allow("login:global", 300, 300);
+      if (path.equals("/api/livekit/admit"))
+        accepted = accepted && budget.allow("admission:" + ip, 300, 60);
       if (!accepted) {
         s.setHeader("Retry-After", "60");
         s.sendError(429);
