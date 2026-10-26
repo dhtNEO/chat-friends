@@ -6,7 +6,7 @@
 - Logs: `./scripts/compose.sh logs --tail 100 backend livekit`; JSON files rotacionados 10 MB × 3 por serviço. Não habilitar DEBUG nem copiar tokens. Logs de Caddy não incluem access log por padrão.
 - Métricas: `docker stats`, uso de volume/disco, tempos de resposta/erros, ICE stats no navegador. Endpoints administrativos de métricas não estão publicados. Sem serviço pago de observabilidade.
 
-Limites atuais: 16 conexões de voz (abas contam), 4.000 unidades UTF-16/mensagem, 20 mensagens/10 s/conta, 8 logins/5 min/nome e 100/5 min/IP visto, 12 h de inatividade de sessão, lease 30 s, conexão de mídia 45 s sem heartbeat. Tetos padrão de tela 1080p/30 fps/8 Mbps, com opções 720p/30 fps/4 Mbps e 480p/15 fps/1 Mbps. Instalações existentes precisam ajustar SCREEN_HEIGHT/SCREEN_BITRATE para habilitar Full HD. Não garantem qualidade ou capacidade; SFU não faz transcoding.
+Limites atuais: 16 conexões de voz (abas contam), 4.000 unidades UTF-16/mensagem, 20 mensagens/10 s/conta, 8 logins/5 min/nome e 100/5 min/IP visto, 12 h de inatividade de sessão, lease 30 s, conexão de mídia 45 s sem heartbeat. Tetos padrão de tela 1080p/60 fps/8 Mbps, com opções 1080p/30 fps, 720p/30 fps/4 Mbps e 480p/15 fps/1 Mbps. Instalações existentes precisam ajustar SCREEN_HEIGHT/SCREEN_BITRATE para habilitar Full HD. Não garantem qualidade ou capacidade; SFU não faz transcoding.
 
 Internet soma mais 128 MiB de limite para edge. Limites de contêiner são tetos, não reservas nem previsão de consumo. E2-medium é candidata de 4 GiB com CPU compartilhada; builds podem exceder recursos. Construa fora da VM pequena, transfira imagens da arquitetura certa. Use `COMPOSE_PARALLEL_LIMIT=1` quando necessário.
 

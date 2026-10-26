@@ -93,7 +93,14 @@ async function signIn(page: Page, username: string) {
     page.getByRole("button", { name: "Desligar mic" }),
   ).toBeVisible();
 }
+// Device and volume controls live in the microphone menu of the call bar.
+async function voiceSettings(page: Page) {
+  const toggle = page.getByRole("button", { name: "Configurações de voz" });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true")
+    await toggle.click();
+}
 async function slider(page: Page, label: string, value: number) {
+  await voiceSettings(page);
   await page
     .getByRole("slider", { name: label, exact: false })
     .fill(String(value));
@@ -148,6 +155,7 @@ test("ganho de mic, volume por ouvinte, supressão e estado de mudo funcionam", 
     ).toContainText("Áudio silenciado", { timeout: 10000 });
     await b.getByRole("button", { name: "Ouvir áudio", exact: true }).click();
     await expect.poll(() => level(b)).toBeGreaterThan(0.01);
+    await voiceSettings(a);
     await a.getByRole("checkbox", { name: "Supressão de ruído" }).uncheck();
     await expect(
       a.getByRole("checkbox", { name: "Supressão de ruído" }),
@@ -164,6 +172,7 @@ test("ganho de mic, volume por ouvinte, supressão e estado de mudo funcionam", 
     await expect.poll(() => level(b)).toBeGreaterThan(0.01);
     await a.getByRole("button", { name: "Sair da voz", exact: true }).click();
     await signInAfterReload(a);
+    await voiceSettings(a);
     await expect(
       a.getByRole("checkbox", { name: "Supressão de ruído" }),
     ).not.toBeChecked();
@@ -192,6 +201,7 @@ test("Full HD chega ao player; volume e mudo da transmissão controlam o som rea
     await signIn(a, senderName);
     await signIn(b, receiverName);
     await a.getByRole("button", { name: "Desligar mic" }).click();
+    await a.getByRole("button", { name: "Opções de transmissão" }).click();
     await a.getByLabel("Qualidade", { exact: true }).selectOption("fullhd");
     await a
       .getByRole("button", { name: "Compartilhar tela", exact: true })
@@ -244,11 +254,15 @@ test("Full HD chega ao player; volume e mudo da transmissão controlam o som rea
     expect(await b.evaluate(() => document.fullscreenElement === null)).toBe(
       true,
     );
-    await expect(b.locator("#screen-stage .screen-expanded")).toBeVisible();
-    await expect(b.getByLabel("Mensagem em geral")).toBeInViewport();
+    // Expanding maximizes the transmission panel inside the dock.
+    await expect(b.locator(".screen-expanded")).toBeVisible();
     await b.screenshot({ path: "test-results/transmission-desktop.png" });
-    // Screen controls wrap differently with viewport, fonts and receive state.
-    // Check both overlap and clipping; overflow:hidden must not hide the composer.
+    await b.getByRole("button", { name: "Compactar", exact: true }).click();
+    await expect(b.getByLabel("Mensagem em geral")).toBeInViewport();
+    // Narrow screens stack panels as tabs; wide ones split them. Either way the
+    // composer must stay whole inside its panel, with no horizontal scroll.
+    const tab = (title: string) =>
+      b.locator(".dv-tab", { hasText: title }).click();
     for (const viewport of [
       { width: 320, height: 568 },
       { width: 390, height: 844 },
@@ -256,10 +270,15 @@ test("Full HD chega ao player; volume e mudo da transmissão controlam o som rea
     ]) {
       await b.setViewportSize(viewport);
       for (const silenced of [false, true]) {
-        if (silenced)
+        if (silenced) {
+          await tab("Sala de estar");
           await b
             .getByRole("button", { name: "Silenciar áudio", exact: true })
             .click();
+        }
+        await tab("# geral");
+        // The dock shows a panel's content a frame after its tab activates.
+        await expect(b.getByLabel("Mensagem em geral")).toBeVisible();
         await expect
           .poll(
             () =>
@@ -270,14 +289,10 @@ test("Full HD chega ao player; volume e mudo da transmissão controlam o som rea
                 const chat = document
                   .querySelector(".chat")!
                   .getBoundingClientRect();
-                const voice = document
-                  .querySelector(".right-panel")!
-                  .getBoundingClientRect();
                 return {
                   horizontalOverflow:
                     document.documentElement.scrollWidth > innerWidth,
-                  overlapsVoice: composer.bottom > voice.top,
-                  clippedByChat: composer.bottom > chat.bottom,
+                  clippedByChat: composer.bottom > chat.bottom + 0.5,
                   composerCollapsed: composer.height <= 0,
                 };
               }),
@@ -287,14 +302,15 @@ test("Full HD chega ao player; volume e mudo da transmissão controlam o som rea
           )
           .toEqual({
             horizontalOverflow: false,
-            overlapsVoice: false,
             clippedByChat: false,
             composerCollapsed: false,
           });
-        if (silenced)
+        if (silenced) {
+          await tab("Sala de estar");
           await b
             .getByRole("button", { name: "Ouvir áudio", exact: true })
             .click();
+        }
       }
     }
     await b.setViewportSize({ width: 390, height: 844 });

@@ -3,6 +3,7 @@ export type AudioSettings = {
   microphone: number;
   output: number;
   stream: number;
+  effects: number;
   noise: boolean;
   people: Record<string, number>;
 };
@@ -10,13 +11,14 @@ const defaults: AudioSettings = {
   microphone: 100,
   output: 100,
   stream: 100,
+  effects: 60,
   noise: true,
   people: {},
 };
-function volume(value: unknown, maximum: number) {
+function volume(value: unknown, maximum: number, fallback = 100) {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(maximum, Math.max(0, value))
-    : 100;
+    : fallback;
 }
 export function useAudioSettings(userId: string) {
   const key = "chat-friends:audio:" + userId;
@@ -28,6 +30,7 @@ export function useAudioSettings(userId: string) {
         microphone: volume(saved.microphone, 200),
         output: volume(saved.output, 100),
         stream: volume(saved.stream, 100),
+        effects: volume(saved.effects, 100, defaults.effects),
         noise: saved.noise !== false,
         people: Object.fromEntries(
           Object.entries(saved.people || {})

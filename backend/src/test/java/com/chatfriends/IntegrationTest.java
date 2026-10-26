@@ -202,15 +202,15 @@ class IntegrationTest {
         live, "publicUrl", "ws://localhost:8080");
     media.height = 1080;
     media.bitrate = 8000000;
-    media.fps = 30;
+    media.fps = 60;
     assertEquals(
-        Map.of("height", 1080, "bitrate", 8000000, "fps", 30),
+        Map.of("height", 1080, "bitrate", 8000000, "fps", 60),
         media.join(() -> "ana", request).get("screen"));
     media.height = 9000;
     media.bitrate = Integer.MAX_VALUE;
     media.fps = 120;
     assertEquals(
-        Map.of("height", 1080, "bitrate", 8000000, "fps", 30),
+        Map.of("height", 1080, "bitrate", 8000000, "fps", 60),
         media.join(() -> "ana", request).get("screen"));
   }
 
@@ -417,5 +417,129 @@ class IntegrationTest {
                         .SecurityMockMvcRequestPostProcessors.user("ana")
                         .roles("USER")))
         .andExpect(status().isUnauthorized());
+  }
+
+  static org.springframework.test.web.servlet.request.RequestPostProcessor as(String name) {
+    return org.springframework.security.test.web.servlet.request
+        .SecurityMockMvcRequestPostProcessors.user(name)
+        .roles("USER");
+  }
+
+  static org.springframework.test.web.servlet.request.RequestPostProcessor csrf() {
+    return org.springframework.security.test.web.servlet.request
+        .SecurityMockMvcRequestPostProcessors.csrf();
+  }
+
+  @Test
+  void profileChangesNameColorsAndAvatar() throws Exception {
+    mvc.perform(
+            patch("/api/profile")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("application/json")
+                .content(
+                    "{\"displayName\":\"Ana Clara\",\"primaryColor\":\"#FF8800\","
+                        + "\"secondaryColor\":\"#22c55e\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.signedOut").value(false))
+        .andExpect(jsonPath("$.user.primaryColor").value("#ff8800"));
+    var ana = accounts.get("ana");
+    assertEquals("Ana Clara", ana.displayName());
+    assertEquals("#22c55e", ana.secondaryColor());
+    for (String body :
+        new String[] {
+          "{\"primaryColor\":\"red\"}",
+          "{\"displayName\":\" \"}",
+          "{\"username\":\"Ana!\"}"
+        })
+      mvc.perform(
+              patch("/api/profile")
+                  .with(as("ana"))
+                  .with(csrf())
+                  .contentType("application/json")
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    mvc.perform(
+            patch("/api/profile")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"primaryColor\":\"\"}"))
+        .andExpect(status().isOk());
+    assertNull(accounts.get("ana").primaryColor());
+
+    byte[] webp = new byte[64];
+    System.arraycopy("RIFF".getBytes(), 0, webp, 0, 4);
+    System.arraycopy("WEBP".getBytes(), 0, webp, 8, 4);
+    mvc.perform(post("/api/profile/avatar").contentType("image/webp").content(webp))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            post("/api/profile/avatar")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("image/png")
+                .content(webp))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            post("/api/profile/avatar")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("image/svg+xml")
+                .content("<svg/>"))
+        .andExpect(status().isUnsupportedMediaType());
+    mvc.perform(
+            post("/api/profile/avatar")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("image/webp")
+                .content(new byte[16001]))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            post("/api/profile/avatar")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("image/webp")
+                .content(webp))
+        .andExpect(status().isOk());
+    var id = accounts.get("ana").id();
+    assertNotNull(accounts.get("ana").avatarVersion());
+    mvc.perform(get("/api/avatars/" + id).with(as("bia")))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType("image/webp"))
+        .andExpect(content().bytes(webp));
+    mvc.perform(get("/api/avatars/" + id)).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/members").with(as("bia")))
+        .andExpect(jsonPath("$[?(@.username=='ana')].avatarVersion").isNotEmpty())
+        .andExpect(jsonPath("$[0].admin").doesNotExist());
+    mvc.perform(delete("/api/profile/avatar").with(as("ana")).with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/avatars/" + id).with(as("bia"))).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void usernameChangeIsUniqueAndSignsOut() throws Exception {
+    connection("ana", accounts.get("ana").id() + ":tab");
+    mvc.perform(
+            patch("/api/profile")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"username\":\"bia\"}"))
+        .andExpect(status().isConflict());
+    assertEquals("ana", accounts.get("ana").username());
+    mvc.perform(
+            patch("/api/profile")
+                .with(as("ana"))
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"username\":\"ana.nova\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.signedOut").value(true));
+    assertEquals("Ana", accounts.get("ana.nova").displayName());
+    assertEquals(
+        0,
+        accounts.db.queryForObject(
+            "select count(*) from spring_session where principal_name='ana'", Integer.class));
+    assertThrows(ResponseStatusException.class, () -> accounts.get("ana"));
   }
 }

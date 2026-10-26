@@ -13,6 +13,10 @@ Espaço privado para até 16 conexões: chat persistente, uma sala de voz e uma 
 
 `CHAT_MODE` é variável dos comandos. Não definir no `.env`. O mesmo checkout não deve executar os dois modos simultaneamente sobre o mesmo banco.
 
+## Modo demo (sem conexão real)
+
+Para mexer na interface sem Docker, backend ou LiveKit: `cd frontend && npm ci && npm run demo` e abra http://localhost:5173. Qualquer usuário/senha entra. Amigos simulados conversam, falam na call, entram e saem (para ouvir os efeitos sonoros) e um deles transmite uma tela animada; "Encerrar transmissão travada" (botão ⋯) libera a tela para você testar o compartilhamento com sua tela real, que fica só no seu navegador. Mudanças no código aparecem na hora. Sem Node no host: `docker run --rm -it -p 5173:5173 -v "$PWD/frontend:/src" -w /src -u "$(id -u):$(id -g)" node:24.14.0-alpine sh -c "npm ci && npm run demo"`. A simulação fica em `frontend/src/demo/` e não entra no build de produção.
+
 ## Início rápido no Mac ou Linux
 
 Pré-requisitos: Docker Engine com Compose **2.24.4+** (no Mac, OrbStack), Git e Bash. Não instale Java, Node ou Kubernetes no macOS. Reserve espaço para imagens e builds; os limites dos serviços somam cerca de 2,5 GiB, fora SO/cache/builds.
@@ -34,9 +38,9 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 
 - Java 25 / Spring Boot 3.5.16, Maven Wrapper 3.9.11, PostgreSQL 17 / Flyway / sessões JDBC.
 - React 19 / TypeScript / Vite, SDK oficial LiveKit, Caddy e LiveKit self-hosted.
-- Contas individuais, administrador, alteração/redefinição de senha, desativação e invalidação de sessões.
+- Contas individuais, administrador, alteração/redefinição de senha, desativação e invalidação de sessões. Cada pessoa troca nick, usuário, foto de perfil, cores do tema, tamanho da interface e sons da chamada.
 - Mensagens de até 4.000 unidades UTF-16, confirmação após commit, idempotência por UUID, histórico e recuperação após reconexão.
-- Presença da página separada da chamada, microfone, seleção de entrada, ganho de microfone, supressão de ruído nativa, volumes locais por participante/transmissão, indicadores de mic/recepção e tela até Full HD com controles próprios.
+- Presença da página separada da chamada, microfone, seleção de entrada, ganho de microfone, supressão de ruído nativa, volumes locais por participante/transmissão, indicadores de mic/recepção e tela até Full HD 60 fps com controles próprios, layout em painéis arrastáveis.
 - Reserva de tela atômica com lease de 30 s, heartbeat, revogação e reconciliação. Sinalização passa por admissão que revalida sessão e retira fontes de tela de tokens reutilizados; veja [SECURITY](docs/SECURITY.md) para fronteiras e limite de múltiplas tracks maliciosas.
 - Compose dev/prd, backup/restauração, diagnóstico, Terraform GCP sem apply, CI e documentação operacional.
 
