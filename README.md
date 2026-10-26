@@ -36,7 +36,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 - React 19 / TypeScript / Vite, SDK oficial LiveKit, Caddy e LiveKit self-hosted.
 - Contas individuais, administrador, alteração/redefinição de senha, desativação e invalidação de sessões.
 - Mensagens de até 4.000 unidades UTF-16, confirmação após commit, idempotência por UUID, histórico e recuperação após reconexão.
-- Presença da página separada da chamada, microfone, seleção de entrada, silenciar recepção, indicação de fala, tela ampliável e qualidade reduzida.
+- Presença da página separada da chamada, microfone, seleção de entrada, ganho de microfone, supressão de ruído nativa, volumes locais por participante/transmissão, indicadores de mic/recepção e tela até Full HD com controles próprios.
 - Reserva de tela atômica com lease de 30 s, heartbeat, revogação e reconciliação. Sinalização passa por admissão que revalida sessão e retira fontes de tela de tokens reutilizados; veja [SECURITY](docs/SECURITY.md) para fronteiras e limite de múltiplas tracks maliciosas.
 - Compose dev/prd, backup/restauração, diagnóstico, Terraform GCP sem apply, CI e documentação operacional.
 

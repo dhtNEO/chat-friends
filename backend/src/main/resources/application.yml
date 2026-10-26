@@ -34,8 +34,8 @@ app:
   livekit-public-url: ${LIVEKIT_PUBLIC_URL:ws://localhost:8080}
   livekit-key: ${LIVEKIT_API_KEY}
   livekit-secret: ${LIVEKIT_API_SECRET}
-  screen-bitrate: ${SCREEN_BITRATE:4000000}
-  screen-height: ${SCREEN_HEIGHT:720}
+  screen-bitrate: ${SCREEN_BITRATE:8000000}
+  screen-height: ${SCREEN_HEIGHT:1080}
   screen-fps: ${SCREEN_FPS:30}
 logging:
   level:

@@ -6,10 +6,10 @@ O projeto possui somente **dev** (local, padrão) e **prd** (internet). A integr
 
 | Verificação | Evidência |
 |---|---|
-| Backend Java 25/Spring Boot 3.5.16, PostgreSQL separado | 15 testes de integração passaram na implementação; fonte backend preservada nesta limpeza |
+| Backend Java 25/Spring Boot 3.5.16, PostgreSQL separado | 17 testes de integração passaram, incluindo preferências de recepção por sessão, migração V2 e tetos Full HD |
 | Modos dev/prd | 22 testes Node, inspeção de portas Compose e migração de marcadores sem alterar `.env`; modos antigos recusados como entrada |
-| Frontend React/TypeScript/Vite | lint/build e nove testes Playwright executados no runner Linux |
-| Mídia sintética | áudio bidirecional, permissão negada, chegada/parada de tela e ausência de fantasmas testados |
+| Frontend React/TypeScript/Vite | lint/build e 11 testes Playwright executados no runner Linux |
+| Mídia sintética | medidores na saída real Web Audio verificam ganho/mudo/volumes por cliente e da transmissão; canvas recebido em 1920×1080, controles em tela cheia e layouts desktop/móvel testados |
 | ICE | STUN autenticado em UDP/TCP; problema de loopback do container corrigido sem alterar política gerenciada do Chromium |
 | Admissão de mídia | JWT elevado é reduzido a microfone na conexão; sessão expirada recusada |
 | Edge DNS-01 | Caddy 2.11.4, módulo local filtra erros com token; testes Go e HTTPS :18443 com CA de laboratório explícita |
@@ -25,7 +25,7 @@ A validação local usa mídia artificial e o browser pode escolher TCP sob a po
 
 - Exclusividade adversarial estrita de múltiplas tracks: lease/revogação/replay são protegidos, mas um publicador autorizado pode tentar múltiplas tracks da mesma fonte. Reconciliação não é proibição atômica na SFU; ver SECURITY.
 - Carga progressiva de 2/4/8/16 participantes, upload/CPU/RAM/RTT/perda e qualidade humana precisam de medição. Nenhuma capacidade de 16 pessoas ou e2-medium foi comprovada.
-- Captura de áudio do sistema/jogo varia por navegador/SO. Teste sintético Linux não prova suporte completo no macOS/Windows.
+- Qualidade da supressão de ruído nativa e captura de áudio do sistema/jogo variam por navegador/SO. Teste sintético Linux não prova suporte completo no macOS/Windows.
 - Renewals reais em operação prolongada, testes de falha/reinício no Mac, TURN, build multiarch e migração completa entre hosts não são automaticamente cobertos pelo relato de funcionamento.
 - Tarifas/cotas cloud e licença pretendida para o código novo precisam de revisão pelo proprietário. GPL-3.0 preexistente foi preservada; nenhuma conta paga, apply ou publicação de imagem foi feita pelo agente.
 

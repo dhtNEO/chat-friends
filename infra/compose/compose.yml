@@ -34,8 +34,8 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SPACE_NAME: ${SPACE_NAME:-Entre amigos}
-      SCREEN_BITRATE: ${SCREEN_BITRATE:-4000000}
-      SCREEN_HEIGHT: ${SCREEN_HEIGHT:-720}
+      SCREEN_BITRATE: ${SCREEN_BITRATE:-8000000}
+      SCREEN_HEIGHT: ${SCREEN_HEIGHT:-1080}
       SCREEN_FPS: ${SCREEN_FPS:-30}
     depends_on:
       db: {condition: service_healthy}

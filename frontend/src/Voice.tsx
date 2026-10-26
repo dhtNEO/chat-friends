@@ -5,10 +5,14 @@ import {
   Track,
   createLocalScreenTracks,
   type LocalTrack,
-  type RemoteTrack,
+  type RemoteAudioTrack,
+  type LocalAudioTrack,
   type Participant,
 } from "livekit-client";
 import { api, type Lease } from "./api";
+import { MicrophoneGain } from "./MicrophoneGain";
+import { AudioTrack, Screen } from "./MediaPlayback";
+import { useAudioSettings } from "./useAudioSettings";
 type Connection = {
   identity: string;
   url: string;
@@ -32,11 +36,16 @@ function mediaError(e: unknown) {
 }
 export function Voice({
   admin,
+  userId,
   onError,
 }: {
   admin: boolean;
+  userId: string;
   onError: (s: string) => void;
 }) {
+  const [settings, setSettings] = useAudioSettings(userId);
+  const micProcessor = useRef<MicrophoneGain | null>(null);
+  const [audioBusy, setAudioBusy] = useState(false);
   const room = useRef<Room | null>(null),
     connection = useRef<Connection | null>(null),
     lease = useRef<Lease | null>(null),
@@ -53,11 +62,18 @@ export function Voice({
     [quality, setQuality] = useState("normal");
   const [state, setState] = useState<{
     lease: Lease;
-    participants: { identity: string; name: string }[];
+    participants: {
+      identity: string;
+      name: string;
+      micMuted: boolean;
+      deaf: boolean;
+    }[];
   }>({
     lease: { identity: null, leaseId: null, expiresAt: null },
     participants: [],
   });
+  const noiseSupported =
+    navigator.mediaDevices?.getSupportedConstraints().noiseSuppression === true;
   const bump = () => setVersion((x) => x + 1);
   async function release() {
     const c = connection.current,
@@ -136,7 +152,17 @@ export function Voice({
     try {
       const c = await api<Connection>("/media/join", "POST");
       connection.current = c;
-      const r = new Room({ adaptiveStream: true, dynacast: true });
+      const r = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+        webAudioMix: true,
+        audioCaptureDefaults: {
+          deviceId: device,
+          noiseSuppression: settings.noise,
+          echoCancellation: true,
+          autoGainControl: false,
+        },
+      });
       room.current = r;
       for (const event of [
         RoomEvent.ParticipantConnected,
@@ -169,10 +195,11 @@ export function Voice({
       });
       await r.connect(c.url, c.token);
       await r.startAudio();
+      await api("/media/audio", "PUT", { identity: c.identity, deaf });
       setJoined(true);
       setStatus("Voz conectada");
       try {
-        await r.localParticipant.setMicrophoneEnabled(true);
+        await enableMicrophone(r);
         setMic(true);
         setDevices(await Room.getLocalDevices("audioinput"));
       } catch (e) {
@@ -185,15 +212,86 @@ export function Voice({
       setBusy(false);
     }
   }
-  async function toggleMic() {
-    try {
-      await room.current?.localParticipant.setMicrophoneEnabled(!mic, {
+  async function enableMicrophone(r: Room) {
+    if (r.localParticipant.getTrackPublication(Track.Source.Microphone)) {
+      await r.localParticipant.setMicrophoneEnabled(true);
+      return;
+    }
+    // createTracks sets the room AudioContext before we install the processor.
+    // Never publish the raw microphone before applying the user's gain.
+    const tracks = await r.localParticipant.createTracks({
+      audio: {
         deviceId: device,
+        noiseSuppression: settings.noise,
+        echoCancellation: true,
+        autoGainControl: false,
+      },
+    });
+    const track = tracks[0] as LocalAudioTrack;
+    try {
+      micProcessor.current = new MicrophoneGain(settings.microphone);
+      await track.setProcessor(micProcessor.current);
+      await r.localParticipant.publishTrack(track, {
+        source: Track.Source.Microphone,
       });
-      setMic(!mic);
+    } catch (error) {
+      tracks.forEach((item) => item.stop());
+      throw error;
+    }
+  }
+  async function toggleMic() {
+    const r = room.current;
+    if (!r) return;
+    setAudioBusy(true);
+    try {
+      if (mic) await r.localParticipant.setMicrophoneEnabled(false);
+      else await enableMicrophone(r);
+      setMic(r.localParticipant.isMicrophoneEnabled);
       setDevices(await Room.getLocalDevices("audioinput"));
     } catch (e) {
       onError(mediaError(e));
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+  async function toggleDeaf() {
+    const c = connection.current;
+    if (!c) return;
+    setAudioBusy(true);
+    const next = !deaf;
+    // Apply locally at once; publish the display state independently of playback.
+    setDeaf(next);
+    try {
+      await api("/media/audio", "PUT", { identity: c.identity, deaf: next });
+    } catch (e) {
+      onError(mediaError(e));
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+  async function changeNoise(next: boolean) {
+    const previous = settings.noise;
+    setSettings((old) => ({ ...old, noise: next }));
+    setAudioBusy(true);
+    try {
+      const track = room.current?.localParticipant.getTrackPublication(
+        Track.Source.Microphone,
+      )?.track as LocalAudioTrack | undefined;
+      await track?.applyConstraints({
+        noiseSuppression: next,
+        echoCancellation: true,
+        autoGainControl: false,
+      });
+      if (room.current)
+        room.current.options.audioCaptureDefaults = {
+          ...room.current.options.audioCaptureDefaults,
+          noiseSuppression: next,
+        };
+    } catch (e) {
+      setSettings((old) => ({ ...old, noise: previous }));
+      onError(mediaError(e));
+    } finally {
+      setAudioBusy(false);
     }
   }
   async function share() {
@@ -205,12 +303,21 @@ export function Voice({
       c = connection.current;
     if (!r || !c) return;
     // Capture is called from the user gesture, before the network request.
+    const height = Math.min(
+      c.screen.height,
+      quality === "low" ? 480 : quality === "fullhd" ? 1080 : 720,
+    );
+    const fps = Math.min(c.screen.fps, quality === "low" ? 15 : 30);
+    const bitrate = Math.min(
+      c.screen.bitrate,
+      quality === "low" ? 1000000 : quality === "fullhd" ? 8000000 : 4000000,
+    );
     const tracks = await createLocalScreenTracks({
       audio: true,
       resolution: {
-        width: quality === "low" ? 854 : 1280,
-        height: quality === "low" ? 480 : c.screen.height,
-        frameRate: quality === "low" ? 15 : c.screen.fps,
+        width: Math.round((height * 16) / 9),
+        height,
+        frameRate: fps,
       },
     });
     screenTracks.current = tracks;
@@ -232,8 +339,8 @@ export function Voice({
               ? Track.Source.ScreenShare
               : Track.Source.ScreenShareAudio,
           screenShareEncoding: {
-            maxBitrate: quality === "low" ? 1000000 : c.screen.bitrate,
-            maxFramerate: quality === "low" ? 15 : c.screen.fps,
+            maxBitrate: bitrate,
+            maxFramerate: fps,
           },
           simulcast: false,
         });
@@ -268,7 +375,11 @@ export function Voice({
     .flatMap((p) =>
       [...p.audioTrackPublications.values()]
         .filter((pub) => pub.track)
-        .map((pub) => pub.track as RemoteTrack),
+        .map((pub) => ({
+          track: pub.track as RemoteAudioTrack,
+          identity: p.identity,
+          source: pub.source,
+        })),
     );
   return (
     <section
@@ -292,6 +403,13 @@ export function Voice({
               identity: p.identity,
               name: p.name || "Amigo",
               speaking: p.isSpeaking,
+              micMuted: !p.isMicrophoneEnabled,
+              deaf:
+                p === room.current?.localParticipant
+                  ? deaf
+                  : (state.participants.find(
+                      (person) => person.identity === p.identity,
+                    )?.deaf ?? false),
             }))
           : state.participants.map((p) => ({ ...p, speaking: false }))
         ).map((p) => (
@@ -300,8 +418,47 @@ export function Voice({
             key={p.identity}
           >
             <span className="avatar">{p.name.slice(0, 2).toUpperCase()}</span>
-            <span>{p.name}</span>
-            {p.speaking && <small>falando</small>}
+            <div className="person-details">
+              <strong>
+                {p.name}
+                {p.identity === connection.current?.identity ? " (você)" : ""}
+              </strong>
+              <div className="audio-badges">
+                <span
+                  className={"audio-badge " + (p.micMuted ? "is-muted" : "")}
+                >
+                  {p.micMuted ? "Mic desligado" : "Mic ligado"}
+                </span>
+                <span className={"audio-badge " + (p.deaf ? "is-muted" : "")}>
+                  {p.deaf ? "Áudio silenciado" : "Ouvindo"}
+                </span>
+                {p.speaking && !p.micMuted && <small>falando</small>}
+              </div>
+              {joined && p.identity !== connection.current?.identity && (
+                <label className="person-volume">
+                  Volume de {p.name}{" "}
+                  <span className="volume-value" aria-hidden="true">
+                    {settings.people[p.identity.split(":")[0]] ?? 100}%
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="200"
+                    value={settings.people[p.identity.split(":")[0]] ?? 100}
+                    onChange={(e) => {
+                      const value = +e.target.value;
+                      setSettings((old) => ({
+                        ...old,
+                        people: {
+                          ...old.people,
+                          [p.identity.split(":")[0]]: value,
+                        },
+                      }));
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           </div>
         ))}
         {!joined && !state.participants.length && (
@@ -330,10 +487,18 @@ export function Voice({
       ) : (
         <>
           <div className="voice-controls">
-            <button aria-pressed={!mic} onClick={() => void toggleMic()}>
+            <button
+              aria-pressed={!mic}
+              disabled={audioBusy}
+              onClick={() => void toggleMic()}
+            >
               {mic ? "Desligar mic" : "Ligar mic"}
             </button>
-            <button aria-pressed={deaf} onClick={() => setDeaf(!deaf)}>
+            <button
+              aria-pressed={deaf}
+              disabled={audioBusy}
+              onClick={() => void toggleDeaf()}
+            >
               {deaf ? "Ouvir áudio" : "Silenciar áudio"}
             </button>
           </div>
@@ -359,6 +524,56 @@ export function Voice({
                 ))}
             </select>
           </label>
+          <div className="audio-settings">
+            <label className="volume-control">
+              Volume do microfone{" "}
+              <span className="volume-value" aria-hidden="true">
+                {settings.microphone}%
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="200"
+                value={settings.microphone}
+                onChange={(e) => {
+                  const value = +e.target.value;
+                  micProcessor.current?.setVolume(value);
+                  setSettings((old) => ({ ...old, microphone: value }));
+                }}
+              />
+            </label>
+            <label className="volume-control">
+              Volume de saída{" "}
+              <span className="volume-value" aria-hidden="true">
+                {settings.output}%
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={settings.output}
+                onChange={(e) => {
+                  const value = +e.target.value;
+                  setSettings((old) => ({ ...old, output: value }));
+                }}
+              />
+            </label>
+            <label className="noise-toggle">
+              <input
+                type="checkbox"
+                checked={settings.noise}
+                disabled={audioBusy || !noiseSupported}
+                onChange={(e) => void changeNoise(e.target.checked)}
+              />{" "}
+              Supressão de ruído
+            </label>
+            {!noiseSupported && (
+              <small>Supressão nativa indisponível neste navegador.</small>
+            )}
+            <small>
+              Volumes salvos só neste navegador. Acima de 100% pode distorcer.
+            </small>
+          </div>
           <button
             className="danger wide"
             onClick={() => void leave().catch((e) => onError(mediaError(e)))}
@@ -373,10 +588,19 @@ export function Voice({
         <label className="compact">
           Qualidade
           <select
+            aria-label="Qualidade"
             value={quality}
             disabled={sharing}
             onChange={(e) => setQuality(e.target.value)}
           >
+            <option
+              value="fullhd"
+              disabled={
+                joined && (connection.current?.screen.height ?? 0) < 1080
+              }
+            >
+              1080p Full HD · até 30 fps · até 8 Mbps
+            </option>
             <option value="normal">720p · até 30 fps · até 4 Mbps</option>
             <option value="low">480p · até 15 fps · até 1 Mbps</option>
           </select>
@@ -388,6 +612,12 @@ export function Voice({
         >
           {sharing ? "Parar transmissão" : "Compartilhar tela"}
         </button>
+        {joined && (connection.current?.screen.height ?? 0) < 1080 && (
+          <small>
+            Full HD requer SCREEN_HEIGHT=1080 e SCREEN_BITRATE=8000000 no
+            servidor.
+          </small>
+        )}
         <small>Áudio da tela depende do navegador e sistema.</small>
       </div>
       {tracks
@@ -397,7 +627,16 @@ export function Voice({
             (t.identity === connection.current?.identity && sharing),
         )
         .map((t) => (
-          <Screen key={t.track.sid || "local"} track={t.track} name={t.name} />
+          <Screen
+            key={t.track.sid || "local"}
+            track={t.track}
+            name={t.name}
+            local={t.identity === connection.current?.identity}
+            volume={settings.stream}
+            deaf={deaf}
+            onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
+            onError={onError}
+          />
         ))}
       {admin && state.lease.identity && (
         <button
@@ -411,41 +650,23 @@ export function Voice({
           Encerrar transmissão travada
         </button>
       )}
-      {audio.map((t) => (
-        <AudioTrack key={t.sid} track={t} muted={deaf} />
+      {audio.map(({ track, identity, source }) => (
+        <AudioTrack
+          key={track.sid}
+          track={track}
+          identity={identity}
+          source={source}
+          volume={
+            deaf
+              ? 0
+              : ((settings.output / 100) *
+                  (source === Track.Source.ScreenShareAudio
+                    ? settings.stream
+                    : (settings.people[identity.split(":")[0]] ?? 100))) /
+                100
+          }
+        />
       ))}
     </section>
-  );
-}
-function AudioTrack({ track, muted }: { track: RemoteTrack; muted: boolean }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    const el = ref.current!;
-    track.attach(el);
-    return () => {
-      track.detach(el);
-    };
-  }, [track]);
-  return <audio ref={ref} autoPlay muted={muted} />;
-}
-function Screen({ track, name }: { track: Track; name: string }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const el = ref.current!;
-    track.attach(el);
-    return () => {
-      track.detach(el);
-    };
-  }, [track]);
-  return (
-    <div className="screen">
-      <video ref={ref} autoPlay playsInline muted />
-      <div>
-        <span>Tela de {name}</span>
-        <button onClick={() => void ref.current?.requestFullscreen()}>
-          Ampliar
-        </button>
-      </div>
-    </div>
   );
 }

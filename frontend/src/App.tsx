@@ -344,6 +344,7 @@ function Workspace({
             </button>
           </div>
         )}
+        <div id="screen-stage" />
         {panel ? (
           <Settings
             panel={panel}
@@ -446,7 +447,12 @@ function Workspace({
         )}
       </main>
       <aside className="right-panel" id="voice">
-        <Voice admin={me.user.admin} onError={onError} />
+        <Voice
+          key={me.user.id}
+          userId={me.user.id}
+          admin={me.user.admin}
+          onError={onError}
+        />
         <div className="privacy-note">
           <span>◇</span> Privado, do nosso jeito.
           <br />

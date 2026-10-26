@@ -32,3 +32,5 @@ Teste sintético de mídia pode ser útil, mas declare fonte artificial, decodif
 Não rodar scripts destrutivos contra o banco de prd. `scripts/check.sh` recusa prd e usa banco de integração separado em dev. O CI usa dev para testes da aplicação e valida prd sem emitir certificados reais. O [guia DuckDNS](DUCKDNS_SETUP.md) descreve aceite WAN e cargas no Mac.
 
 O teste `frontend/tests/csp.spec.ts` inicia a imagem web com a CSP de prd e verifica no Chromium a consulta HTTPS ao domínio de mídia, incluindo porta 18443. A resposta de validação é simulada; outro destino HTTPS deve ser bloqueado. Não comprova conectividade WAN nem certificado do servidor real.
+
+Os testes `frontend/tests/audio.spec.ts` usam fontes de áudio por oscilador e tela de canvas 1920×1080. Medidores na saída Web Audio verificam ganho de microfone, volume local por participante, volume geral e da transmissão, mudo/recepção, independência entre clientes e ausência de som após parar. A decodificação de vídeo verifica 1080 linhas. A qualidade de supressão nativa e o desempenho em telas/jogos reais precisam de teste humano no dispositivo.

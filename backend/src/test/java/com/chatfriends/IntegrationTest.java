@@ -114,7 +114,8 @@ class IntegrationTest {
         now + 3600000,
         name);
     accounts.db.update(
-        "insert into media_connections values(?,?,?,now()+interval '45 seconds')",
+        "insert into media_connections(identity,account_id,session_id,expires_at)"
+            + " values(?,?,?,now()+interval '45 seconds')",
         identity,
         accounts.get(name).id(),
         session.getId());
@@ -133,6 +134,84 @@ class IntegrationTest {
         .setName(id)
         .setPermission(permission)
         .build();
+  }
+
+  @Test
+  void audioPreferencesBelongToTheConnectionSessionAndDoNotChangePermissions() {
+    var ana = connection("ana", "ana-audio");
+    var otherTab = connection("ana", "ana-other");
+    var bia = connection("bia", "bia-audio");
+    when(live.participants())
+        .thenReturn(
+            List.of(
+                participant("ana-audio", false).toBuilder()
+                    .addTracks(
+                        TrackInfo.newBuilder().setSource(TrackSource.MICROPHONE).setMuted(true))
+                    .build(),
+                participant("bia-audio", false).toBuilder()
+                    .addTracks(
+                        TrackInfo.newBuilder().setSource(TrackSource.MICROPHONE).setMuted(false))
+                    .build()));
+    media.audio(() -> "ana", ana, new Media.AudioPreferences("ana-audio", true));
+    var people = (List<?>) media.state().get("participants");
+    assertTrue(
+        people.contains(
+            Map.of("identity", "ana-audio", "name", "ana-audio", "micMuted", true, "deaf", true)));
+    assertTrue(
+        people.contains(
+            Map.of(
+                "identity", "bia-audio", "name", "bia-audio", "micMuted", false, "deaf", false)));
+    assertEquals(
+        403,
+        assertThrows(
+                ResponseStatusException.class,
+                () -> media.audio(() -> "bia", bia, new Media.AudioPreferences("ana-audio", false)))
+            .getStatusCode()
+            .value());
+    assertEquals(
+        403,
+        assertThrows(
+                ResponseStatusException.class,
+                () ->
+                    media.audio(
+                        () -> "ana", otherTab, new Media.AudioPreferences("ana-audio", false)))
+            .getStatusCode()
+            .value());
+    media.audio(() -> "ana", ana, new Media.AudioPreferences("ana-audio", false));
+    assertFalse(
+        accounts.db.queryForObject(
+            "select deaf from media_connections where identity='ana-audio'", Boolean.class));
+    accounts.db.update(
+        "update media_connections set expires_at=now()-interval '1 second' where"
+            + " identity='ana-audio'");
+    assertEquals(
+        401,
+        assertThrows(
+                ResponseStatusException.class,
+                () -> media.audio(() -> "ana", ana, new Media.AudioPreferences("ana-audio", true)))
+            .getStatusCode()
+            .value());
+    verify(live, never()).permission(anyString(), anyBoolean());
+  }
+
+  @Test
+  void screenCapabilitiesSupportFullHdAndClampUnsafeValues() {
+    var request = connection("ana", "previous-tab");
+    when(live.token(anyString(), anyString())).thenReturn("test-only-token");
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        live, "publicUrl", "ws://localhost:8080");
+    media.height = 1080;
+    media.bitrate = 8000000;
+    media.fps = 30;
+    assertEquals(
+        Map.of("height", 1080, "bitrate", 8000000, "fps", 30),
+        media.join(() -> "ana", request).get("screen"));
+    media.height = 9000;
+    media.bitrate = Integer.MAX_VALUE;
+    media.fps = 120;
+    assertEquals(
+        Map.of("height", 1080, "bitrate", 8000000, "fps", 30),
+        media.join(() -> "ana", request).get("screen"));
   }
 
   @Test

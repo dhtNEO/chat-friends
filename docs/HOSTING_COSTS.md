@@ -4,7 +4,7 @@
 
 ## Banda mensurável e estimativa reproduzível
 
-Tela em GB decimais = Mbps × espectadores remotos × horas × 0,45. Com 4 Mbps e 15 espectadores: **27 GB/h**, **540 GB em 20 h**, **1.620 GB em 60 h**, antes de áudio/overhead. São respectivamente cerca de 502,9 GiB e 1.508,7 GiB. Uma SFU recebe uma cópia do transmissor e entrega aos espectadores; upload doméstico precisa suportar esse fan-out, não apenas 4 Mbps. Áudio/overhead aumentam o total. Conteúdo parado e controle adaptativo podem reduzir bitrate real: medir.
+Tela em GB decimais = Mbps × espectadores remotos × horas × 0,45. Com 4 Mbps e 15 espectadores: **27 GB/h**, **540 GB em 20 h**, **1.620 GB em 60 h**, antes de áudio/overhead. São respectivamente cerca de 502,9 GiB e 1.508,7 GiB. Uma SFU recebe uma cópia do transmissor e entrega aos espectadores; upload doméstico precisa suportar esse fan-out, não apenas 4 Mbps. Em Full HD no teto de 8 Mbps, os mesmos 15 espectadores representam 54 GB/h, antes de áudio/overhead. Áudio/overhead aumentam o total. Conteúdo parado e controle adaptativo podem reduzir bitrate real: medir.
 
 ```bash
 docker run --rm -v "$PWD:/work" -w /work node:24.14.0-alpine node scripts/costs.mjs hours=20 viewers=15 mbps=4

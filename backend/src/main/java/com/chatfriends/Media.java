@@ -102,7 +102,8 @@ public class Media {
               >= 16) throw new ResponseStatusException(CONFLICT, "Sala cheia (16 conexões)");
           String id = a.id() + ":" + UUID.randomUUID();
           db.update(
-              "insert into media_connections values(?,?,?,now()+interval '45 seconds')",
+              "insert into media_connections(identity,account_id,session_id,expires_at)"
+                  + " values(?,?,?,now()+interval '45 seconds')",
               id,
               a.id(),
               q.getSession().getId());
@@ -116,9 +117,9 @@ public class Media {
               "screen",
               Map.of(
                   "bitrate",
-                  Math.clamp(bitrate, 100000, 4000000),
+                  Math.clamp(bitrate, 100000, 8000000),
                   "height",
-                  Math.clamp(height, 360, 720),
+                  Math.clamp(height, 360, 1080),
                   "fps",
                   Math.clamp(fps, 5, 30)));
         });
@@ -132,6 +133,15 @@ public class Media {
     db.update(
         "update media_connections set expires_at=now()+interval '45 seconds' where identity=?",
         b.identity());
+  }
+
+  public record AudioPreferences(String identity, boolean deaf) {}
+
+  @PutMapping("/audio")
+  public void audio(Principal p, HttpServletRequest q, @RequestBody AudioPreferences b) {
+    own(b.identity(), p, q);
+    if (!validConnection(b.identity())) throw new ResponseStatusException(UNAUTHORIZED);
+    db.update("update media_connections set deaf=? where identity=?", b.deaf(), b.identity());
   }
 
   @PostMapping("/leave")
@@ -153,7 +163,24 @@ public class Media {
               "participants",
               live.participants().stream()
                   .filter(p -> validConnection(p.getIdentity()))
-                  .map(p -> Map.of("identity", p.getIdentity(), "name", p.getName()))
+                  .map(
+                      p ->
+                          Map.of(
+                              "identity",
+                              p.getIdentity(),
+                              "name",
+                              p.getName(),
+                              "micMuted",
+                              p.getTracksList().stream()
+                                  .noneMatch(
+                                      t ->
+                                          t.getSource() == TrackSource.MICROPHONE && !t.getMuted()),
+                              "deaf",
+                              Boolean.TRUE.equals(
+                                  db.queryForObject(
+                                      "select deaf from media_connections where identity=?",
+                                      Boolean.class,
+                                      p.getIdentity()))))
                   .toList());
         });
   }

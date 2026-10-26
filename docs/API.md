@@ -1,6 +1,6 @@
 # Contrato HTTP e WebSocket
 
-Mesma origem do frontend. JSON UTF-8, exceto login (form) e webhook (JSON bruto). Antes de login e após login, obtenha `GET /api/csrf`; envie `X-CSRF-TOKEN` em POST/PATCH/DELETE. Cookie `SESSION`, HttpOnly, SameSite=Strict; Secure quando COOKIE_SECURE=true. Sessão inativa expira em 12 h. Sem CORS aberto.
+Mesma origem do frontend. JSON UTF-8, exceto login (form) e webhook (JSON bruto). Antes de login e após login, obtenha `GET /api/csrf`; envie `X-CSRF-TOKEN` em POST/PUT/PATCH/DELETE. Cookie `SESSION`, HttpOnly, SameSite=Strict; Secure quando COOKIE_SECURE=true. Sessão inativa expira em 12 h. Sem CORS aberto.
 
 | Método/caminho | Corpo / resultado |
 |---|---|
@@ -19,8 +19,9 @@ Mesma origem do frontend. JSON UTF-8, exceto login (form) e webhook (JSON bruto)
 | PATCH /api/admin/accounts/USERNAME | `{enabled?,password?}`; invalida sessões; admin não pode ser desativado |
 | POST /api/media/join | `{}`; `{identity,token,url,screen:{bitrate,height,fps}}` |
 | POST /api/media/heartbeat | `{identity}` a cada 10 s |
+| PUT /api/media/audio | `{identity,deaf:boolean}`; estado de recepção da própria conexão/sessão, sem mudar permissões |
 | POST /api/media/leave | `{identity}` |
-| GET /api/media/state | `{lease:{identity,leaseId,expiresAt},participants:[{identity,name}]}` |
+| GET /api/media/state | `{lease:{identity,leaseId,expiresAt},participants:[{identity,name,micMuted,deaf}]}` |
 | POST /api/media/screen | `{identity}`; reserva ou 409 |
 | POST /api/media/screen/heartbeat | `{identity,leaseId}`; renovar antes de 30 s |
 | DELETE /api/media/screen | `{identity,leaseId}`; liberação idempotente |
@@ -37,3 +38,5 @@ WebSocket `/ws`: sessão autenticada, `Origin` exatamente APP_ORIGIN. Cliente en
 401: sem sessão/conta desativada. 403: CSRF, origem ou autorização. 400: entrada inválida. 409: conflito/lease/sala cheia. 429: limite. 503: SFU indisponível ou revogação pendente. A interface não deve repetir POST de chat com novo UUID quando a resposta é incerta. Atualizar senha/desativar pode ter sido aplicado mesmo se a expulsão de mídia retornar 503; a reconciliação continuará.
 
 As identidades de mídia são geradas pelo servidor e vinculadas à conta e sessão. Duas abas usam identidades diferentes; ocupam duas das 16 conexões. O cliente não escolhe sala, privilégios administrativos nem permissão de câmera.
+
+`micMuted` vem da publicação de microfone na SFU; `deaf` é estado declarado pelo cliente autenticado e pode levar até 5 s para aparecer nos outros clientes. Não é prova de que o dispositivo físico está sem som. Ganho de microfone e volumes de recepção ficam no cliente, não alteram os ajustes de outros usuários. `screen` informa tetos de até 1080p/30 fps/8 Mbps; resolução efetiva depende da captura e da conexão.

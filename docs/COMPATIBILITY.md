@@ -4,7 +4,7 @@ Legenda: **testado** exige execução neste ambiente e evidência em STATUS; **d
 
 | Ambiente | Chat/login | Voz/tela | Áudio da tela |
 |---|---|---|---|
-| Chromium Linux AMD64 no runner | testes Playwright, ver STATUS | ICE bloqueado pela política do runner; sinalização testada | não prova áudio real do sistema |
+| Chromium Linux AMD64 no runner | testes Playwright, ver STATUS | mídia sintética, Full HD e ICE UDP/TCP testados; browser pode usar TCP | faixa sintética e volumes testados; não prova áudio real do sistema |
 | macOS M4 Pro + OrbStack + Chrome/Edge | pendente | APIs documentadas; teste humano pendente | depende de versão/seleção de aba/janela e permissões macOS |
 | macOS Safari | pendente | teste humano obrigatório; diferenças de seleção/codec | não prometer áudio do jogo |
 | macOS Firefox | pendente | teste humano obrigatório | verificar no próprio sistema |
