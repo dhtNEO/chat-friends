@@ -56,5 +56,6 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 | Migração | [MIGRATION](docs/MIGRATION.md) |
 | Testes e limites | [TESTING](docs/TESTING.md), [COMPATIBILITY](docs/COMPATIBILITY.md), [STATUS](docs/STATUS.md) |
 | Problemas | [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) |
+| Próximas funcionalidades (planejadas) | [Atalhos pessoais](docs/SHORTCUTS_PLAN.md), [fila de música compartilhada](docs/MUSIC_PLAYER_PLAN.md) |
 
 O repositório já continha [LICENSE](LICENSE), GPL-3.0. Esse arquivo foi preservado; a intenção de licenciamento do código novo precisa ser confirmada pelo proprietário antes de distribuir. Não houve publicação de imagens ou recursos em nuvem. Dependências e suas licenças: [DEPENDENCIES](docs/DEPENDENCIES.md).
