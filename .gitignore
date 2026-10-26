@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+infra/compose/generated/
+**/target/
+**/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+backups/
+*.log
+.terraform/
+*.tfstate*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+*.tsbuildinfo

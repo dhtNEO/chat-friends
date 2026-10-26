@@ -1,0 +1,34 @@
+# Compose >= 2.24.4 (tag !override). Sem exposição da porta administrativa 7880.
+services:
+  livekit:
+    ports: !override
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
+  web:
+    ports: !override []
+    environment:
+      MEDIA_CONNECT_SRC: "https://${MEDIA_DOMAIN:?}:${PUBLIC_HTTPS_PORT:-443} wss://${MEDIA_DOMAIN:?}:${PUBLIC_HTTPS_PORT:-443}"
+  edge:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    ports: ["80:80/tcp", "443:443/tcp", "443:443/udp"]
+    environment:
+      NO_PROXY: localhost,127.0.0.1,backend,db,livekit,web
+      no_proxy: localhost,127.0.0.1,backend,db,livekit,web
+      APP_DOMAIN: ${APP_DOMAIN:?}
+      MEDIA_DOMAIN: ${MEDIA_DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+      ACME_CA: https://acme-v02.api.letsencrypt.org/directory
+    volumes:
+      - ./Caddyfile.prd:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+      - caddy_config:/config
+    depends_on: [web, livekit]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    mem_limit: 128m
+volumes:
+  certificates:
+  caddy_config:

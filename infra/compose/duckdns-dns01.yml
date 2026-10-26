@@ -1,0 +1,12 @@
+# HTTPS público pode usar 18443 -> 443 no roteador; DNS-01 não depende de 80/443 WAN.
+services:
+  edge:
+    image: chat-friends-edge-duckdns
+    build: ../caddy
+    ports: !override ["443:443/tcp"]
+    volumes:
+      - ./Caddyfile.duckdns:/etc/caddy/Caddyfile:ro
+    secrets: [duckdns_token]
+secrets:
+  duckdns_token:
+    file: ${DUCKDNS_TOKEN_FILE:-./generated/duckdns/token}

@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://db:5432/friends}
+    username: ${POSTGRES_USER:friends}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      maximum-pool-size: 8
+  session:
+    jdbc:
+      initialize-schema: never
+    timeout: 12h
+  flyway:
+    enabled: true
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: ${COOKIE_SECURE:false}
+        same-site: strict
+  tomcat:
+    max-http-form-post-size: 16KB
+    max-swallow-size: 16KB
+app:
+  origin: ${APP_ORIGIN:http://localhost:8080}
+  name: ${SPACE_NAME:Entre amigos}
+  room: ${LIVEKIT_ROOM:amigos}
+  livekit-url: ${LIVEKIT_INTERNAL_URL:http://livekit:7880}
+  livekit-public-url: ${LIVEKIT_PUBLIC_URL:ws://localhost:8080}
+  livekit-key: ${LIVEKIT_API_KEY}
+  livekit-secret: ${LIVEKIT_API_SECRET}
+  screen-bitrate: ${SCREEN_BITRATE:8000000}
+  screen-height: ${SCREEN_HEIGHT:1080}
+  screen-fps: ${SCREEN_FPS:30}
+logging:
+  level:
+    root: WARN
+    com.chatfriends: INFO

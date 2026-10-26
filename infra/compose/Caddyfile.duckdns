@@ -1,0 +1,37 @@
+{
+ email {$ACME_EMAIL}
+ acme_ca {$ACME_CA}
+ acme_dns duckdns_private {env.DUCKDNS_API_TOKEN}
+ admin off
+ auto_https disable_redirects
+ servers {
+  protocols h1 h2
+ }
+}
+(duckdns_tls) {
+ tls {
+  dns duckdns_private {env.DUCKDNS_API_TOKEN}
+  resolvers 1.1.1.1 8.8.8.8
+  propagation_timeout 5m
+ }
+}
+https://{$APP_DOMAIN}:443 {
+ import duckdns_tls
+ header Strict-Transport-Security "max-age=31536000"
+ reverse_proxy web:8080
+}
+https://{$MEDIA_DOMAIN}:443 {
+ import duckdns_tls
+ @signal path /rtc /rtc/*
+ handle @signal {
+  forward_auth backend:8080 {
+   uri /api/livekit/admit
+   copy_headers X-Media-Authorization
+  }
+  reverse_proxy livekit:7880 {
+   header_up Authorization {http.request.header.X-Media-Authorization}
+   header_up -X-Media-Authorization
+  }
+ }
+ respond 404
+}

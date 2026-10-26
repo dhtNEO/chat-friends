@@ -1,0 +1,88 @@
+# Arquitetura
+
+Monólito modular Java, banco único e SFU. Não há Redis, transcoding, agentes, ingress/egress ou gravação. A SFU encaminha mídia; HTTP/WebSocket transportam controle e chat.
+
+```mermaid
+flowchart LR
+  U[Navegadores] -->|HTTPS: login, chat, tokens| C[Caddy]
+  U <-->|WSS: eventos de chat/presença| C
+  C --> B[Spring Boot]
+  B -->|JDBC: contas, mensagens, sessões, leases| P[(PostgreSQL)]
+  B -->|API administrativa interna| L[LiveKit SFU]
+  L -->|Webhook assinado| B
+  U <-->|WSS: sinalização /rtc| C
+  C --> L
+  U <-->|WebRTC UDP 7882 / TCP 7881| L
+  U -.->|TURN/TLS 5349 opcional| L
+```
+
+## Identidade
+
+```mermaid
+sequenceDiagram
+ participant U as Navegador
+ participant B as Backend
+ participant P as PostgreSQL
+ U->>B: GET /api/csrf
+ B-->>U: Token CSRF + cookie de sessão
+ U->>B: POST /api/login (form + CSRF)
+ B->>P: Consultar conta / limite de tentativas
+ B->>B: BCrypt 12 + proteção contra fixation
+ B->>P: Persistir sessão
+ B-->>U: 204 + novo cookie HttpOnly
+ U->>B: GET /api/csrf (após rotação)
+```
+
+## Mensagem
+
+```mermaid
+sequenceDiagram
+ participant U as Navegador
+ participant B as Backend
+ participant P as PostgreSQL
+ participant O as Outros clientes
+ U->>B: POST mensagem com clientId UUID
+ B->>P: BEGIN, advisory lock 1
+ B->>P: Buscar (autor, clientId), validar limite e inserir
+ P-->>B: COMMIT
+ B-->>U: Mensagem persistida (ACK HTTP)
+ B-->>O: Evento WebSocket
+ Note over U,O: Ao reconectar, buscar páginas after=cursor
+```
+
+O lock serializa alocação/commit dos IDs do canal único, evitando que uma mensagem com ID menor faça commit depois de outra já entregue ao cursor. Erro na entrega WebSocket não desfaz persistência. Repetir mesmo UUID/corpo devolve a mesma mensagem; mesmo UUID com outro corpo dá 409.
+
+## Voz e tela
+
+```mermaid
+sequenceDiagram
+ participant U as Navegador
+ participant B as Backend
+ participant P as PostgreSQL
+ participant L as LiveKit
+ U->>B: POST /media/join com sessão + CSRF
+ B->>P: Registrar identidade única por aba/sessão
+ B-->>U: JWT 90 s, sala fixa, somente microfone
+ U->>B: Admissão da sinalização via Caddy
+ B->>B: Verificar sessão e substituir JWT por grant de microfone
+ U->>L: Conectar via proxy com JWT restrito
+ U->>U: Pedir captura de tela na ação do usuário
+ U->>B: POST /media/screen
+ B->>P: BEGIN + advisory lock 2; reconciliar lease
+ B->>L: Revogar transmissor anterior antes de conceder nova fonte
+ B->>P: Reservar UUID / expiração 30 s
+ B->>L: Habilitar screen_share e screen_share_audio
+ B->>P: COMMIT
+ B-->>U: Lease
+ U->>L: Publicar tela
+ U->>B: Heartbeat a cada 10 s
+ U->>B: DELETE /media/screen com leaseId
+ B->>L: Revogar fontes de tela
+ B->>P: Limpar lease
+```
+
+Reconciliação a cada 3 s, também acionada por webhook assinado. Eventos duplicados/fora de ordem são gatilhos: consultamos estado atual na SFU, não reaplicamos cegamente eventos antigos. Se LiveKit não responde, novas reservas falham com 503. Lease persistente permite recuperar reinício. Conexões precisam heartbeat em 45 s e sessão válida. Página precisa ping WebSocket; é removida da presença em até 45 s, com verificação a cada 10 s.
+
+Não há transação distribuída PostgreSQL/LiveKit. Concessão externa seguida de falha de commit pode deixar permissão órfã por alguns segundos; reconciliador a remove. JWTs renovados pela SFU podem carregar permissões elevadas; a admissão de sinalização os substitui por grants só de microfone. [SECURITY](SECURITY.md) registra as fronteiras desse controle. Não confundir uma única lease autorizada com garantia adversarial de uma única track em cada instante.
+
+Modelo: accounts → messages; accounts → media_connections → session_id; screen_lease tem uma linha. Sessões JDBC persistem no PostgreSQL. Senhas não são recuperáveis. Backup inclui contas, histórico, esquema; restauração apaga sessões/conexões/leases por segurança.

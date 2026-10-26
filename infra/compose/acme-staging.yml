@@ -1,0 +1,11 @@
+# Somente com CHAT_MODE=prd CHAT_ACME_STAGING=true.
+services:
+  edge:
+    environment:
+      ACME_CA: https://acme-staging-v02.api.letsencrypt.org/directory
+    volumes:
+      - certificates_staging:/data
+      - caddy_config_staging:/config
+volumes:
+  certificates_staging:
+  caddy_config_staging:
