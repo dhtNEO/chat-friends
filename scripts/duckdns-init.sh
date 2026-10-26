@@ -31,4 +31,6 @@ printf '%s\n' "$app" "$media" "$email" "$wan" "$https_port" | duck_node init
 fi
 if [[ ! -f .env ]]; then ./scripts/configure.sh dev; fi
 duck_node prepare >/dev/null
+printf "prd\n" > infra/compose/generated/mode
+chmod 600 infra/compose/generated/mode
 echo 'DNS confirmado e configuração preparada. Abra as portas previstas no guia e inicie CHAT_MODE=prd ./scripts/up.sh.'

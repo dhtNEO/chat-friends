@@ -7,8 +7,8 @@ chat_mode() {
   esac
 }
 chat_saved_mode() {
-  local file=infra/compose/generated/network/mode
-  [[ -f "$file" ]] || file=infra/compose/generated/mode
+  local file=infra/compose/generated/mode
+  [[ -f "$file" ]] || file=infra/compose/generated/network/mode
   [[ -f "$file" ]] || return 0
   case "$(cat "$file")" in
     dev|local) printf 'dev\n' ;;

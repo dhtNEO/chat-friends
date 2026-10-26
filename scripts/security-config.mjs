@@ -1,4 +1,4 @@
-// Operator-only configuration. Helpers never mount this file or its output.
+// Operator-only generator. Database/MFA keys stay outside worker mounts.
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { parseEnv } from "./network-config.mjs";

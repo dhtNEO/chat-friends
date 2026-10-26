@@ -60,7 +60,7 @@ Implementação na branch `work`, 26/10/2026. Execute a atualização em manuten
 
 ### Alteração nos arquivos gerados
 
-`.env` permanece como configuração do operador. O atualizador não o reescreve. Overrides de DNS/IP/origem ficam em `generated/network/network.env`; Compose os carrega após `.env` e `generated/runtime.env`. O YAML da SFU fica em `generated/network/livekit.yaml`. O helper recebe somente `generated/helper.env` (credenciais de mídia e parâmetros de rede), scripts RO e os diretórios network/duckdns. Ele não recebe a senha do banco nem a chave MFA. Renomeações atômicas continuam dentro de diretórios graváveis.
+`.env` permanece como configuração do operador. O atualizador não o reescreve. Overrides de DNS/IP/origem ficam em `generated/network/network.env`; Compose os carrega após `.env` e `generated/runtime.env`. O YAML da SFU fica em `generated/livekit.yaml`. O helper recebe somente `generated/helper.env` (credenciais de mídia e parâmetros de rede), scripts RO e os diretórios network/duckdns. Ele não recebe a senha do banco nem a chave MFA. Renomeações atômicas continuam dentro de diretórios graváveis.
 
 Ao voltar a dev em manutenção, arquive/remova o override `generated/network/network.env` do caminho ativo, restaure as origens localhost no `.env` e use `CHAT_ALLOW_MODE_CHANGE=true ./scripts/configure.sh dev`. Não deixe o agendador prd executando durante a troca.
 
@@ -103,3 +103,5 @@ Revisar avisos de segurança semanalmente e após alertas relevantes; executar C
 As publicações prd do aplicativo/SFU são explicitamente IPv4. Isso não altera nem comprova o firewall IPv6 dos demais serviços do Mac.
 
 Na primeira atualização, snapshots completos antigos e arquivos temporários desconhecidos do DuckDNS são preservados em `generated/operator-backups`, fora do mount do helper. Os snapshots ativos passam a conter somente parâmetros de rede. A configuração usa o mesmo lock do atualizador para evitar concorrência nessa migração. Logs ficam separados em `generated/duckdns-logs`. Proteja também os arquivos arquivados e aplique retenção somente após verificar o backup.
+
+O helper propõe `generated/network/network.env` e um YAML candidato em `generated/network/livekit.yaml`. O chamador valida uma lista fechada de variáveis e não permite expansão de segredos. O YAML ativo (`generated/livekit.yaml`) e o marcador de modo ficam fora do mount gravável do worker e são gerados pelo código do operador sob lock. Assim, o estado de rede não pode sobrescrever credenciais de banco/MFA nem escolher o modo de execução.

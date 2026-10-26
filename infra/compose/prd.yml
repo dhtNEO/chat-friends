@@ -3,6 +3,7 @@ services:
   backend:
     environment:
       ADMIN_MFA_REQUIRED: "true"
+      COOKIE_SECURE: "true"
   livekit:
     ports: !override
       - "0.0.0.0:7881:7881/tcp"

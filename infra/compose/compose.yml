@@ -79,7 +79,7 @@ services:
       NO_PROXY: localhost,127.0.0.1,backend,db,livekit,web
       no_proxy: localhost,127.0.0.1,backend,db,livekit,web
     command: ["--config", "/etc/livekit.yaml"]
-    volumes: ["./generated/network/livekit.yaml:/etc/livekit.yaml:ro"]
+    volumes: ["./generated/livekit.yaml:/etc/livekit.yaml:ro"]
     ports:
       - "127.0.0.1:7881:7881/tcp"
       - "127.0.0.1:7882:7882/udp"

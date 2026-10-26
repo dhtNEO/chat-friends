@@ -16,6 +16,7 @@ unset phrase repeat
 mkdir "$work/config"
 cp .env "$work/config/env"
 cp infra/compose/generated/runtime.env "$work/config/runtime.env"
+cp infra/compose/generated/livekit.yaml "$work/config/livekit.yaml"
 for dir in network duckdns turn-certs; do
  if [[ -d infra/compose/generated/$dir ]]; then cp -R "infra/compose/generated/$dir" "$work/config/$dir"; fi
 done

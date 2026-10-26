@@ -253,7 +253,6 @@ export async function prepare(
   }
   if (!fs.existsSync(yamlFile) || !fs.readFileSync(yamlFile).equals(yaml))
     atomic(yamlFile, yaml);
-  atomic(path.join(root, "infra/compose/generated/network/mode"), "prd\n");
   if (next !== original) atomic(envFile, next);
   const desired = { ip, fingerprint: fingerprint(root) };
   atomic(path.join(dir, "pending.json"), JSON.stringify(desired));
