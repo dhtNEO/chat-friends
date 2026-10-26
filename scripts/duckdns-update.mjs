@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { checkHTTPS } from "./duckdns-https.mjs";
+import { portSuffix } from "./network-config.mjs";
 import {
   DuckDNSError,
   directory,
@@ -13,15 +15,26 @@ const root = process.cwd(),
   action = process.argv[2];
 try {
   if (action === "init") {
-    const [appDomain, mediaDomain, email, wanIP] = fs
+    const [appDomain, mediaDomain, email, wanIP, httpsPort] = fs
       .readFileSync(0, "utf8")
       .trim()
       .split(/\r?\n/);
-    const value = settings({ appDomain, mediaDomain, email, wanIP });
+    const value = settings({
+      appDomain,
+      mediaDomain,
+      email,
+      wanIP,
+      httpsPort: httpsPort || 18443,
+    });
     atomic(directory + "/settings.json", JSON.stringify(value));
     console.log("Configuração DuckDNS salva; DNS ainda não foi atualizado.");
-  } else if (action === "prepare" || action === "update")
-    console.log(await prepare(root, { initial: action === "prepare" }));
+  } else if (action === "prepare" || action === "update" || action === "start")
+    console.log(
+      await prepare(root, {
+        initial: action === "prepare",
+        allowOriginChange: action === "start",
+      }),
+    );
   else if (action === "diagnose") {
     const config = settings(
       JSON.parse(fs.readFileSync(directory + "/settings.json", "utf8")),
@@ -31,16 +44,16 @@ try {
     );
     for (const domain of [config.appDomain, config.mediaDomain]) {
       await verifyDNS(domain, applied.ip);
-      const response = await fetch(
-        "https://" +
-          domain +
-          (domain === config.appDomain ? "/api/health" : "/"),
-        { signal: AbortSignal.timeout(8000), redirect: "error" },
+      await checkHTTPS(
+        domain,
+        portSuffix(config.httpsPort ?? 18443),
+        domain === config.appDomain ? "/api/health" : "/",
+        domain === config.appDomain ? 200 : 404,
       );
-      if (response.status !== (domain === config.appDomain ? 200 : 404))
-        throw new Error("HTTPS não respondeu como esperado");
     }
-    console.log("DNS A/AAAA e HTTPS dos dois nomes: OK (TLS validado).");
+    console.log(
+      "DNS A/AAAA e HTTPS interno: OK (certificado validado para os dois nomes). Teste WAN separadamente.",
+    );
   } else if (action === "health") {
     await healthy(root);
     console.log("SFU administrativa saudável.");

@@ -17,3 +17,5 @@ Versões diretas fixadas em pom.xml/package.json/Dockerfiles/Compose; resoluçã
 É inventário inicial, não parecer jurídico nem inventário exaustivo de transitivas/imagens. Consulte LICENSE/NOTICE de cada distribuição antes de redistribuir. Preserve avisos; gere SBOM e revisão de transitivas na publicação. `npm audit` é executado na validação, não prova ausência de vulnerabilidades desconhecidas. CI executa Trivy em arquivos para dependências/segredos; mantenha banco de advisories atualizado e trate resultados com contexto.
 
 LICENSE GPL-3.0 já existia no commit inicial e não foi alterado. Confirmação da licença pretendida para o código novo permanece decisão do proprietário.
+
+Edge DuckDNS: Caddy 2.11.4, `caddy-dns/duckdns` v0.5.0 e `libdns/duckdns` v0.3.0; resolução Go completa em `infra/caddy/go.mod` e `go.sum`. O módulo local `duckdns_private` filtra erros do provider antes de enviá-los aos logs. Fontes: https://github.com/caddy-dns/duckdns e https://github.com/libdns/duckdns. Não publicar imagens sem revisar os avisos/licenças das distribuições.

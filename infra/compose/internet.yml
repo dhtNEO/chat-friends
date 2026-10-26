@@ -7,7 +7,7 @@ services:
   web:
     ports: !override []
   edge:
-    image: caddy:2.10.2-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
     ports: ["80:80/tcp", "443:443/tcp", "443:443/udp"]

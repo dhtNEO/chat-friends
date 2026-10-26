@@ -59,7 +59,9 @@ jobs:
       - run: python3 scripts/tests/duckdns-lock.py
       - run: ./scripts/up.sh
       - run: python3 scripts/tests/compose-profile.py
+      - run: docker build -t chat-friends-edge-duckdns infra/caddy
       - run: python3 scripts/tests/internet-profile.py
+      - run: python3 scripts/tests/dns01-https.py
       - run: python3 scripts/tests/container-bindings.py
       - run: ./scripts/compose.sh config -q && CHAT_MODE=internet ./scripts/compose.sh config -q
       - name: Browser tests with disposable administrator
@@ -101,3 +103,4 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/backend.oci backend
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/frontend.oci frontend
+      - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/edge.oci infra/caddy

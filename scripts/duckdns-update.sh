@@ -10,7 +10,7 @@ source scripts/duckdns-common.sh
 duck_lock
 [[ -f "$duck_dir/token" && -f "$duck_dir/settings.json" ]] || { echo 'Configuração DuckDNS ausente.' >&2; exit 1; }
 if [[ "$action" == update && -z "$(./scripts/compose.sh ps -q livekit)" ]]; then echo 'SFU parada; o agendador não inicia a stack automaticamente.' >&2; exit 1; fi
-decision=$(duck_node update)
+if [[ "$action" == --start ]]; then decision=$(duck_node start); else decision=$(duck_node update); fi
 [[ "$decision" == restart || "$decision" == unchanged ]] || exit 1
 if [[ "$action" == --start ]]; then ./scripts/compose.sh up -d --build --wait --wait-timeout 240; fi
 if [[ "$decision" == restart ]]; then

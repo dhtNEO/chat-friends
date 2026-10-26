@@ -2,6 +2,10 @@
 
 Data: **26/10/2026 (America/Sao_Paulo)**. Estado: **implementação entregue; ativação externa pendente**. Consulte o [guia executável](DUCKDNS_SETUP.md). Base: `dc4c012`. Este documento não registra domínios, altera roteador ou publica serviços.
 
+## Revisão após teste de rede
+
+O proprietário confirmou acesso externo em TCP 18443 encaminhado para 443 do Mac, enquanto 80/443 públicas deram timeout. A implementação agora usa **HTTPS/WSS :18443 e DNS-01**, conforme [guia atualizado](DUCKDNS_SETUP.md). As seções abaixo preservam o plano original com HTTP/TLS-ALPN como histórico; para ativação, seguir o guia atualizado. Não é necessária liberação das portas WAN 80/443 neste modo.
+
 ## Decisão e premissas
 
 Usar o perfil existente **`CHAT_MODE=internet`**, dois nomes gratuitos DuckDNS, certificados públicos gerenciados pelo Caddy e mídia LiveKit diretamente pelo IPv4 público do servidor. Amigos acessam pelo navegador, sem cliente VPN.

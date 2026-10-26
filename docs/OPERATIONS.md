@@ -21,3 +21,5 @@ Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.
 ## DuckDNS e IPv4 público
 
 Atualizador, bootstrap, ACME staging isolado e LaunchAgent implementados: [guia DuckDNS](DUCKDNS_SETUP.md). Atualiza DNS e IP anunciado pelo LiveKit, com lock e confirmação após saúde. Testes locais usam API/DNS simulados; DNS/HTTPS reais, portas do roteador, macOS e capacidade externa permanecem pendentes.
+
+DuckDNS revisado após bloqueio de portas padrão: HTTPS/WSS público **18443 → 443 no Mac**, certificados **DNS-01**, sem entrada WAN 80/443. Ver [migração](DUCKDNS_SETUP.md). Caddy atualizado para 2.11.4; emissão real e mídia externa seguem pendentes de teste no servidor.

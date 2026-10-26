@@ -32,6 +32,7 @@ async function fixture(fn) {
     "network-config.mjs",
     "duckdns-update.mjs",
     "duckdns-lib.mjs",
+    "duckdns-https.mjs",
   ])
     fs.copyFileSync(
       path.join(root, "scripts", name),
@@ -306,4 +307,49 @@ test("LaunchAgent escapa caminhos, usa binário absoluto e não contém token", 
   assert.match(result.stdout, /Test &amp; App/);
   assert.ok(!result.stdout.includes(token));
   assert.ok(!result.stdout.includes("__REPO__"));
+});
+
+test("DuckDNS gera HTTPS/WSS na porta 18443, sem mudar portas internas da SFU", () =>
+  fixture(async (cwd) => {
+    await prepare(cwd, { initial: true, ...network() });
+    const env = fs.readFileSync(path.join(cwd, ".env"), "utf8");
+    assert.match(env, /APP_ORIGIN=https:\/\/test-app.duckdns.org:18443/);
+    assert.match(
+      env,
+      /LIVEKIT_PUBLIC_URL=wss:\/\/test-media.duckdns.org:18443/,
+    );
+    assert.match(env, /PUBLIC_HTTPS_PORT=18443/);
+    const yaml = fs.readFileSync(
+      path.join(cwd, "infra/compose/generated/livekit.yaml"),
+      "utf8",
+    );
+    assert.match(yaml, /tcp_port: 7881/);
+    assert.match(yaml, /udp_port: 7882/);
+  }));
+test("migração de 443 exige startup completo; job não muda origem sozinho", () =>
+  fixture(async (cwd) => {
+    fs.writeFileSync(
+      path.join(cwd, directory, "settings.json"),
+      JSON.stringify({ ...config, httpsPort: 443 }),
+    );
+    await prepare(cwd, { initial: true, ...network() });
+    commit(cwd);
+    const before = fs.readFileSync(path.join(cwd, ".env"), "utf8");
+    fs.writeFileSync(
+      path.join(cwd, directory, "settings.json"),
+      JSON.stringify(config),
+    );
+    await assert.rejects(prepare(cwd, network()), /Porta\/origem mudou/);
+    assert.equal(fs.readFileSync(path.join(cwd, ".env"), "utf8"), before);
+    assert.equal(
+      await prepare(cwd, { allowOriginChange: true, ...network() }),
+      "restart",
+    );
+    assert.match(fs.readFileSync(path.join(cwd, ".env"), "utf8"), /:18443/);
+  }));
+test("porta personalizada é validada; 443 permanece compatível", () => {
+  for (const httpsPort of [0, 80, 65536, -1, "18443/path", "018443", "https"])
+    assert.throws(() => settings({ ...config, httpsPort }));
+  assert.doesNotThrow(() => settings({ ...config, httpsPort: 18443 }));
+  assert.doesNotThrow(() => settings({ ...config, httpsPort: 443 }));
 });

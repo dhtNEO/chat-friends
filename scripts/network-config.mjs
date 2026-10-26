@@ -54,3 +54,17 @@ export function parseEnv(text) {
       }),
   );
 }
+
+export function httpsPort(value = 443) {
+  const text = String(value);
+  if (
+    !/^[1-9][0-9]{0,4}$/.test(text) ||
+    Number(text) > 65535 ||
+    (Number(text) < 1024 && text !== "443")
+  )
+    throw new Error("Porta HTTPS pública inválida");
+  return Number(text);
+}
+export function portSuffix(port) {
+  return httpsPort(port) === 443 ? "" : ":" + httpsPort(port);
+}

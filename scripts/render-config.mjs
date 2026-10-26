@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
-import { publicIPv4, hostname, email } from "./network-config.mjs";
+import { publicIPv4, hostname, email, portSuffix } from "./network-config.mjs";
 const mode = process.argv[2] || "local";
 if (!["local", "internet", "tailscale"].includes(mode))
   throw new Error("Modo deve ser local, internet ou tailscale");
@@ -79,8 +79,14 @@ if (mode === "internet") {
       "Internet requer domínios distintos, email ACME e API interna",
     );
   if (
-    values.APP_ORIGIN !== "https://" + values.APP_DOMAIN ||
-    values.LIVEKIT_PUBLIC_URL !== "wss://" + values.MEDIA_DOMAIN
+    values.APP_ORIGIN !==
+      "https://" +
+        values.APP_DOMAIN +
+        portSuffix(values.PUBLIC_HTTPS_PORT || 443) ||
+    values.LIVEKIT_PUBLIC_URL !==
+      "wss://" +
+        values.MEDIA_DOMAIN +
+        portSuffix(values.PUBLIC_HTTPS_PORT || 443)
   )
     throw new Error("URLs devem corresponder aos domínios");
 }

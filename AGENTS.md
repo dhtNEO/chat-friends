@@ -17,3 +17,5 @@
 - Perfil Tailscale: docs/TAILSCALE_SETUP.md. Não recriar só o nó: up.sh coordena namespace. Web é loopback e API LiveKit escuta no IP Docker; preservar essas restrições. Testes: node --test scripts/tests/*.test.mjs e python3 scripts/tests/compose-profile.py (com .env descartável). Sem conta/TUN não afirmar validação externa.
 
 - DuckDNS: docs/DUCKDNS_SETUP.md. Token privado em generated/duckdns/token, nunca em argv/logs. Preservar lock Docker e pending/applied; diagnóstico não confirma aplicação. CI testa mocks e lock real sem conta; nunca alegar validação WAN/ACME sem executá-la.
+
+- DuckDNS DNS-01: edge customizado infra/caddy, provider duckdns_private filtra erros com token. Nunca usar upstream diretamente nem exportar segredo no Compose. Porta pública 18443, host/container 443; mudanças de origem exigem startup completo.

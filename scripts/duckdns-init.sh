@@ -14,12 +14,14 @@ read -r -p 'Nome APP registrado (nome.duckdns.org): ' app
 read -r -p 'Nome MIDIA registrado (outro.duckdns.org): ' media
 read -r -p 'Email para certificado ACME: ' email
 read -r -p 'IPv4 WAN atual do roteador: ' wan
+read -r -p 'Porta HTTPS pública [18443]: ' https_port
+https_port=${https_port:-18443}
 read -r -s -p 'Token DuckDNS (não será exibido): ' token
 printf '\n'
 printf '%s' "$token" > "$duck_dir/token"
 chmod 600 "$duck_dir/token"
 unset token
-printf '%s\n' "$app" "$media" "$email" "$wan" | duck_node init
+printf '%s\n' "$app" "$media" "$email" "$wan" "$https_port" | duck_node init
 fi
 if [[ ! -f .env ]]; then ./scripts/configure.sh local; fi
 duck_node prepare >/dev/null

@@ -16,6 +16,7 @@ duck_remove_operation() {
 duck_node() {
   local network=${DUCKDNS_NETWORK:-bridge}
   "$duck_docker" run --rm -i --name "$duck_operation" --label "chatfriends.duckdns.lock=$duck_lock_id" --network "$network" \
+    -e NO_PROXY=localhost,127.0.0.1,backend,db,livekit,web,edge -e no_proxy=localhost,127.0.0.1,backend,db,livekit,web,edge \
     --user "$(id -u):$(id -g)" -v "$PWD:/work" -v "$PWD/$duck_dir/token:/work/$duck_dir/token:ro" -w /work \
     node:24.14.0-alpine node scripts/duckdns-update.mjs "$@"
 }

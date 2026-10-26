@@ -3,7 +3,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { Resolver } from "node:dns/promises";
-import { publicIPv4, email, parseEnv } from "./network-config.mjs";
+import {
+  publicIPv4,
+  email,
+  parseEnv,
+  httpsPort,
+  portSuffix,
+} from "./network-config.mjs";
 export class DuckDNSError extends Error {}
 export const directory = "infra/compose/generated/duckdns";
 export function atomic(file, data) {
@@ -16,6 +22,7 @@ export function atomic(file, data) {
   }
 }
 export function settings(value) {
+  httpsPort(value.httpsPort ?? 18443);
   for (const key of ["appDomain", "mediaDomain"])
     if (
       !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.duckdns\.org$/.test(
@@ -94,7 +101,13 @@ export function fingerprint(root) {
 }
 export async function prepare(
   root,
-  { initial = false, fetcher = fetch, dns = verifyDNS, pause } = {},
+  {
+    initial = false,
+    allowOriginChange = false,
+    fetcher = fetch,
+    dns = verifyDNS,
+    pause,
+  } = {},
 ) {
   const dir = path.join(root, directory);
   const config = settings(
@@ -143,12 +156,26 @@ export async function prepare(
     throw new DuckDNSError(
       "Configuração mudou; execute bootstrap em manutenção",
     );
+  if (
+    !initial &&
+    !allowOriginChange &&
+    (values.APP_ORIGIN !==
+      "https://" + config.appDomain + portSuffix(config.httpsPort ?? 18443) ||
+      values.LIVEKIT_PUBLIC_URL !==
+        "wss://" + config.mediaDomain + portSuffix(config.httpsPort ?? 18443))
+  )
+    throw new DuckDNSError(
+      "Porta/origem mudou; inicie CHAT_MODE=internet ./scripts/up.sh em manutenção",
+    );
   const updates = {
     APP_DOMAIN: config.appDomain,
     MEDIA_DOMAIN: config.mediaDomain,
     ACME_EMAIL: config.email,
-    APP_ORIGIN: "https://" + config.appDomain,
-    LIVEKIT_PUBLIC_URL: "wss://" + config.mediaDomain,
+    PUBLIC_HTTPS_PORT: String(httpsPort(config.httpsPort ?? 18443)),
+    APP_ORIGIN:
+      "https://" + config.appDomain + portSuffix(config.httpsPort ?? 18443),
+    LIVEKIT_PUBLIC_URL:
+      "wss://" + config.mediaDomain + portSuffix(config.httpsPort ?? 18443),
     COOKIE_SECURE: "true",
     LIVEKIT_NODE_IP: ip,
     LIVEKIT_INTERNAL_URL: "http://livekit:7880",
