@@ -25,7 +25,11 @@ function fixture(fn) {
   const cwd = mkdtempSync(join(tmpdir(), "friends-config-"));
   mkdirSync(join(cwd, "infra/compose/generated"), { recursive: true });
   mkdirSync(join(cwd, "scripts"));
-  for (const name of ["render-config.mjs", "tailscale-config.mjs"])
+  for (const name of [
+    "render-config.mjs",
+    "tailscale-config.mjs",
+    "network-config.mjs",
+  ])
     copyFileSync(join(root, "scripts", name), join(cwd, "scripts", name));
   writeFileSync(join(cwd, ".env"), env);
   writeFileSync(

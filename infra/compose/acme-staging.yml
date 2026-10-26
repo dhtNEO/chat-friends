@@ -1,0 +1,12 @@
+# Somente com CHAT_MODE=internet CHAT_ACME_STAGING=true.
+services:
+  edge:
+    environment:
+      ACME_CA: https://acme-staging-v02.api.letsencrypt.org/directory
+    volumes: !override
+      - ./Caddyfile.internet:/etc/caddy/Caddyfile:ro
+      - certificates_staging:/data
+      - caddy_config_staging:/config
+volumes:
+  certificates_staging:
+  caddy_config_staging:

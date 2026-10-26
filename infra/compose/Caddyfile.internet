@@ -1,5 +1,6 @@
 {
  email {$ACME_EMAIL}
+ acme_ca {$ACME_CA}
  admin off
 }
 {$APP_DOMAIN} {

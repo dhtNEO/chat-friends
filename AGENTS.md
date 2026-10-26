@@ -15,3 +15,5 @@
 - Append new Flyway migrations; do not rewrite applied ones. Preserve existing user changes and LICENSE. The owner still needs to confirm licensing intent before distribution.
 
 - Perfil Tailscale: docs/TAILSCALE_SETUP.md. Não recriar só o nó: up.sh coordena namespace. Web é loopback e API LiveKit escuta no IP Docker; preservar essas restrições. Testes: node --test scripts/tests/*.test.mjs e python3 scripts/tests/compose-profile.py (com .env descartável). Sem conta/TUN não afirmar validação externa.
+
+- DuckDNS: docs/DUCKDNS_SETUP.md. Token privado em generated/duckdns/token, nunca em argv/logs. Preservar lock Docker e pending/applied; diagnóstico não confirma aplicação. CI testa mocks e lock real sem conta; nunca alegar validação WAN/ACME sem executá-la.

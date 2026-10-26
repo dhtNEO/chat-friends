@@ -64,3 +64,9 @@ O draft também inclui acesso a cloud.google.com, docs.cloud.google.com, docs.or
 ## Perfil Tailscale
 
 Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).
+
+## DuckDNS e IPv4 público
+
+Atualizador, bootstrap, ACME staging isolado e LaunchAgent implementados: [guia DuckDNS](DUCKDNS_SETUP.md). Atualiza DNS e IP anunciado pelo LiveKit, com lock e confirmação após saúde. Testes locais usam API/DNS simulados; DNS/HTTPS reais, portas do roteador, macOS e capacidade externa permanecem pendentes.
+
+Evidência DuckDNS nesta implementação: **26 testes de configuração/atualizador e 8 testes Playwright passaram**, lint/build passaram; lock com processo morto e helper órfão testado no Docker real; Caddy/portas/volumes ACME validados em staging e produção sem emissão. Consulta administrativa assinada executada contra SFU real. Contrato de DNS atualizado foi exercitado com mocks, sem token externo. LaunchAgent exige aceite no macOS.

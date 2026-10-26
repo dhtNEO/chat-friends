@@ -11,5 +11,9 @@ case "$mode" in
     args+=(-f infra/compose/tailscale.yml) ;;
   *) echo 'CHAT_MODE inválido' >&2; exit 1 ;;
 esac
+if [[ "${CHAT_ACME_STAGING:-false}" == true ]]; then
+  [[ "$mode" == internet ]] || { echo 'ACME staging exige internet' >&2; exit 1; }
+  args+=(-f infra/compose/acme-staging.yml)
+fi
 if [[ "${CHAT_TURN:-false}" == true ]]; then args+=(-f infra/compose/turn.yml); fi
-exec docker compose "${args[@]}" "$@"
+exec "${DUCKDNS_DOCKER_BIN:-docker}" compose "${args[@]}" "$@"

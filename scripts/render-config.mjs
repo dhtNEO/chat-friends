@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
+import { publicIPv4, hostname, email } from "./network-config.mjs";
 const mode = process.argv[2] || "local";
 if (!["local", "internet", "tailscale"].includes(mode))
   throw new Error("Modo deve ser local, internet ou tailscale");
@@ -56,17 +57,27 @@ if (mode === "internet") {
     values.COOKIE_SECURE !== "true" ||
     !values.APP_ORIGIN?.startsWith("https://") ||
     !values.LIVEKIT_PUBLIC_URL?.startsWith("wss://") ||
-    ip === "127.0.0.1"
+    !publicIPv4(ip)
   )
     throw new Error(
       "Internet requer HTTPS, WSS, COOKIE_SECURE=true e IP anunciado alcançável",
     );
   for (const k of ["APP_DOMAIN", "MEDIA_DOMAIN"])
     if (
-      !/^[a-zA-Z0-9.-]+$/.test(values[k] || "") ||
-      values[k].endsWith("example.com")
+      !hostname(values[k]) ||
+      values[k].toLowerCase().endsWith("example.com") ||
+      values[k].toLowerCase().endsWith(".ts.net")
     )
       throw new Error("Preencha " + k);
+  if (
+    values.APP_DOMAIN?.toLowerCase() === values.MEDIA_DOMAIN?.toLowerCase() ||
+    !email(values.ACME_EMAIL) ||
+    (values.LIVEKIT_INTERNAL_URL || "http://livekit:7880") !==
+      "http://livekit:7880"
+  )
+    throw new Error(
+      "Internet requer domínios distintos, email ACME e API interna",
+    );
   if (
     values.APP_ORIGIN !== "https://" + values.APP_DOMAIN ||
     values.LIVEKIT_PUBLIC_URL !== "wss://" + values.MEDIA_DOMAIN

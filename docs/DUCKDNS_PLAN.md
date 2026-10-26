@@ -1,6 +1,6 @@
 # DuckDNS com IPv4 público — plano de implementação
 
-Data: **26/10/2026 (America/Sao_Paulo)**. Estado: **planejado, para execução futura**. Base: `dc4c012`. Este documento não registra domínios, altera roteador ou publica serviços.
+Data: **26/10/2026 (America/Sao_Paulo)**. Estado: **implementação entregue; ativação externa pendente**. Consulte o [guia executável](DUCKDNS_SETUP.md). Base: `dc4c012`. Este documento não registra domínios, altera roteador ou publica serviços.
 
 ## Decisão e premissas
 
@@ -126,7 +126,7 @@ Uma mudança real de IP interrompe chamadas; a automação restaura o serviço, 
 7. **Validação externa:** testar app, sinalização e mídia a partir de duas redes externas; corrigir antes de instalar o agendamento permanente e convidar o restante do grupo.
 8. **Agendamento e operação:** instalar LaunchAgent, exercitar mudança simulada de IP em ambiente isolado, verificar recuperação após OrbStack/rede indisponíveis e documentar como desativar o job.
 
-Comandos finais de ativação devem ser publicados no futuro guia depois que os scripts existirem. Os nomes de scripts deste plano são entregas propostas, não comandos atualmente disponíveis.
+Scripts e comandos de ativação agora estão no [guia DuckDNS](DUCKDNS_SETUP.md). Conta, roteador, ACME e aceite no Mac ainda precisam ser executados pelo proprietário.
 
 ## Testes e critérios de aceite
 

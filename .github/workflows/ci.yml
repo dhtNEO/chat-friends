@@ -56,8 +56,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "24.14.0" }
       - run: node --test scripts/tests/*.test.mjs
+      - run: python3 scripts/tests/duckdns-lock.py
       - run: ./scripts/up.sh
       - run: python3 scripts/tests/compose-profile.py
+      - run: python3 scripts/tests/internet-profile.py
       - run: python3 scripts/tests/container-bindings.py
       - run: ./scripts/compose.sh config -q && CHAT_MODE=internet ./scripts/compose.sh config -q
       - name: Browser tests with disposable administrator

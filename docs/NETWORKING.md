@@ -8,7 +8,7 @@ O gerador mantém `enable_loopback_candidate: false` dentro do container LiveKit
 
 ## 2. LAN
 
-Use nomes DNS alcançáveis, certificados confiáveis nos dispositivos e IP LAN anunciado no LiveKit. Não use HTTP por IP privado para prometer getUserMedia/getDisplayMedia. Para laboratório, Caddy `tls internal` exige instalar a CA local em cada dispositivo conscientemente; não desative verificação TLS. Alternativa: domínio real e TLS público. Ajuste APP_ORIGIN, LIVEKIT_PUBLIC_URL e COOKIE_SECURE=true, bindings de portas para interface LAN. O perfil internet pode ser usado com domínio real e firewall restrito à LAN; certificados ACME precisam alcançar o host ou usar DNS challenge (não incluído). Validar macOS e outros dispositivos separadamente.
+Use nomes DNS alcançáveis, certificados confiáveis nos dispositivos e IP LAN anunciado no LiveKit. Não use HTTP por IP privado para prometer getUserMedia/getDisplayMedia. Para laboratório, Caddy `tls internal` exige instalar a CA local em cada dispositivo conscientemente; não desative verificação TLS. Alternativa: domínio real e TLS público. Ajuste APP_ORIGIN, LIVEKIT_PUBLIC_URL e COOKIE_SECURE=true, bindings de portas para interface LAN. O perfil internet exige IPv4 global; uma LAN isolada com IP privado requer configuração própria de rede/TLS. Com domínio real e firewall restrito à LAN, certificados ACME precisam alcançar o host ou usar DNS challenge (não incluído). Validar macOS e outros dispositivos separadamente.
 
 ## 3. Internet com IP público
 
@@ -49,3 +49,7 @@ Checklist antes de convite externo: upload sustentado cabeado; WAN/CGNAT; acesso
 ## Perfil Tailscale
 
 Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).
+
+## DuckDNS e IPv4 público
+
+Atualizador, bootstrap, ACME staging isolado e LaunchAgent implementados: [guia DuckDNS](DUCKDNS_SETUP.md). Atualiza DNS e IP anunciado pelo LiveKit, com lock e confirmação após saúde. Testes locais usam API/DNS simulados; DNS/HTTPS reais, portas do roteador, macOS e capacidade externa permanecem pendentes.
