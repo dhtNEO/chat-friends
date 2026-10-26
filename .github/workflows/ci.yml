@@ -1,0 +1,98 @@
+name: Validate
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      multiarch:
+        description: Build ARM64 and AMD64 locally in CI (no publication)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.7-alpine
+        env:
+          POSTGRES_USER: friends
+          POSTGRES_PASSWORD: ci-ephemeral-test-only
+          POSTGRES_DB: friends_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U friends -d friends_test"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      DATABASE_URL: jdbc:postgresql://localhost:5432/friends_test
+      POSTGRES_USER: friends
+      POSTGRES_PASSWORD: ci-ephemeral-test-only
+      LIVEKIT_API_KEY: ci-only
+      LIVEKIT_API_SECRET: ci-ephemeral-test-secret-never-for-runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "25", cache: maven }
+      - run: ./mvnw -B -ntp verify
+        working-directory: backend
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          {
+            node-version: "24.14.0",
+            cache: npm,
+            cache-dependency-path: frontend/package-lock.json,
+          }
+      - run: npm ci && npm run lint && npm run build && npm audit --omit=dev --audit-level=high
+        working-directory: frontend
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24.14.0" }
+      - run: ./scripts/up.sh
+      - run: ./scripts/compose.sh config -q && CHAT_MODE=internet ./scripts/compose.sh config -q
+      - name: Browser tests with disposable administrator
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          secret=$(mktemp "$PWD/infra/compose/generated/ci-admin.XXXXXX")
+          trap 'rm -f "$secret"' EXIT
+          openssl rand -hex 24 > "$secret"
+          export TEST_ADMIN_PASSWORD="$(cat "$secret")"
+          echo "::add-mask::$TEST_ADMIN_PASSWORD"
+          ./scripts/compose.sh run --rm --no-deps --user 0:0 -v "$secret:/run/password:ro" -e ADMIN_PASSWORD_FILE=/run/password backend --server.port=0 --bootstrap-admin=admin
+          export TEST_LIVEKIT_SECRET="$(node -e 'const fs=require("fs");process.stdout.write(fs.readFileSync(".env","utf8").split("\n").find(l=>l.startsWith("LIVEKIT_API_SECRET=")).slice(19))')"
+          echo "::add-mask::$TEST_LIVEKIT_SECRET"
+          cd frontend
+          npm ci
+          npx playwright install --with-deps chromium
+          npm test
+      - run: ./scripts/test-backup.sh
+      - if: always()
+        run: ./scripts/compose.sh down
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.13.5" }
+      - run: terraform fmt -check && terraform init -backend=false && terraform validate
+        working-directory: infra/gcp
+      - name: Dependency and secret scan (no publication)
+        run: docker run --rm -v "$PWD:/work:ro" aquasec/trivy:0.68.1 fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /work/.git /work
+  multiarch:
+    if: github.event_name == 'workflow_dispatch' && inputs.multiarch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/backend.oci backend
+      - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/frontend.oci frontend

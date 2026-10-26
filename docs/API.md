@@ -1,0 +1,39 @@
+# Contrato HTTP e WebSocket
+
+Mesma origem do frontend. JSON UTF-8, exceto login (form) e webhook (JSON bruto). Antes de login e após login, obtenha `GET /api/csrf`; envie `X-CSRF-TOKEN` em POST/PATCH/DELETE. Cookie `SESSION`, HttpOnly, SameSite=Strict; Secure quando COOKIE_SECURE=true. Sessão inativa expira em 12 h. Sem CORS aberto.
+
+| Método/caminho | Corpo / resultado |
+|---|---|
+| GET /api/health | público, consulta DB, `{status:"ok"}` |
+| GET /api/csrf | público, `{token,headerName}` |
+| POST /api/login | form `username,password`; 204 ou 401/429 |
+| POST /api/logout | 204; invalida sessão |
+| GET /api/me | `{user:{id,username,displayName,admin,enabled},spaceName}` |
+| POST /api/password | `{currentPassword,password}`; invalida todas as sessões e solicita expulsão |
+| GET /api/messages | últimas 50, ordem crescente |
+| GET /api/messages?before=ID | até 50 anteriores, ordem crescente |
+| GET /api/messages?after=ID | até 100 posteriores; repetir até página menor que 100 |
+| POST /api/messages | `{clientId:UUID,body}`; ACK com mensagem após commit |
+| GET /api/admin/accounts | lista; somente administrador |
+| POST /api/admin/accounts | `{username,displayName,password}`; cria usuário comum |
+| PATCH /api/admin/accounts/USERNAME | `{enabled?,password?}`; invalida sessões; admin não pode ser desativado |
+| POST /api/media/join | `{}`; `{identity,token,url,screen:{bitrate,height,fps}}` |
+| POST /api/media/heartbeat | `{identity}` a cada 10 s |
+| POST /api/media/leave | `{identity}` |
+| GET /api/media/state | `{lease:{identity,leaseId,expiresAt},participants:[{identity,name}]}` |
+| POST /api/media/screen | `{identity}`; reserva ou 409 |
+| POST /api/media/screen/heartbeat | `{identity,leaseId}`; renovar antes de 30 s |
+| DELETE /api/media/screen | `{identity,leaseId}`; liberação idempotente |
+| POST /api/media/screen/force-stop | admin; revoga a tela atual |
+| GET /api/livekit/admit | usado pelo Caddy; JWT no Authorization ou URI encaminhada; retorna X-Media-Authorization restrito, nunca concede fonte de tela |
+| POST /api/livekit/webhook | corpo bruto + Authorization assinado pelo LiveKit; única exceção CSRF |
+
+Mensagem: `{id,clientId,authorId,author,body,createdAt}`. `createdAt` ISO-8601 UTC; interface converte ao fuso do navegador. Corpo 1–4000 unidades UTF-16, não vazio; texto puro. Limite 20 mensagens/10 s por conta. Reenvio idempotente não consome limite. Identificador idempotente por autor; corpo divergente dá 409. Sem edição/exclusão no MVP.
+
+Usuário: 3–32 caracteres `[a-z0-9][a-z0-9_.-]{2,31}`. Nome 1–64. Senha 12 caracteres a 72 bytes UTF-8, BCrypt custo 12. Login limitado a 8 tentativas/5 min por nome e 100/5 min por IP visto pelo backend (atrás do proxy, limite compartilhado). Não confiamos em X-Forwarded-For arbitrário.
+
+WebSocket `/ws`: sessão autenticada, `Origin` exatamente APP_ORIGIN. Cliente envia texto `ping` a cada 10 s; servidor responde `{"type":"pong"}`. Eventos: `{"type":"message","message":...}` e `{"type":"presence","users":["username"]}`. Presença deduplicada por conta entre abas. Não é protocolo de envio do chat. Ao reconectar recuperar histórico HTTP; WebSocket não é fila durável.
+
+401: sem sessão/conta desativada. 403: CSRF, origem ou autorização. 400: entrada inválida. 409: conflito/lease/sala cheia. 429: limite. 503: SFU indisponível ou revogação pendente. A interface não deve repetir POST de chat com novo UUID quando a resposta é incerta. Atualizar senha/desativar pode ter sido aplicado mesmo se a expulsão de mídia retornar 503; a reconciliação continuará.
+
+As identidades de mídia são geradas pelo servidor e vinculadas à conta e sessão. Duas abas usam identidades diferentes; ocupam duas das 16 conexões. O cliente não escolhe sala, privilégios administrativos nem permissão de câmera.

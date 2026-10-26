@@ -1,0 +1,22 @@
+{
+ email {$ACME_EMAIL}
+ admin off
+}
+{$APP_DOMAIN} {
+ header Strict-Transport-Security "max-age=31536000"
+ reverse_proxy web:8080
+}
+{$MEDIA_DOMAIN} {
+ @signal path /rtc /rtc/*
+ handle @signal {
+  forward_auth backend:8080 {
+   uri /api/livekit/admit
+   copy_headers X-Media-Authorization
+  }
+  reverse_proxy livekit:7880 {
+   header_up Authorization {http.request.header.X-Media-Authorization}
+   header_up -X-Media-Authorization
+  }
+ }
+ respond 404
+}
