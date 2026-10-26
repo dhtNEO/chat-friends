@@ -147,7 +147,8 @@ public class Media {
             "update media_connections set expires_at=now()+interval '45 seconds' where identity=?"
                 + " and expires_at>now()",
             b.identity())
-        != 1) throw new ResponseStatusException(UNAUTHORIZED);
+        != 1)
+      throw new ResponseStatusException(CONFLICT, "Entre na voz novamente; conexão expirada");
   }
 
   public record AudioPreferences(String identity, boolean deaf) {}
@@ -156,7 +157,8 @@ public class Media {
   public void audio(Principal p, HttpServletRequest q, @RequestBody AudioPreferences b) {
     invalidateState();
     own(b.identity(), p, q);
-    if (!validConnection(b.identity())) throw new ResponseStatusException(UNAUTHORIZED);
+    if (!validConnection(b.identity()))
+      throw new ResponseStatusException(CONFLICT, "Entre na voz novamente; conexão expirada");
     db.update("update media_connections set deaf=? where identity=?", b.deaf(), b.identity());
   }
 

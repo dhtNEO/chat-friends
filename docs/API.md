@@ -55,3 +55,5 @@ As identidades de mídia são geradas pelo servidor e vinculadas à conta e sess
 | DELETE `/api/security/sessions/{id}` | Revoga somente sessão da própria conta |
 
 Mantém CSRF para mutações. HTTP 428 em mutação administrativa exige confirmar identidade em Segurança e repetir a ação explicitamente. Login tem inatividade de 2 h e TTL absoluto de 8 h; replay TOTP/recuperação é recusado.
+
+Heartbeat/estado de áudio de uma conexão expirada retorna 409 e exige nova entrada na voz. HTTP 401 continua representando autenticação/sessão inválida; perder uma conexão de mídia não deve encerrar o login do chat.

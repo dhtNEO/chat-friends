@@ -198,7 +198,7 @@ class IntegrationTest {
         "update media_connections set expires_at=now()-interval '1 second' where"
             + " identity='ana-audio'");
     assertEquals(
-        401,
+        409,
         assertThrows(
                 ResponseStatusException.class,
                 () -> media.audio(() -> "ana", ana, new Media.AudioPreferences("ana-audio", true)))
@@ -471,7 +471,7 @@ class IntegrationTest {
         "update media_connections set expires_at=now()-interval '1 second' where"
             + " identity='expired'");
     assertEquals(
-        401,
+        409,
         assertThrows(
                 ResponseStatusException.class,
                 () -> media.heartbeat(() -> "ana", q, new Media.Connection("expired")))
