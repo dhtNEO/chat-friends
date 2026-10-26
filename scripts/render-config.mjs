@@ -81,7 +81,8 @@ rtc:
   udp_port: 7882
   use_external_ip: false
   node_ip: ${JSON.stringify(ip)}
-  enable_loopback_candidate: true
+  # Docker forwards media to eth0, never to the container loopback socket.
+  enable_loopback_candidate: false
 room:
   max_participants: 16
   empty_timeout: 60

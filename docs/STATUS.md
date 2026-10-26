@@ -1,6 +1,6 @@
 # Estado da implementação — atualizado em 26/10/2026 (America/Sao_Paulo)
 
-Implementação executável no checkout `/workspace/chat-friends`, em Linux AMD64/Docker no Codex. Não foi usado o Mac do proprietário. **Não declarar o aceite completo de mídia ou prontidão para exposição pública irrestrita.** Não houve contratação, conta cloud, apply Terraform, push, publicação de imagem ou publicação do ambiente.
+Implementação executável no checkout `/workspace/chat-friends`, em Linux AMD64/Docker no Codex. Não foi usado o Mac do proprietário. **Não declarar o aceite completo de mídia ou prontidão para exposição pública irrestrita.** Não houve contratação, conta cloud, apply Terraform, publicação de imagem ou publicação do ambiente.
 
 ## Entregas
 
@@ -20,8 +20,8 @@ Implementação executável no checkout `/workspace/chat-friends`, em Linux AMD6
 | `npm run lint`, `npm run build` (TypeScript + Vite) | passaram; aviso de bundle >500 kB (SDK de mídia), não erro |
 | Playwright: login/logout, persistência/XSS como texto, realtime/admin/desativação, viewport móvel | **3 passaram** |
 | Playwright: JWT elevado passando pelo Caddy/SFU real, retorno de permissão só microfone; sessão expirada recusada | **1 passou** |
-| Execução final filtrada desses 4 testes de browser/sinalização | **4 passaram, 0 falharam**; filtro explícito, não a suíte inteira |
-| Suíte completa de 6 testes anterior ao novo teste de sinalização | 3 passaram, **3 falharam** em mídia; não foi um passe completo |
+| Suíte original completa após corrigir candidatos ICE no Docker | **7 passaram, 0 falharam**; inclui áudio sintético bidirecional, recusa de microfone e recepção/parada de vídeo |
+| Suíte completa com regressão de transporte ICE | **8 passaram, 0 falharam**; verifica STUN autenticado em UDP/TCP. Controle negativo com configuração antiga: falha nas duas portas; configuração corrigida: passa |
 | HTTP `/api/health` através de Caddy + saúde DB/backend/web | passou |
 | `scripts/backup.sh`, `scripts/test-backup.sh` e `scripts/restore.sh` | restauração isolada e restauração completa da stack de teste passaram; 5 mensagens preservadas na restauração completa, sessões invalidadas e serviços reiniciados |
 | `docker compose config -q`, local e internet | passaram |
@@ -29,13 +29,17 @@ Implementação executável no checkout `/workspace/chat-friends`, em Linux AMD6
 | `npm audit --omit=dev --audit-level=high` | 0 vulnerabilidades reportadas na execução |
 | Trivy 0.68.1, manifests/segredos, HIGH/CRITICAL | inicialmente CVE-2026-54291 em JDBC 42.7.11; corrigido para **42.7.12**; nova execução: 0 HIGH/CRITICAL, 0 segredos reportados |
 
-Trivy avisou que parte de dependências Maven herdadas não pôde ser inferida do POM. O resultado não é auditoria exaustiva de todas as transitivas e camadas das imagens. CI inclui nova varredura; advisories mudam. Todas as execuções de CI remoto e de build multiarch permanecem **não executadas**; o YAML não é evidência de execução.
+Trivy avisou que parte de dependências Maven herdadas não pôde ser inferida do POM. O resultado não é auditoria exaustiva de todas as transitivas e camadas das imagens. CI inclui nova varredura; advisories mudam. O CI remoto executou e apresentou as três falhas de mídia relatadas pelo proprietário; o resultado remoto após esta correção ainda precisa ser confirmado. Build multiarch não foi executado; o YAML não é evidência de execução.
 
 Comandos cloud usaram configuração explícita de proxy/CA confiável, sem desligar TLS/checksums. Primeiro wrapper only-script falhou porque trocava ZIP por tar.gz quando não havia unzip; foi substituído pelo wrapper oficial bin/Java, mantendo verificação do ZIP oficial. Build cache descartável foi limpo quando o disco encheu; fontes/volumes foram preservados.
 
-## Bloqueio concreto da mídia no runner
+## Correção da falha de mídia no CI
 
-Chromium instalado tem política gerenciada `WebRtcIPHandling=disable_non_proxied_udp`. Diagnóstico mostrou WebSocket LiveKit conectado, candidato remoto TCP 127.0.0.1:7881, ICE em checking e zero bytes de transporte; terminou com falha de conexão. Porta TCP aceitava conexão, o que **não** prova ICE. Não alteramos nem contornamos a política. Os testes de áudio sintético, tela sintética e permissão negada integrada **não foram validados até o fim** aqui. Precisam rodar no Mac/runner de mídia apropriado. O teste independente de sinalização não exige PeerConnection e passou no servidor real.
+A atribuição inicial das falhas à política do Chromium estava incompleta. `enable_loopback_candidate: true` criava também um socket na interface loopback do container, enquanto Docker encaminhava as portas para a interface de rede. Com o mapeamento para `node_ip`, o handshake ICE não recebia resposta, inclusive por TCP. Uma porta TCP aberta não comprova ICE funcionando.
+
+O gerador agora define `enable_loopback_candidate: false`. O IP anunciado ao cliente continua sendo `LIVEKIT_NODE_IP` (127.0.0.1 no perfil local). Antes da correção, probes STUN autenticados por UDP e TCP expiravam; depois, ambos receberam Binding Success. Os sete testes originais passaram, incluindo áudio e tela sintéticos entre duas conexões. O teste adicional de regressão verifica a integridade das respostas STUN nas duas portas e imprime somente estados de transporte para diagnóstico.
+
+A política gerenciada `WebRtcIPHandling=disable_non_proxied_udp` foi preservada. A validação de mídia no browser usa o fallback TCP; o probe UDP nativo verifica separadamente a SFU. Isso não comprova mídia UDP no browser, áudio de sistema, acesso externo ou capacidade para 16 pessoas.
 
 ## Requisitos ainda abertos
 
@@ -49,7 +53,7 @@ Chromium instalado tem política gerenciada `WebRtcIPHandling=disable_non_proxie
 
 ## Próximo passo
 
-No Mac, `./scripts/up.sh`, `./scripts/admin.sh admin`, testes de mídia e checklist NETWORKING. Somente depois avaliar acesso dos amigos e capacidade. Rerodar `npm test` completo com credenciais de teste seguras e browser com WebRTC permitido; registrar os resultados. Resolver a limitação de múltiplas tracks antes de afirmar exclusividade adversarial estrita.
+No Mac, `./scripts/up.sh`, `./scripts/admin.sh admin`, testes de mídia e checklist NETWORKING. Somente depois avaliar acesso dos amigos e capacidade. Confirmar o novo resultado do CI remoto e repetir a suíte completa no Mac com credenciais de teste seguras. Resolver a limitação de múltiplas tracks antes de afirmar exclusividade adversarial estrita.
 
 ## Handoff do ambiente
 

@@ -11,6 +11,7 @@
 | LiveKit 503 | serviço, chave/segredo e URL interna; logs sem token; API de participante deve responder; não liberar nova tela sem revogação |
 | Voz conecta sem som | permissões, mic mute, recepção silenciada, autoplay, input correto, RTCStats/candidate pair |
 | Tela funciona sem áudio | limitação de navegador/SO/fonte; teste aba com som; vídeo continua sendo funcional |
+| Voz fica conectando mesmo com sinalização/portas acessíveis | confira `enable_loopback_candidate: false` no LiveKit em Docker; execute `./scripts/configure.sh` e `./scripts/compose.sh restart livekit` (encerra chamadas). O teste `tests/ice.spec.ts` valida respostas ICE autenticadas em UDP/TCP; não publicar SDP/tokens |
 | ICE falha fora de casa | IP anunciado, portas UDP/TCP, roteador/macOS/VM, CGNAT; túnel HTTP não resolve UDP |
 | Backend unhealthy | DB saudável, migrações, log; health.sh legível pelo UID 10001; memória disponível |
 | Troca de senha do banco falha | `.env` não altera senha em volume já inicializado; ALTER ROLE seguro e credencial correspondente |

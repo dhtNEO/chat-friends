@@ -4,6 +4,8 @@
 
 Perfil local publica 8080/TCP (web e sinalização autenticada), 7881/TCP (ICE fallback), 7882/UDP (ICE multiplexado), **somente 127.0.0.1**. LIVEKIT_NODE_IP=127.0.0.1 é exclusivo desse cenário. localhost é contexto seguro especial. Serviços internos: backend 8080/TCP, PostgreSQL 5432/TCP. Sem TURN por padrão.
 
+O gerador mantém `enable_loopback_candidate: false` dentro do container LiveKit. Docker entrega as portas à interface de rede do container; habilitar também o socket loopback pode impedir as respostas ICE com o mapeamento de `node_ip`. Isso não altera o IP 127.0.0.1 anunciado ao browser no perfil local. O teste `tests/ice.spec.ts`, destinado à stack Compose acessível pelo host de `APP_TEST_URL`, verifica STUN autenticado nas portas padrão 7882/UDP e 7881/TCP.
+
 ## 2. LAN
 
 Use nomes DNS alcançáveis, certificados confiáveis nos dispositivos e IP LAN anunciado no LiveKit. Não use HTTP por IP privado para prometer getUserMedia/getDisplayMedia. Para laboratório, Caddy `tls internal` exige instalar a CA local em cada dispositivo conscientemente; não desative verificação TLS. Alternativa: domínio real e TLS público. Ajuste APP_ORIGIN, LIVEKIT_PUBLIC_URL e COOKIE_SECURE=true, bindings de portas para interface LAN. O perfil internet pode ser usado com domínio real e firewall restrito à LAN; certificados ACME precisam alcançar o host ou usar DNS challenge (não incluído). Validar macOS e outros dispositivos separadamente.
