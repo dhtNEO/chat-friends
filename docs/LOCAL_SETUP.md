@@ -17,3 +17,7 @@ Configurar nome/qualidade: edite SPACE_NAME, SCREEN_HEIGHT (360–720), SCREEN_F
 Os dados ficam em volume nomeado `chat-friends_database`. Shutdown: `./scripts/compose.sh down` preserva volume. Não suspenda o Mac durante encontros; suspensão quebra chamadas e conexões. Após reinício, serviços têm restart policy, mas confirme portas/DNS/IP e healthchecks. Se o daemon não iniciou, inicie OrbStack e rode up.sh novamente. Recomenda-se cabo de rede.
 
 Ambiente cloud Codex com proxy: pode exigir CA corporativa e proxy para builds, além de NO_PROXY para tráfego entre containers. Os Dockerfiles aceitam segredos de build opcionais `maven_settings`, `build_truststore`, `build_ca`; não desligue TLS/checksums. Não copie esses arquivos para o projeto. Configuração específica do runner não é necessária no Mac doméstico usual.
+
+## Perfil Tailscale
+
+Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).

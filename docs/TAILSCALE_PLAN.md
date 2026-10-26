@@ -1,6 +1,6 @@
 # Rede privada: comparação e plano de implementação
 
-Data da pesquisa: **26/10/2026 (America/Sao_Paulo)**. Estado: **plano para execução futura**. Este documento não instala clientes, cria contas, altera ACLs ou ativa acesso remoto. Base do projeto: commit `f26f6c9`.
+Data da pesquisa: **26/10/2026 (America/Sao_Paulo)**. Estado: **implementação no repositório entregue; aceite externo pendente**. Perfil, bootstrap, Serve, testes e operação estão disponíveis no [guia de execução](TAILSCALE_SETUP.md). O ambiente Codex não possui TUN no Docker nem sessão Tailscale; as etapas de conta/compartilhamento e carga no Mac não foram executadas. Base do projeto: commit `f26f6c9`.
 
 ## Decisão
 

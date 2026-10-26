@@ -13,3 +13,7 @@ Internet soma mais 128 MiB de limite para edge. Limites de contêiner são tetos
 Após queda/reinício: aguarde DB saudável/Flyway, confirme saúde, reabra frontend, teste chat e mídia. Sessões/mensagens persistem; sockets/chamadas não. A lease é reconciliada com participantes reais, órfãos são revogados. Falha de LiveKit não deve impedir histórico/chat; UI indica falha ao entrar. Mac suspenso perde chamadas; configure energia conscientemente e prefira cabo.
 
 Manutenção: avise amigos; pare web/edge para bloquear novas escritas (backend não exposto); encerre chamadas; backup final. Veja MIGRATION. Não existe alta disponibilidade. Atualizações de dependências devem preservar verificações de assinatura/checksum/TLS e repetir suíte de riscos.
+
+## Perfil Tailscale
+
+Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).

@@ -177,7 +177,7 @@ test("portas Docker de mídia respondem ao ICE autenticado por UDP e TCP", async
       credentials.password,
       credentials.controlling,
     );
-    const host = new URL(baseURL!).hostname;
+    const host = process.env.TEST_MEDIA_HOST || new URL(baseURL!).hostname;
     const results = await Promise.all(
       (["udp", "tcp"] as const).map(async (protocol) => ({
         protocol,

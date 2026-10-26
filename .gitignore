@@ -15,3 +15,7 @@ backups/
 *.tfvars
 !*.tfvars.example
 *.tsbuildinfo
+
+# Estado/chaves Tailscale: identidade privada do nó
+.tailscale/
+*.authkey

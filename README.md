@@ -21,6 +21,8 @@ Apenas os serviços web e mídia têm portas locais publicadas; PostgreSQL e bac
 
 Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](docs/NETWORKING.md), então `CHAT_MODE=internet ./scripts/up.sh`. Não basta trocar localhost por um IP privado: captura de mídia exige contexto seguro.
 
+Para rede privada sem domínio próprio: veja o [guia Tailscale](docs/TAILSCALE_SETUP.md). O perfil usa HTTPS e mídia pela rede privada; o aceite no Mac e entre amigos ainda precisa ser executado.
+
 ## O que está incluído
 
 - Java 25 / Spring Boot 3.5.16, Maven Wrapper 3.9.11, PostgreSQL 17 / Flyway / sessões JDBC.
@@ -41,7 +43,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 | API e segurança | [API](docs/API.md), [SECURITY](docs/SECURITY.md) |
 | Uso | [USER_GUIDE](docs/USER_GUIDE.md) |
 | OrbStack e rede | [LOCAL_SETUP](docs/LOCAL_SETUP.md), [NETWORKING](docs/NETWORKING.md) |
-| Rede privada com amigos — plano futuro | [Comparação Tailscale/Cloudflare Mesh e plano Tailscale](docs/TAILSCALE_PLAN.md) |
+| Rede privada com amigos | [Configuração Tailscale](docs/TAILSCALE_SETUP.md), [decisão e plano](docs/TAILSCALE_PLAN.md) |
 | Operação e dados | [OPERATIONS](docs/OPERATIONS.md), [BACKUP_RESTORE](docs/BACKUP_RESTORE.md) |
 | GCP e alternativas | [GCP_DEPLOY](docs/GCP_DEPLOY.md), [HOSTING_COSTS](docs/HOSTING_COSTS.md) |
 | Migração | [MIGRATION](docs/MIGRATION.md) |

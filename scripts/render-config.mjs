@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 const mode = process.argv[2] || "local";
-if (!["local", "internet"].includes(mode))
-  throw new Error("Modo deve ser local ou internet");
+if (!["local", "internet", "tailscale"].includes(mode))
+  throw new Error("Modo deve ser local, internet ou tailscale");
+if (mode === "tailscale" && process.env.CHAT_TURN === "true")
+  throw new Error("Tailscale não pode ser combinado com TURN público");
 if (!fs.existsSync(".env")) {
   if (mode !== "local")
     throw new Error("Crie .env com os domínios e IP antes de usar internet");
@@ -71,11 +73,46 @@ if (mode === "internet") {
   )
     throw new Error("URLs devem corresponder aos domínios");
 }
+let dockerIP;
+if (mode === "tailscale") {
+  const node = JSON.parse(
+    fs.readFileSync("infra/compose/generated/tailscale-node.json", "utf8"),
+  );
+  const domain = node.domain;
+  if (
+    node.state !== "Running" ||
+    node.https !== true ||
+    !/^100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}$/.test(ip) ||
+    node.ip !== ip
+  )
+    throw new Error(
+      "Nó Tailscale ausente, deslogado ou IP incompatível; execute tailscale-init.sh",
+    );
+  if (
+    !/^[a-z0-9-]+\.[a-z0-9-]+\.ts\.net$/.test(domain || "") ||
+    values.APP_ORIGIN !== "https://" + domain ||
+    values.LIVEKIT_PUBLIC_URL !== "wss://" + domain ||
+    values.COOKIE_SECURE !== "true" ||
+    values.LIVEKIT_INTERNAL_URL !== "http://livekit:7880"
+  )
+    throw new Error(
+      "Tailscale requer FQDN real, HTTPS/WSS na mesma origem, cookie seguro e API interna",
+    );
+  dockerIP = node.dockerIP;
+  if (
+    !/^\d{1,3}(\.\d{1,3}){3}$/.test(dockerIP || "") ||
+    dockerIP.split(".").some((x) => +x > 255) ||
+    dockerIP.startsWith("127.") ||
+    dockerIP === ip ||
+    dockerIP === "0.0.0.0"
+  )
+    throw new Error("Interface Docker inválida no nó Tailscale");
+}
 fs.mkdirSync("infra/compose/generated", { recursive: true, mode: 0o700 });
 fs.writeFileSync(
   "infra/compose/generated/livekit.yaml",
   `port: 7880
-bind_addresses: ["0.0.0.0"]
+bind_addresses: [${JSON.stringify(dockerIP || "0.0.0.0")}]
 rtc:
   tcp_port: 7881
   udp_port: 7882
@@ -83,7 +120,7 @@ rtc:
   node_ip: ${JSON.stringify(ip)}
   # Docker forwards media to eth0, never to the container loopback socket.
   enable_loopback_candidate: false
-room:
+${mode === "tailscale" ? "  interfaces:\n    includes: [tailscale0]\n" : ""}room:
   max_participants: 16
   empty_timeout: 60
 keys:
@@ -96,6 +133,7 @@ logging:
 `,
   { mode: 0o600 },
 );
+fs.writeFileSync("infra/compose/generated/mode", mode + "\n", { mode: 0o600 });
 fs.chmodSync(".env", 0o600);
 if (process.env.CHAT_TURN === "true") {
   const domain = values.TURN_DOMAIN;

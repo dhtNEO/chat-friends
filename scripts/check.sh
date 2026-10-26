@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if [[ "${CHAT_MODE:-local}" != local ]] || { [[ -f infra/compose/generated/mode ]] && [[ "$(cat infra/compose/generated/mode)" != local ]]; }; then
+  echo 'check.sh exige stack local separada; não altera configuração de uma stack remota.' >&2
+  exit 1
+fi
 ./scripts/configure.sh local
 ./scripts/compose.sh config -q
 ./scripts/compose.sh up -d --wait db livekit

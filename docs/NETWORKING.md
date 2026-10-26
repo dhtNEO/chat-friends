@@ -45,3 +45,7 @@ Caddy renova certificados do app automaticamente enquanto DNS, portas e volumes 
 Port forwarding no roteador não controla NAT da operadora. Alternativas: solicitar IPv4 público (pode custar), rede privada entre amigos com cliente/configuração em cada máquina e DNS/TLS apropriados, hospedar stack/SFU numa VM ou usar LiveKit Cloud para mídia. Túnel HTTP sozinho não transporta UDP da SFU. Não exigir que os amigos instalem cliente sem combinar previamente.
 
 Checklist antes de convite externo: upload sustentado cabeado; WAN/CGNAT; acesso roteador; domínio; TLS; UDP publicado; fallback/relay testados; browser/OS de cada amigo; necessidade de áudio do jogo; horas/mês; backup; medições de CPU/RAM/banda. Sem acesso ao Mac, esses itens permanecem externos.
+
+## Perfil Tailscale
+
+Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).

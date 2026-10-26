@@ -60,3 +60,7 @@ No Mac, `./scripts/up.sh`, `./scripts/admin.sh admin`, testes de mídia e checkl
 Script de instalação cloud com proxy/CA e start_skill foram executados/salvos em draft. Isso não publica o ambiente nem comprova restauração em outra tarefa. Stack atual saudável; contas/mensagens sintéticas e credenciais temporárias removidas após conferir que somente os fixtures desta implementação existiam. Primeiro administrador real deve ser criado por `scripts/admin.sh admin`. Capturas de interface usam apenas os fixtures anteriores.
 
 O draft também inclui acesso a cloud.google.com, docs.cloud.google.com, docs.oracle.com e docs.livekit.io para revalidar preços/cotas. A gravação não aplica a política ao runtime nem valida os sites: revisar/salvar nas configurações do ambiente e publicar quando apropriado; depois repetir consultas oficiais.
+
+## Perfil Tailscale
+
+Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).

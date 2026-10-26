@@ -13,3 +13,5 @@
 - Database locks serialize chat commits and screen leases. Preserve idempotency and revoke-before-grant ordering. All public self-hosted signaling must pass MediaAdmission; never publish LiveKit 7880 or forward incoming elevated tokens unchanged.
 - See docs/SECURITY.md for the residual multi-track publication limitation and docs/STATUS.md for evidence/external checks. Fixes to these areas need meaningful race/auth tests.
 - Append new Flyway migrations; do not rewrite applied ones. Preserve existing user changes and LICENSE. The owner still needs to confirm licensing intent before distribution.
+
+- Perfil Tailscale: docs/TAILSCALE_SETUP.md. Não recriar só o nó: up.sh coordena namespace. Web é loopback e API LiveKit escuta no IP Docker; preservar essas restrições. Testes: node --test scripts/tests/*.test.mjs e python3 scripts/tests/compose-profile.py (com .env descartável). Sem conta/TUN não afirmar validação externa.
