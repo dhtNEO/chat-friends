@@ -5,4 +5,4 @@ source scripts/duckdns-common.sh
 duck_lock
 DUCKDNS_NETWORK=chat-friends_default duck_node diagnose
 DUCKDNS_NETWORK=chat-friends_default duck_node health
-CHAT_MODE=internet ./scripts/compose.sh ps
+CHAT_MODE=prd ./scripts/compose.sh ps

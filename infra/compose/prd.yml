@@ -19,7 +19,7 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:?}
       ACME_CA: https://acme-v02.api.letsencrypt.org/directory
     volumes:
-      - ./Caddyfile.internet:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.prd:/etc/caddy/Caddyfile:ro
       - certificates:/data
       - caddy_config:/config
     depends_on: [web, livekit]

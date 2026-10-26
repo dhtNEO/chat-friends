@@ -18,6 +18,4 @@ Os dados ficam em volume nomeado `chat-friends_database`. Shutdown: `./scripts/c
 
 Ambiente cloud Codex com proxy: pode exigir CA corporativa e proxy para builds, além de NO_PROXY para tráfego entre containers. Os Dockerfiles aceitam segredos de build opcionais `maven_settings`, `build_truststore`, `build_ca`; não desligue TLS/checksums. Não copie esses arquivos para o projeto. Configuração específica do runner não é necessária no Mac doméstico usual.
 
-## Perfil Tailscale
-
-Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).
+Modo de desenvolvimento: `CHAT_MODE=dev` (padrão). Para produção no mesmo Mac, usar `CHAT_MODE=prd` e seguir [DuckDNS](DUCKDNS_SETUP.md). Não trocar de modo mantendo origens/cookie/IP do outro ambiente; veja [migração](MIGRATION.md).

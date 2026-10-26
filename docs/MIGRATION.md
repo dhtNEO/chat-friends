@@ -1,5 +1,15 @@
 # Migração e rollback
 
+## Nomes dos modos e atualização do checkout
+
+Somente `CHAT_MODE=dev` e `CHAT_MODE=prd` são aceitos. As entradas antigas `local` e `internet` foram substituídas por dev/prd. Apenas os marcadores persistidos são reconhecidos para migração automática, sem criar modos adicionais ou alterar segredos.
+
+Na instalação DuckDNS existente: atualizar o checkout e executar `CHAT_MODE=prd ./scripts/up.sh`. O agendador existente chama o mesmo script, que agora seleciona prd. `.env`, token, volumes do banco e certificados são preservados. Não é necessário refazer bootstrap ou emitir certificados já válidos.
+
+Para trocar realmente entre dev e prd: fazer backup, parar o modo atual sem `-v`, preparar as URLs/cookie/IP do destino no `.env` e executar `CHAT_ALLOW_MODE_CHANGE=true ./scripts/configure.sh dev` ou `prd`. Depois subir com `CHAT_MODE` correspondente. Em dev: localhost:8080, ws://localhost:8080, COOKIE_SECURE=false e LIVEKIT_NODE_IP=127.0.0.1; em prd: HTTPS/WSS, cookie seguro e IPv4 público.
+
+## Migração entre hosts
+
 Não transportar chamadas ativas. Agendar janela; avisar usuários; reduzir TTL de DNS antecipadamente. A mesma stack usa URLs/chaves configuráveis.
 
 1. Fazer backup e restaurar em destino isolado de teste; verificar contagens, login e mensagens conhecidas. Guardar `.env`/certificados em canal seguro, fora do dump.

@@ -165,7 +165,7 @@ export async function prepare(
         "wss://" + config.mediaDomain + portSuffix(config.httpsPort ?? 18443))
   )
     throw new DuckDNSError(
-      "Porta/origem mudou; inicie CHAT_MODE=internet ./scripts/up.sh em manutenção",
+      "Porta/origem mudou; inicie CHAT_MODE=prd ./scripts/up.sh em manutenção",
     );
   const updates = {
     APP_DOMAIN: config.appDomain,
@@ -194,7 +194,7 @@ export async function prepare(
     fs.writeFileSync(path.join(staging, ".env"), next, { mode: 0o600 });
     const rendered = spawnSync(
       process.execPath,
-      [path.join(root, "scripts/render-config.mjs"), "internet"],
+      [path.join(root, "scripts/render-config.mjs"), "prd"],
       {
         cwd: staging,
         env: { ...process.env, CHAT_TURN: "false" },
@@ -203,7 +203,7 @@ export async function prepare(
     );
     if (rendered.status !== 0)
       throw new DuckDNSError(
-        "Configuração internet recusada; arquivos anteriores preservados",
+        "Configuração prd recusada; arquivos anteriores preservados",
       );
     yaml = fs.readFileSync(
       path.join(staging, "infra/compose/generated/livekit.yaml"),
@@ -235,7 +235,7 @@ export async function prepare(
   }
   if (!fs.existsSync(yamlFile) || !fs.readFileSync(yamlFile).equals(yaml))
     atomic(yamlFile, yaml);
-  atomic(path.join(root, "infra/compose/generated/mode"), "internet\n");
+  atomic(path.join(root, "infra/compose/generated/mode"), "prd\n");
   if (next !== original) atomic(envFile, next);
   const desired = { ip, fingerprint: fingerprint(root) };
   atomic(path.join(dir, "pending.json"), JSON.stringify(desired));

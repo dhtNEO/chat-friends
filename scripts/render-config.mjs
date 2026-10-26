@@ -1,14 +1,13 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { publicIPv4, hostname, email, portSuffix } from "./network-config.mjs";
-const mode = process.argv[2] || "local";
-if (!["local", "internet", "tailscale"].includes(mode))
-  throw new Error("Modo deve ser local, internet ou tailscale");
-if (mode === "tailscale" && process.env.CHAT_TURN === "true")
-  throw new Error("Tailscale não pode ser combinado com TURN público");
+const mode = process.argv[2] ?? "dev";
+if (!["dev", "prd"].includes(mode)) throw new Error("Modo deve ser dev ou prd");
+if (mode !== "prd" && process.env.CHAT_TURN === "true")
+  throw new Error("TURN exige prd");
 if (!fs.existsSync(".env")) {
-  if (mode !== "local")
-    throw new Error("Crie .env com os domínios e IP antes de usar internet");
+  if (mode !== "dev")
+    throw new Error("Crie .env com os domínios e IP antes de usar prd");
   let env = fs
     .readFileSync(".env.example", "utf8")
     .replace(
@@ -52,7 +51,7 @@ if (values.LIVEKIT_API_SECRET.length < 32)
 const ip = values.LIVEKIT_NODE_IP || "127.0.0.1";
 if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip) || ip.split(".").some((x) => +x > 255))
   throw new Error("LIVEKIT_NODE_IP deve ser IPv4");
-if (mode === "internet") {
+if (mode === "prd") {
   if (
     values.COOKIE_SECURE !== "true" ||
     !values.APP_ORIGIN?.startsWith("https://") ||
@@ -63,11 +62,7 @@ if (mode === "internet") {
       "Internet requer HTTPS, WSS, COOKIE_SECURE=true e IP anunciado alcançável",
     );
   for (const k of ["APP_DOMAIN", "MEDIA_DOMAIN"])
-    if (
-      !hostname(values[k]) ||
-      values[k].toLowerCase().endsWith("example.com") ||
-      values[k].toLowerCase().endsWith(".ts.net")
-    )
+    if (!hostname(values[k]) || values[k].toLowerCase().endsWith("example.com"))
       throw new Error("Preencha " + k);
   if (
     values.APP_DOMAIN?.toLowerCase() === values.MEDIA_DOMAIN?.toLowerCase() ||
@@ -90,46 +85,11 @@ if (mode === "internet") {
   )
     throw new Error("URLs devem corresponder aos domínios");
 }
-let dockerIP;
-if (mode === "tailscale") {
-  const node = JSON.parse(
-    fs.readFileSync("infra/compose/generated/tailscale-node.json", "utf8"),
-  );
-  const domain = node.domain;
-  if (
-    node.state !== "Running" ||
-    node.https !== true ||
-    !/^100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}$/.test(ip) ||
-    node.ip !== ip
-  )
-    throw new Error(
-      "Nó Tailscale ausente, deslogado ou IP incompatível; execute tailscale-init.sh",
-    );
-  if (
-    !/^[a-z0-9-]+\.[a-z0-9-]+\.ts\.net$/.test(domain || "") ||
-    values.APP_ORIGIN !== "https://" + domain ||
-    values.LIVEKIT_PUBLIC_URL !== "wss://" + domain ||
-    values.COOKIE_SECURE !== "true" ||
-    values.LIVEKIT_INTERNAL_URL !== "http://livekit:7880"
-  )
-    throw new Error(
-      "Tailscale requer FQDN real, HTTPS/WSS na mesma origem, cookie seguro e API interna",
-    );
-  dockerIP = node.dockerIP;
-  if (
-    !/^\d{1,3}(\.\d{1,3}){3}$/.test(dockerIP || "") ||
-    dockerIP.split(".").some((x) => +x > 255) ||
-    dockerIP.startsWith("127.") ||
-    dockerIP === ip ||
-    dockerIP === "0.0.0.0"
-  )
-    throw new Error("Interface Docker inválida no nó Tailscale");
-}
 fs.mkdirSync("infra/compose/generated", { recursive: true, mode: 0o700 });
 fs.writeFileSync(
   "infra/compose/generated/livekit.yaml",
   `port: 7880
-bind_addresses: [${JSON.stringify(dockerIP || "0.0.0.0")}]
+bind_addresses: ["0.0.0.0"]
 rtc:
   tcp_port: 7881
   udp_port: 7882
@@ -137,7 +97,7 @@ rtc:
   node_ip: ${JSON.stringify(ip)}
   # Docker forwards media to eth0, never to the container loopback socket.
   enable_loopback_candidate: false
-${mode === "tailscale" ? "  interfaces:\n    includes: [tailscale0]\n" : ""}room:
+room:
   max_participants: 16
   empty_timeout: 60
 keys:

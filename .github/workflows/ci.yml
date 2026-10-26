@@ -58,12 +58,11 @@ jobs:
       - run: node --test scripts/tests/*.test.mjs
       - run: python3 scripts/tests/duckdns-lock.py
       - run: ./scripts/up.sh
-      - run: python3 scripts/tests/compose-profile.py
       - run: docker build -t chat-friends-edge-duckdns infra/caddy
-      - run: python3 scripts/tests/internet-profile.py
+      - run: python3 scripts/tests/modes-profile.py
+      - run: python3 scripts/tests/prd-profile.py
       - run: python3 scripts/tests/dns01-https.py
-      - run: python3 scripts/tests/container-bindings.py
-      - run: ./scripts/compose.sh config -q && CHAT_MODE=internet ./scripts/compose.sh config -q
+      - run: ./scripts/compose.sh config -q && CHAT_MODE=prd ./scripts/compose.sh config -q
       - name: Browser tests with disposable administrator
         shell: bash
         run: |

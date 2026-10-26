@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [[ "${CHAT_MODE:-local}" == internet && -f infra/compose/generated/duckdns/settings.json ]]; then
+source scripts/modes.sh
+CHAT_MODE=$(chat_mode "${CHAT_MODE-dev}")
+export CHAT_MODE
+if [[ "$CHAT_MODE" == prd && -f infra/compose/generated/duckdns/settings.json ]]; then
   exec ./scripts/duckdns-update.sh --start
-elif [[ "${CHAT_MODE:-local}" == tailscale ]]; then
-  # Somente depois do login inicial. Recria consumidores do namespace em conjunto.
-  ./scripts/tailscale-init.sh preflight
-  ./scripts/compose.sh stop web livekit backend
-  ./scripts/tailscale-init.sh configure
-  ./scripts/compose.sh up -d --build --force-recreate --wait --wait-timeout 240 backend web livekit
-else
-  ./scripts/configure.sh "${CHAT_MODE:-local}"
-  ./scripts/compose.sh up -d --build --wait --wait-timeout 240
 fi
+./scripts/configure.sh "$CHAT_MODE"
+./scripts/compose.sh up -d --build --wait --wait-timeout 240
 ./scripts/compose.sh ps

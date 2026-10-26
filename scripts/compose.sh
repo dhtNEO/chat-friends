@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-mode=${CHAT_MODE:-local}
+source scripts/modes.sh
+mode=$(chat_mode "${CHAT_MODE-dev}")
 args=(--env-file .env -f infra/compose/compose.yml)
-case "$mode" in
-  local) ;;
-  internet) args+=(-f infra/compose/internet.yml) ;;
-  tailscale)
-    [[ "${CHAT_TURN:-false}" != true ]] || { echo 'Tailscale não aceita CHAT_TURN=true' >&2; exit 1; }
-    args+=(-f infra/compose/tailscale.yml) ;;
-  *) echo 'CHAT_MODE inválido' >&2; exit 1 ;;
-esac
-if [[ "$mode" == internet ]] && { [[ -f infra/compose/generated/duckdns/settings.json ]] || [[ "${CHAT_DUCKDNS_DNS01:-false}" == true ]]; }; then
+if [[ "$mode" == prd ]]; then args+=(-f infra/compose/prd.yml); fi
+if [[ "$mode" == prd ]] && { [[ -f infra/compose/generated/duckdns/settings.json ]] || [[ "${CHAT_DUCKDNS_DNS01:-false}" == true ]]; }; then
   args+=(-f infra/compose/duckdns-dns01.yml)
 fi
 if [[ "${CHAT_ACME_STAGING:-false}" == true ]]; then
-  [[ "$mode" == internet ]] || { echo 'ACME staging exige internet' >&2; exit 1; }
+  [[ "$mode" == prd ]] || { echo 'ACME staging exige prd.' >&2; exit 1; }
   args+=(-f infra/compose/acme-staging.yml)
 fi
-if [[ "${CHAT_TURN:-false}" == true ]]; then args+=(-f infra/compose/turn.yml); fi
+if [[ "${CHAT_TURN:-false}" == true ]]; then
+  [[ "$mode" == prd ]] || { echo 'TURN exige prd.' >&2; exit 1; }
+  args+=(-f infra/compose/turn.yml)
+fi
 exec "${DUCKDNS_DOCKER_BIN:-docker}" compose "${args[@]}" "$@"

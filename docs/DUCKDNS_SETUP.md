@@ -1,27 +1,21 @@
 # DuckDNS com HTTPS público na porta 18443
 
-Perfil `CHAT_MODE=internet`, dois nomes DuckDNS, certificados públicos por **DNS-01** e acesso pelo navegador. O endereço será `https://NOME-APP.duckdns.org:18443`; a sinalização usará `wss://NOME-MIDIA.duckdns.org:18443`.
+Perfil `CHAT_MODE=prd`, dois nomes DuckDNS, certificados públicos por **DNS-01** e acesso pelo navegador. O endereço será `https://NOME-APP.duckdns.org:18443`; a sinalização usará `wss://NOME-MIDIA.duckdns.org:18443`.
 
 DNS-01 valida registros TXT na zona DuckDNS e não exige entrada nas portas WAN 80 ou 443. A mídia continua em UDP 7882 e TCP 7881. O IP residencial fica consultável pelo DNS e o login do aplicativo continua obrigatório.
 
-## Migração de uma instalação DuckDNS já preparada
+## Atualização para os modos dev/prd
 
-Não é necessário criar novos nomes nem informar novamente o token. Configurações antigas sem `httpsPort` passam a usar **18443**. Execute no terminal privado do Mac, com OrbStack ativo:
+A aplicação usa somente **dev** (local, padrão) e **prd** (internet). Na instalação existente, atualize o checkout e passe a usar `CHAT_MODE=prd` em todos os comandos de produção:
 
 ```bash
-# Somente se já instalou o agendador:
-./scripts/install-duckdns-launchagent.sh remove
-
 git pull --ff-only origin work
-CHAT_MODE=internet CHAT_ACME_STAGING=true ./scripts/compose.sh down --remove-orphans
-CHAT_MODE=internet CHAT_ACME_STAGING=true ./scripts/up.sh
+CHAT_MODE=prd ./scripts/up.sh
 ```
 
-Não usar `down -v`. Faça backup dos dados e guarde cópia privada do `.env` antes da migração. O script mantém token, credenciais do banco/LiveKit e volumes. Na primeira execução constrói uma imagem Caddy com suporte DuckDNS; esse build pode levar alguns minutos, inclusive no ARM64.
+Os marcadores de configuração anteriores são migrados automaticamente; `.env`, token, banco e certificados são preservados. Não recriar nomes ou informar o token novamente. Os scripts do agendador usam prd automaticamente; o LaunchAgent instalado continua válido, pois o caminho do script e o label não mudaram. A variante ACME staging pertence ao modo prd e é ativada somente por `CHAT_ACME_STAGING=true`.
 
-O startup atualiza URLs/cookie/IP e recria os serviços que usam essas variáveis. Se um agendador antigo detectar mudança de porta/origem, ele recusa aplicá-la sozinho e pede startup em manutenção, evitando deixar o backend com a origem antiga.
-
-No roteador, mantenha a regra já testada **TCP externa 18443 → IP LAN do Mac, porta interna 443**. O container e o host Mac continuam usando 443; não mudar o destino dessa regra para 18443. Depois de concluir o teste, remova a regra temporária 18080 e as regras WAN 80/443 que não serão usadas neste perfil.
+Mantenha **TCP externa 18443 → IP LAN do Mac, porta interna 443**, além das portas de mídia. Se precisar parar a stack: `CHAT_MODE=prd ./scripts/compose.sh down --remove-orphans`, sem `-v`.
 
 ## Primeira instalação
 
@@ -29,7 +23,7 @@ Pré-requisitos: Docker/OrbStack, Compose >=2.24.4, IPv4 WAN público, dois nome
 
 1. Registre dois nomes na conta DuckDNS. O atualizador não cria nomes. Não publicar AAAA no piloto IPv4. Confirme termos/frequência permitida pelo serviço.
 2. Reserve o IPv4 LAN do Mac no DHCP do roteador. Prefira cabo. Em Wi-Fi, endereço privado **fixo** mantém a identidade usada pela reserva. Private Relay e Limitar Rastreamento podem permanecer ativos; a descoberta feita no Docker precisa corresponder à WAN, sem VPN/proxy de saída diferente.
-3. Faça backup pelo perfil atual e pare a instalação anterior sem apagar volumes. Para local, `./scripts/compose.sh down`; para Tailscale, `CHAT_MODE=tailscale ./scripts/compose.sh down`.
+3. Faça backup pelo modo atual e pare a instalação anterior sem apagar volumes. Em dev: `CHAT_MODE=dev ./scripts/compose.sh down`. Em prd: `CHAT_MODE=prd ./scripts/compose.sh down`.
 4. Execute:
 
    ```bash
@@ -64,8 +58,8 @@ O fluxo real é internet → roteador → macOS → OrbStack → Docker. TCP 184
 Comece com:
 
 ```bash
-CHAT_MODE=internet CHAT_ACME_STAGING=true ./scripts/up.sh
-CHAT_MODE=internet CHAT_ACME_STAGING=true ./scripts/compose.sh logs --tail=100 edge
+CHAT_MODE=prd CHAT_ACME_STAGING=true ./scripts/up.sh
+CHAT_MODE=prd CHAT_ACME_STAGING=true ./scripts/compose.sh logs --tail=100 edge
 ```
 
 O edge deve usar `dns-01`, criar/remover TXT `_acme-challenge` e obter certificados para os dois nomes. Precisa de saída HTTPS para DuckDNS/ACME e consultas DNS. A propagação pode levar minutos. Se houver falha, conferir DNS/token/conectividade; repetir startup continuamente não acelera propagação.
@@ -75,9 +69,9 @@ O token é montado como secret de arquivo, lido pelo entrypoint e passado ao pro
 Staging usa CA e volumes separados; o certificado não é confiável no navegador. Não ignorar TLS para concluir o teste. Após confirmar emissão em staging:
 
 ```bash
-CHAT_MODE=internet CHAT_ACME_STAGING=true ./scripts/compose.sh down --remove-orphans
-CHAT_MODE=internet ./scripts/up.sh
-CHAT_MODE=internet ./scripts/admin.sh admin
+CHAT_MODE=prd CHAT_ACME_STAGING=true ./scripts/compose.sh down --remove-orphans
+CHAT_MODE=prd ./scripts/up.sh
+CHAT_MODE=prd ./scripts/admin.sh admin
 ./scripts/diagnose-duckdns.sh
 ```
 
@@ -115,6 +109,6 @@ Para Playwright externo: `APP_TEST_URL=https://NOME-APP.duckdns.org:18443`, `TES
 
 ## Rollback e limites da evidência
 
-Remova o LaunchAgent, feche os encaminhamentos e pare internet sem remover volumes. Restaure o `.env` anterior (0600), mova `generated/duckdns/settings.json` para backup privado fora do caminho ativo e regenere o perfil anterior com `CHAT_ALLOW_MODE_CHANGE=true`. Para Tailscale, siga seu guia de namespace. Nunca usar `down -v`.
+Remova o LaunchAgent, feche os encaminhamentos e pare prd sem remover volumes. Para voltar a dev, restaure o `.env` local anterior (0600), com origens localhost, cookie local e IP anunciado 127.0.0.1. Execute `CHAT_ALLOW_MODE_CHANGE=true ./scripts/configure.sh dev` e `CHAT_MODE=dev ./scripts/up.sh`. O marcador de modo protege a troca acidental. Nunca usar `down -v`.
 
-Implementação testada com mocks DNS/API, provider Go com falhas que contêm token, validação Caddy/Compose e HTTPS local com CA de laboratório explicitamente confiável. Não houve token real, TXT público, emissão ACME real, mudança do roteador ou teste no Mac/ARM64 neste ambiente. A validação externa e a capacidade permanecem pendentes.
+Implementação testada com mocks DNS/API, provider Go com falhas que contêm token, validação Caddy/Compose e HTTPS local com CA de laboratório explicitamente confiável. Não houve token real, TXT público, emissão ACME real, mudança do roteador ou teste no Mac/ARM64 neste ambiente. O proprietário confirmou funcionamento em produção no Mac; carga com vários participantes, qualidade e renovação prolongada continuam pendentes, conforme [STATUS](STATUS.md).

@@ -2,7 +2,16 @@
 
 Espaço privado para até 16 conexões: chat persistente, uma sala de voz e uma tela compartilhada. Interface em português. Sem cadastro público, anúncios, IA, gravação ou serviços pagos obrigatórios.
 
-**Implementação local; validações externas ainda pendentes.** Leia [STATUS](docs/STATUS.md) antes de abrir o acesso à internet. Capacidade para 16 pessoas, OrbStack, ARM64, TURN e áudio de jogos no macOS não são garantidos por um build.
+**Dois modos: dev (local) e prd (internet).** O proprietário confirmou o funcionamento em produção no Mac com DuckDNS. Leia [STATUS](docs/STATUS.md) para evidências e limites; capacidade para 16 pessoas precisa de medição.
+
+## Modos de execução
+
+| Modo | Comando | Acesso |
+|---|---|---|
+| `dev` (padrão) | `CHAT_MODE=dev ./scripts/up.sh` | http://localhost:8080, portas somente em loopback |
+| `prd` | `CHAT_MODE=prd ./scripts/up.sh` | HTTPS/WSS, DuckDNS :18443 e DNS-01 |
+
+`CHAT_MODE` é variável dos comandos. Não definir no `.env`. O mesmo checkout não deve executar os dois modos simultaneamente sobre o mesmo banco.
 
 ## Início rápido no Mac ou Linux
 
@@ -19,9 +28,7 @@ cd chat-friends
 
 Apenas os serviços web e mídia têm portas locais publicadas; PostgreSQL e backend permanecem internos. Execute `./scripts/compose.sh down` para parar sem apagar dados. **Não use `down -v` com dados importantes.**
 
-Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](docs/NETWORKING.md), então `CHAT_MODE=internet ./scripts/up.sh`. Não basta trocar localhost por um IP privado: captura de mídia exige contexto seguro.
-
-Para rede privada sem domínio próprio: veja o [guia Tailscale](docs/TAILSCALE_SETUP.md). O perfil usa HTTPS e mídia pela rede privada; o aceite no Mac e entre amigos ainda precisa ser executado.
+Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](docs/NETWORKING.md), então `CHAT_MODE=prd ./scripts/up.sh`. Não basta trocar localhost por um IP privado: captura de mídia exige contexto seguro.
 
 ## O que está incluído
 
@@ -31,7 +38,7 @@ Para rede privada sem domínio próprio: veja o [guia Tailscale](docs/TAILSCALE_
 - Mensagens de até 4.000 unidades UTF-16, confirmação após commit, idempotência por UUID, histórico e recuperação após reconexão.
 - Presença da página separada da chamada, microfone, seleção de entrada, silenciar recepção, indicação de fala, tela ampliável e qualidade reduzida.
 - Reserva de tela atômica com lease de 30 s, heartbeat, revogação e reconciliação. Sinalização passa por admissão que revalida sessão e retira fontes de tela de tokens reutilizados; veja [SECURITY](docs/SECURITY.md) para fronteiras e limite de múltiplas tracks maliciosas.
-- Compose local/internet, backup/restauração, diagnóstico, Terraform GCP sem apply, CI e documentação operacional.
+- Compose dev/prd, backup/restauração, diagnóstico, Terraform GCP sem apply, CI e documentação operacional.
 
 ## Desenvolvimento e documentação
 
@@ -43,8 +50,7 @@ Para rede privada sem domínio próprio: veja o [guia Tailscale](docs/TAILSCALE_
 | API e segurança | [API](docs/API.md), [SECURITY](docs/SECURITY.md) |
 | Uso | [USER_GUIDE](docs/USER_GUIDE.md) |
 | OrbStack e rede | [LOCAL_SETUP](docs/LOCAL_SETUP.md), [NETWORKING](docs/NETWORKING.md) |
-| Rede privada com amigos | [Configuração Tailscale](docs/TAILSCALE_SETUP.md), [decisão e plano](docs/TAILSCALE_PLAN.md) |
-| Acesso público com endereço gratuito | [DuckDNS :18443 e DNS-01](docs/DUCKDNS_SETUP.md), [plano](docs/DUCKDNS_PLAN.md) |
+| Acesso público com endereço gratuito | [DuckDNS :18443 e DNS-01](docs/DUCKDNS_SETUP.md), [migração entre modos](docs/MIGRATION.md) |
 | Operação e dados | [OPERATIONS](docs/OPERATIONS.md), [BACKUP_RESTORE](docs/BACKUP_RESTORE.md) |
 | GCP e alternativas | [GCP_DEPLOY](docs/GCP_DEPLOY.md), [HOSTING_COSTS](docs/HOSTING_COSTS.md) |
 | Migração | [MIGRATION](docs/MIGRATION.md) |

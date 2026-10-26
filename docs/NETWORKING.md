@@ -1,57 +1,55 @@
-# Rede: quatro cenários
+# Rede nos modos dev e prd
 
-## 1. Mesmo Mac
+O projeto aceita somente `CHAT_MODE=dev` (padrão, local) e `CHAT_MODE=prd` (internet). Os dois usam a mesma stack e volumes; não devem rodar simultaneamente no mesmo checkout. A troca de modo exige parada, backup e configuração compatível com o destino.
 
-Perfil local publica 8080/TCP (web e sinalização autenticada), 7881/TCP (ICE fallback), 7882/UDP (ICE multiplexado), **somente 127.0.0.1**. LIVEKIT_NODE_IP=127.0.0.1 é exclusivo desse cenário. localhost é contexto seguro especial. Serviços internos: backend 8080/TCP, PostgreSQL 5432/TCP. Sem TURN por padrão.
+## Dev: acesso local
 
-O gerador mantém `enable_loopback_candidate: false` dentro do container LiveKit. Docker entrega as portas à interface de rede do container; habilitar também o socket loopback pode impedir as respostas ICE com o mapeamento de `node_ip`. Isso não altera o IP 127.0.0.1 anunciado ao browser no perfil local. O teste `tests/ice.spec.ts`, destinado à stack Compose acessível pelo host de `APP_TEST_URL`, verifica STUN autenticado nas portas padrão 7882/UDP e 7881/TCP.
+```bash
+CHAT_MODE=dev ./scripts/up.sh
+```
 
-## 2. LAN
+Portas publicadas somente em **127.0.0.1**: 8080/TCP para web/API/sinalização, 7881/TCP e 7882/UDP para mídia. Não há edge público. `.env`: APP_ORIGIN=http://localhost:8080, LIVEKIT_PUBLIC_URL=ws://localhost:8080, COOKIE_SECURE=false e LIVEKIT_NODE_IP=127.0.0.1.
 
-Use nomes DNS alcançáveis, certificados confiáveis nos dispositivos e IP LAN anunciado no LiveKit. Não use HTTP por IP privado para prometer getUserMedia/getDisplayMedia. Para laboratório, Caddy `tls internal` exige instalar a CA local em cada dispositivo conscientemente; não desative verificação TLS. Alternativa: domínio real e TLS público. Ajuste APP_ORIGIN, LIVEKIT_PUBLIC_URL e COOKIE_SECURE=true, bindings de portas para interface LAN. O perfil internet exige IPv4 global; uma LAN isolada com IP privado requer configuração própria de rede/TLS. Com domínio real e firewall restrito à LAN, certificados ACME precisam alcançar o host ou usar DNS challenge (não incluído). Validar macOS e outros dispositivos separadamente.
+Localhost é contexto seguro especial para microfone/tela. O gerador mantém `enable_loopback_candidate: false` dentro do container: Docker entrega mídia à interface de rede, e sockets adicionais de loopback podem impedir resposta ICE com o mapeamento de node_ip. Isso não altera o IP de loopback anunciado ao browser em dev.
 
-## 3. Internet com IP público
+## Prd: DuckDNS e DNS-01
 
-Descubra WAN do roteador e compare com IPv4 externo observado por ferramenta confiável. Verifique também duplo NAT; um endereço WAN privado/100.64.0.0/10 e diferença para IP externo indicam possível CGNAT. Pergunte à operadora. Tenha domínio/DDNS e acesso ao roteador.
+```bash
+CHAT_MODE=prd ./scripts/up.sh
+```
 
-Em `.env`: APP_DOMAIN, MEDIA_DOMAIN, ACME_EMAIL reais; APP_ORIGIN=https://APP_DOMAIN; LIVEKIT_PUBLIC_URL=wss://MEDIA_DOMAIN; COOKIE_SECURE=true; LIVEKIT_NODE_IP=IPv4 público atual. Crie A records dos dois domínios; não publique AAAA sem IPv6 realmente configurado. Execute `CHAT_MODE=internet ./scripts/up.sh`.
+Para primeira instalação e agendamento, seguir [DuckDNS](DUCKDNS_SETUP.md). Dois nomes registrados apontam ao IPv4 público; app e sinalização usam HTTPS/WSS **:18443**. DNS-01 emite/renova certificados com token privado, sem depender de entrada WAN 80/443.
 
-| Porta/protocolo | Origem → destino | Uso no perfil internet |
-|---|---|---|
-| 80/TCP | amigos/ACME → Caddy | challenge ACME e redirect HTTPS |
-| 443/TCP | amigos → Caddy | HTTPS/WSS app e sinalização /rtc |
-| 443/UDP | amigos → Caddy | HTTP/3 opcional; não é mídia LiveKit |
-| 7881/TCP | amigos → LiveKit | ICE/TCP fallback |
-| 7882/UDP | amigos → LiveKit | mídia multiplexada, principal |
-| 5432/TCP | backend → db, rede interna | PostgreSQL, não publicar |
-| 8080/TCP | Caddy → backend/web, interna | HTTP interno |
-| 7880/TCP | backend/Caddy → LiveKit, interna | controle/admin/sinalização; admin não encaminhado |
-| 5349/TCP, 3478/UDP | amigos → LiveKit, somente perfil TURN | relay opcional |
+| Fluxo do roteador | Uso |
+|---|---|
+| 18443/TCP → Mac 443/TCP | HTTPS/WSS no Caddy edge |
+| 7881/TCP → Mac 7881/TCP | Fallback de mídia |
+| 7882/UDP → Mac 7882/UDP | Mídia principal multiplexada |
 
-Encaminhe portas no roteador para o IP LAN fixo do Mac/host. Permita no firewall macOS o processo/interface correspondente; não desative firewall globalmente. No OrbStack, fluxo é **roteador → macOS → VM Linux do OrbStack → porta publicada do container**. `network_mode: host` dentro da VM não equivale à interface física do Mac e não foi usado como solução mágica.
+Não encaminhar banco 5432, backend/web 8080, API LiveKit 7880 ou SSH 22. Caddy admin fica desabilitado. A sinalização sempre passa pela admissão `/api/livekit/admit`; não publicar 7880 para contorná-la.
 
-Diagnóstico UDP: confirme porta publicada com compose ps; no Mac use `sudo tcpdump -ni <interface-lan> udp port 7882` durante chamada de uma rede externa; examine chegada e retorno. Dentro da VM, use o terminal Linux do OrbStack e observe interface/porta correspondente (nome de interface depende da versão). Se chega ao Mac mas não à VM/container, verifique suporte/configuração de encaminhamento UDP da versão do OrbStack, conflito de portas e firewall. Não inventamos um comando de ajuste universal. Se a versão não encaminhar adequadamente, usar VM Linux com rede alcançável ou mídia externa é alternativa. Capturas de rede podem conter metadados: não publicar.
+`.env` de prd usa cookie Secure, origens HTTPS/WSS com domínio e porta, IPv4 público real e API interna `http://livekit:7880`. O atualizador mantém o mesmo IP nos dois nomes e no candidato LiveKit. Uma mudança real de IP interrompe chamadas e pode levar tempo para propagar por caches DNS.
 
-Use ferramentas de WebRTC (`chrome://webrtc-internals`, `about:webrtc`) e procure selected candidate pair, protocol, local/remote candidate type (host/srflx/relay), bytes e perda/jitter/RTT. Um socket aberto ou página carregada não prova mídia bidirecional. Teste fora do Wi-Fi; hairpin NAT local pode enganar.
+## Prd com domínio próprio
 
-## TURN/TLS opcional
+Sem configuração DuckDNS, `infra/compose/prd.yml` e `Caddyfile.prd` fornecem HTTPS automático tradicional, com dois domínios distintos. Preencher APP_DOMAIN, MEDIA_DOMAIN, ACME_EMAIL, APP_ORIGIN, LIVEKIT_PUBLIC_URL, COOKIE_SECURE=true e LIVEKIT_NODE_IP público. A porta padrão é 443, e HTTP 80 é usado para redirecionamento/ACME. Esse caminho exige entrada WAN nas portas apropriadas.
 
-A configuração base tenta UDP 7882 e TCP 7881. Redes corporativas podem bloquear ambos. TURN embutido opcional: gere certificado TLS público para um terceiro domínio e monte em `infra/compose/generated/turn-certs` (0600). Preencha `TURN_DOMAIN` no .env e execute `CHAT_MODE=internet CHAT_TURN=true ./scripts/up.sh`. O gerador verifica presença de fullchain.pem/privkey.pem e adiciona a seção turn com TLS real em 5349, UDP em 3478 e external_tls=false; o wrapper inclui turn.yml. Mantenha CHAT_TURN=true também nas próximas atualizações; sem a variável, o perfil base permanece sem TURN. Isso configura, mas não valida certificados, relay ou conectividade externa. Certificados TURN não são automaticamente extraídos/renovados pelo Caddy: providencie renovação segura pelo proprietário e reinicie LiveKit em manutenção após troca. TURN/TLS 5349 evita disputar 443. Para redes que só aceitam 443, use IP público/host separado para TURN 443 ou proxy L4/SNI especializado; não incluído nem validado. Não exponha um relay aberto. Não usar `external_tls:true` sem terminador TLS real.
+DuckDNS/DNS-01 e ACME staging são opções de configuração de **prd**, não modos adicionais. `CHAT_ACME_STAGING=true` usa CA e volumes de teste separados; certificados staging não são confiáveis no navegador.
 
-Caddy renova certificados do app automaticamente enquanto DNS, portas e volumes persistem. Acompanhe logs sem tokens e validade via `openssl s_client -connect domínio:443 -servername domínio`. Mudança de IP exige DDNS/A, novo LIVEKIT_NODE_IP, configure/restart LiveKit e teste ICE. Chamadas ativas cairão.
+## Mac, roteador e diagnóstico
 
-## 4. CGNAT
+Reserve IP LAN para o Mac no DHCP. Prefira cabo ou identidade Wi-Fi privada fixa para essa reserva. Private Relay e Limitar Rastreamento podem permanecer ativos; o IP descoberto no Docker deve coincidir com a WAN, sem proxy/VPN de saída divergente.
 
-Port forwarding no roteador não controla NAT da operadora. Alternativas: solicitar IPv4 público (pode custar), rede privada entre amigos com cliente/configuração em cada máquina e DNS/TLS apropriados, hospedar stack/SFU numa VM ou usar LiveKit Cloud para mídia. Túnel HTTP sozinho não transporta UDP da SFU. Não exigir que os amigos instalem cliente sem combinar previamente.
+O fluxo é internet → roteador → macOS → VM OrbStack → porta Docker publicada. Não desativar firewall globalmente, habilitar DMZ ou tratar rede host dentro da VM como interface física do Mac.
 
-Checklist antes de convite externo: upload sustentado cabeado; WAN/CGNAT; acesso roteador; domínio; TLS; UDP publicado; fallback/relay testados; browser/OS de cada amigo; necessidade de áudio do jogo; horas/mês; backup; medições de CPU/RAM/banda. Sem acesso ao Mac, esses itens permanecem externos.
+Teste fora do Wi-Fi, usando dados móveis ou outra rede. Uma porta aberta ou página carregada não comprova mídia. Confirmar áudio/frame decodificados e selected candidate pair, protocolo, bytes, perda, jitter e RTT. Para UDP, conferir chegada e retorno no Mac/VM; capturas podem conter metadados e não devem ser publicadas sem revisão.
 
-## Perfil Tailscale
+Acesso pelo domínio público dentro da LAN pode depender de NAT hairpin. Com porta pública 18443 mapeada para 443 no Mac, DNS local sozinho não basta: uma configuração LAN alternativa também precisa disponibilizar a porta 18443. Não usar HTTP por IP privado ou ignorar TLS para resolver isso. O diagnóstico interno verifica certificado sem depender de hairpin; o aceite WAN é separado.
 
-Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).
+Se WAN e IPv4 externo coincidirem e forem públicos, isso indica ausência de CGNAT nesse caminho, mas não comprova portas liberadas. Se houver CGNAT, encaminhamento no roteador não remove o NAT da operadora. Consultar a operadora ou hospedar prd em host com conectividade pública. Túnel HTTP sozinho não transporta mídia UDP da SFU.
 
-## DuckDNS e IPv4 público
+## TURN opcional em prd
 
-Atualizador, bootstrap, ACME staging isolado e LaunchAgent implementados: [guia DuckDNS](DUCKDNS_SETUP.md). Atualiza DNS e IP anunciado pelo LiveKit, com lock e confirmação após saúde. Testes locais usam API/DNS simulados; DNS/HTTPS reais, portas do roteador, macOS e capacidade externa permanecem pendentes.
+Somente para instalação manual com domínio/certificados próprios, `CHAT_MODE=prd CHAT_TURN=true ./scripts/up.sh` adiciona TURN embutido. Exige TURN_DOMAIN e `generated/turn-certs/fullchain.pem`/`privkey.pem`; publica TLS 5349/TCP e UDP 3478. Não é um modo separado e não está integrado ao atualizador DuckDNS.
 
-DuckDNS revisado após bloqueio de portas padrão: HTTPS/WSS público **18443 → 443 no Mac**, certificados **DNS-01**, sem entrada WAN 80/443. Ver [migração](DUCKDNS_SETUP.md). Caddy atualizado para 2.11.4; emissão real e mídia externa seguem pendentes de teste no servidor.
+A presença dos arquivos não valida certificado ou relay. A renovação TURN é responsabilidade do operador, separada dos certificados Caddy. Não usar `external_tls:true` sem terminador TLS real nem criar relay aberto. Redes que permitem apenas 443 podem precisar de host/IP dedicado ou proxy L4; não foi validado neste projeto.

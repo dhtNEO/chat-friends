@@ -20,6 +20,6 @@ Compare contagens e, em ambiente isolado, confirme login/histórico com a versã
 
 ## Recuperação real
 
-Avise usuários e verifique backup legível. `CONFIRM_RESTORE=REPLACE_DATABASE ./scripts/restore.sh backups/ARQUIVO.dump` para web/backend/livekit, restaura transacionalmente com `--clean --if-exists`, apaga sessões/conexões/leases e reinicia. A variável é uma confirmação explícita de substituição; não é dry-run. Se restaurar falhar, serviços permanecem parados para diagnóstico. No perfil internet use CHAT_MODE=internet; edge pode servir erro enquanto web está parado, sem novas escritas.
+Avise usuários e verifique backup legível. `CONFIRM_RESTORE=REPLACE_DATABASE ./scripts/restore.sh backups/ARQUIVO.dump` para web/backend/livekit, restaura transacionalmente com `--clean --if-exists`, apaga sessões/conexões/leases e reinicia. A variável é uma confirmação explícita de substituição; não é dry-run. Se restaurar falhar, serviços permanecem parados para diagnóstico. No modo prd use CHAT_MODE=prd; edge pode servir erro enquanto web está parado, sem novas escritas.
 
 Teste novamente saúde, login, leitura de mensagem conhecida, nova mensagem, chamada. Sessões antigas serão invalidadas. Não restaura chamadas ativas. Dados posteriores ao backup serão perdidos se não forem reconciliados antes da substituição. Procedimento de migração/rollback em MIGRATION.

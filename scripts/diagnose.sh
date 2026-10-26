@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [[ "${CHAT_MODE:-local}" == tailscale ]]; then exec ./scripts/diagnose-tailscale.sh; fi
 ./scripts/compose.sh ps
 ./scripts/compose.sh exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -d friends'
 ./scripts/compose.sh exec -T web wget -Y off -qO- http://127.0.0.1:8080/api/health

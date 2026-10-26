@@ -1,7 +1,7 @@
 # Operação
 
-- Iniciar/atualizar: backup, revisar mudanças/migrações, `./scripts/up.sh` (ou CHAT_MODE=internet). Build não publica imagens. Mantenha a versão anterior local para rollback da aplicação; migrações podem impedir downgrade sem restauração.
-- Parar: `./scripts/compose.sh down`; internet exige CHAT_MODE=internet no wrapper para incluir edge. Não usar `-v`.
+- Iniciar/atualizar: backup, revisar mudanças/migrações, `./scripts/up.sh` (ou CHAT_MODE=prd). Build não publica imagens. Mantenha a versão anterior local para rollback da aplicação; migrações podem impedir downgrade sem restauração.
+- Parar: `./scripts/compose.sh down`; internet exige CHAT_MODE=prd no wrapper para incluir edge. Não usar `-v`.
 - Estado: `./scripts/diagnose.sh`; DB/web/backend têm healthchecks. LiveKit é verificado funcionalmente por /media/state e uma chamada, não apenas PID.
 - Logs: `./scripts/compose.sh logs --tail 100 backend livekit`; JSON files rotacionados 10 MB × 3 por serviço. Não habilitar DEBUG nem copiar tokens. Logs de Caddy não incluem access log por padrão.
 - Métricas: `docker stats`, uso de volume/disco, tempos de resposta/erros, ICE stats no navegador. Endpoints administrativos de métricas não estão publicados. Sem serviço pago de observabilidade.
@@ -14,12 +14,8 @@ Após queda/reinício: aguarde DB saudável/Flyway, confirme saúde, reabra fron
 
 Manutenção: avise amigos; pare web/edge para bloquear novas escritas (backend não exposto); encerre chamadas; backup final. Veja MIGRATION. Não existe alta disponibilidade. Atualizações de dependências devem preservar verificações de assinatura/checksum/TLS e repetir suíte de riscos.
 
-## Perfil Tailscale
+## Dev e prd
 
-Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).
+`dev` é o padrão local. Em produção, usar `CHAT_MODE=prd` em up, admin, compose, backup, restore e diagnose. `CHAT_ACME_STAGING=true` apenas seleciona a CA de teste dentro de prd. Trocas reais entre dev/prd exigem backup, parada e `CHAT_ALLOW_MODE_CHANGE=true` no configure; o arquivo `.env` deve corresponder ao destino. Nunca apagar volumes para trocar de modo.
 
-## DuckDNS e IPv4 público
-
-Atualizador, bootstrap, ACME staging isolado e LaunchAgent implementados: [guia DuckDNS](DUCKDNS_SETUP.md). Atualiza DNS e IP anunciado pelo LiveKit, com lock e confirmação após saúde. Testes locais usam API/DNS simulados; DNS/HTTPS reais, portas do roteador, macOS e capacidade externa permanecem pendentes.
-
-DuckDNS revisado após bloqueio de portas padrão: HTTPS/WSS público **18443 → 443 no Mac**, certificados **DNS-01**, sem entrada WAN 80/443. Ver [migração](DUCKDNS_SETUP.md). Caddy atualizado para 2.11.4; emissão real e mídia externa seguem pendentes de teste no servidor.
+Para DuckDNS em prd, seguir [ativação e operação](DUCKDNS_SETUP.md): DNS-01, HTTPS/WSS :18443, atualização do IP, LaunchAgent e rollback. O job já instalado passa a usar prd após atualizar os scripts; não contém o modo antigo no plist. Diagnóstico interno não comprova WAN, e logs não devem conter token.

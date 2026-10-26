@@ -1,4 +1,4 @@
-# Somente com CHAT_MODE=internet CHAT_ACME_STAGING=true.
+# Somente com CHAT_MODE=prd CHAT_ACME_STAGING=true.
 services:
   edge:
     environment:

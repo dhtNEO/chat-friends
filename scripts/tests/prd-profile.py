@@ -6,7 +6,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[2]
 for staging in ['false', 'true']:
-    env = dict(os.environ, CHAT_MODE='internet', CHAT_TURN='false', CHAT_ACME_STAGING=staging)
+    env = dict(os.environ, CHAT_MODE='prd', CHAT_TURN='false', CHAT_ACME_STAGING=staging)
     result = subprocess.run(['./scripts/compose.sh', 'config', '--format', 'json'],
                             cwd=root, env=env, capture_output=True, check=True)
     config = json.loads(result.stdout)
@@ -22,15 +22,15 @@ for staging in ['false', 'true']:
         'docker', 'run', '--rm',
         '-e', 'APP_DOMAIN=test-app.duckdns.org', '-e', 'MEDIA_DOMAIN=test-media.duckdns.org',
         '-e', 'ACME_EMAIL=test@example.org', '-e', 'ACME_CA=' + ca,
-        '-v', str(root / 'infra/compose/Caddyfile.internet') + ':/etc/caddy/Caddyfile:ro',
+        '-v', str(root / 'infra/compose/Caddyfile.prd') + ':/etc/caddy/Caddyfile:ro',
         'caddy:2.11.4-alpine', 'caddy', 'adapt', '--config', '/etc/caddy/Caddyfile', '--validate',
     ], capture_output=True, check=True)
     assert json.loads(result.stdout)['apps']['http']['servers']
-print('Internet: portas limitadas, ACME staging isolado e Caddy válido em ambos os modos.')
+print('prd: portas limitadas, ACME staging isolado e Caddy válido com CA de produção e staging.')
 
 # DNS-01 usa segredo de arquivo; nenhuma porta HTTP ou QUIC é publicada.
 for staging in ['false', 'true']:
-    env = dict(os.environ, CHAT_MODE='internet', CHAT_DUCKDNS_DNS01='true', CHAT_ACME_STAGING=staging)
+    env = dict(os.environ, CHAT_MODE='prd', CHAT_DUCKDNS_DNS01='true', CHAT_ACME_STAGING=staging)
     result = subprocess.run(['./scripts/compose.sh', 'config', '--format', 'json'], cwd=root, env=env, capture_output=True, check=True)
     config = json.loads(result.stdout)
     edge = config['services']['edge']

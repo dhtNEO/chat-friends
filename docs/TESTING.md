@@ -20,12 +20,13 @@ Cada rodada: registrar data, commit, hardware/OS/arquitetura, versões dos naveg
 
 Teste sintético de mídia pode ser útil, mas declare fonte artificial, decodificação medida e limites. Não alegar compatibilidade de áudio de jogo/macOS a partir de Chromium Linux fake media. Matriz em COMPATIBILITY e resultados reais em STATUS.
 
-## Perfil Tailscale
+## Configuração e infraestrutura
 
-Perfil privado implementado: [bootstrap, operação e rollback](TAILSCALE_SETUP.md). Usa identidade dedicada, Serve HTTPS e mídia pela interface Tailscale, sem portas publicadas no host. Testes de configuração/Compose independem de conta. Aceite real de HTTPS/ACL, OrbStack/ARM64 e carga depende do servidor e das contas externas; não foi validado no Codex sem TUN. Consulte também [critérios do plano](TAILSCALE_PLAN.md).
+- `node --test scripts/tests/*.test.mjs`: modos dev/prd, migração dos marcadores, proteção de prd e atualizador DuckDNS com API/DNS simulados.
+- `python3 scripts/tests/modes-profile.py`: portas dev em loopback, ausência de edge e rejeição de modos inválidos.
+- `python3 scripts/tests/prd-profile.py`: portas prd, volumes ACME isolados, DNS-01 e Caddy válido; requer as imagens construídas e `.env` descartável.
+- `python3 scripts/tests/duckdns-lock.py`: lock real no Docker, concorrência e recuperação de processo morto, sem token externo.
+- `python3 scripts/tests/dns01-https.py`: HTTPS :18443 com CA de laboratório confiável, SNI/Host, admissão e ausência de segredo no autosave/logs. Requer stack dev saudável e edge construído.
+- `docker build -t chat-friends-edge-duckdns infra/caddy`: inclui testes Go do filtro de erros do provider.
 
-## DuckDNS e IPv4 público
-
-Atualizador, bootstrap, ACME staging isolado e LaunchAgent implementados: [guia DuckDNS](DUCKDNS_SETUP.md). Atualiza DNS e IP anunciado pelo LiveKit, com lock e confirmação após saúde. Testes locais usam API/DNS simulados; DNS/HTTPS reais, portas do roteador, macOS e capacidade externa permanecem pendentes.
-
-DuckDNS revisado após bloqueio de portas padrão: HTTPS/WSS público **18443 → 443 no Mac**, certificados **DNS-01**, sem entrada WAN 80/443. Ver [migração](DUCKDNS_SETUP.md). Caddy atualizado para 2.11.4; emissão real e mídia externa seguem pendentes de teste no servidor.
+Não rodar scripts destrutivos contra o banco de prd. `scripts/check.sh` recusa prd e usa banco de integração separado em dev. O CI usa dev para testes da aplicação e valida prd sem emitir certificados reais. O [guia DuckDNS](DUCKDNS_SETUP.md) descreve aceite WAN e cargas no Mac.

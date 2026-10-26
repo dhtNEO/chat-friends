@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export CHAT_MODE=internet
+source scripts/modes.sh
+export CHAT_MODE=prd
 [[ "${CHAT_TURN:-false}" != true ]] || { echo 'DuckDNS inicial não aceita TURN.' >&2; exit 1; }
 action=${1:-update}
 [[ "$action" == update || "$action" == --start ]] || { echo 'Uso: duckdns-update.sh [--start]' >&2; exit 1; }
-[[ -f infra/compose/generated/mode && "$(cat infra/compose/generated/mode)" == internet ]] || { echo 'Execute bootstrap DuckDNS em manutenção antes de atualizar.' >&2; exit 1; }
+[[ "$(chat_saved_mode)" == prd ]] || { echo 'Execute bootstrap DuckDNS em manutenção antes de atualizar.' >&2; exit 1; }
 source scripts/duckdns-common.sh
 duck_lock
 [[ -f "$duck_dir/token" && -f "$duck_dir/settings.json" ]] || { echo 'Configuração DuckDNS ausente.' >&2; exit 1; }

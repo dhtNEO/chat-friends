@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [[ "${CHAT_MODE:-local}" != local ]] || { [[ -f infra/compose/generated/mode ]] && [[ "$(cat infra/compose/generated/mode)" != local ]]; }; then
-  echo 'check.sh exige stack local separada; não altera configuração de uma stack remota.' >&2
+source scripts/modes.sh
+mode=$(chat_mode "${CHAT_MODE-dev}")
+saved=$(chat_saved_mode)
+if [[ "$mode" != dev || ( -n "$saved" && "$saved" != dev ) ]]; then
+  echo 'check.sh exige stack dev separada; não altera configuração prd.' >&2
   exit 1
 fi
-./scripts/configure.sh local
+./scripts/configure.sh dev
 ./scripts/compose.sh config -q
 ./scripts/compose.sh up -d --wait db livekit
 network=chat-friends_default

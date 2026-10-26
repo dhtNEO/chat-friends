@@ -119,13 +119,6 @@ test("bootstrap publica os dois nomes, preserva segredos e precisa de aplicaçã
     assert.equal(await prepare(cwd, dep), "restart"); // configuração escrita != SFU aplicada
     commit(cwd);
     assert.equal(await prepare(cwd, network()), "unchanged");
-    assert.doesNotMatch(
-      fs.readFileSync(
-        path.join(cwd, "infra/compose/generated/livekit.yaml"),
-        "utf8",
-      ),
-      /tailscale0/,
-    );
   }));
 test("mudança de IP e retry após falha não suprimem recriação", () =>
   fixture(async (cwd) => {
@@ -238,7 +231,7 @@ test("CLI não vaza token em stdout/stderr nem permite modo desconhecido", () =>
     assert.notEqual(result.status, 0);
     assert.ok(!(result.stdout + result.stderr).includes(token));
   }));
-test("internet recusa IP privado, nomes iguais, email inválido e origem insegura", () =>
+test("prd recusa IP privado, nomes iguais, email inválido e origem insegura", () =>
   fixture(async (cwd) => {
     await prepare(cwd, { initial: true, ...network() });
     const good = fs.readFileSync(path.join(cwd, ".env"), "utf8");
@@ -253,7 +246,7 @@ test("internet recusa IP privado, nomes iguais, email inválido e origem insegur
     ]) {
       fs.writeFileSync(path.join(cwd, ".env"), bad);
       assert.notEqual(
-        spawnSync(process.execPath, ["scripts/render-config.mjs", "internet"], {
+        spawnSync(process.execPath, ["scripts/render-config.mjs", "prd"], {
           cwd,
           stdio: "ignore",
         }).status,

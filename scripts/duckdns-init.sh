@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 [[ "${1:-init}" == init || "${1:-init}" == --retry ]] || { echo 'Uso: duckdns-init.sh [--retry]' >&2; exit 1; }
 source scripts/duckdns-common.sh
 duck_lock
-for service in backend web livekit edge tailscale; do
+for service in backend web livekit edge; do
   if [[ -n "$("$duck_docker" ps -q --filter label=com.docker.compose.project=chat-friends --filter "label=com.docker.compose.service=$service")" ]]; then
     echo 'Pare a stack anterior (sem apagar volumes) antes do bootstrap DuckDNS.' >&2; exit 1
   fi
@@ -23,6 +23,6 @@ chmod 600 "$duck_dir/token"
 unset token
 printf '%s\n' "$app" "$media" "$email" "$wan" "$https_port" | duck_node init
 fi
-if [[ ! -f .env ]]; then ./scripts/configure.sh local; fi
+if [[ ! -f .env ]]; then ./scripts/configure.sh dev; fi
 duck_node prepare >/dev/null
-echo 'DNS confirmado e configuração preparada. Abra as portas previstas no guia e inicie CHAT_MODE=internet ./scripts/up.sh.'
+echo 'DNS confirmado e configuração preparada. Abra as portas previstas no guia e inicie CHAT_MODE=prd ./scripts/up.sh.'
