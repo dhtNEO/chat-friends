@@ -14,6 +14,7 @@ function fixture(fn) {
     "security-config.mjs",
     "network-config.mjs",
     "modes.sh",
+    "compose.sh",
     "configure.sh",
     "check.sh",
   ])
@@ -25,11 +26,10 @@ function fixture(fn) {
     path.join(root, ".env.example"),
     path.join(cwd, ".env.example"),
   );
-  const result = spawnSync(
-    process.execPath,
-    ["scripts/render-config.mjs"],
-    { cwd, encoding: "utf8" },
-  );
+  const result = spawnSync(process.execPath, ["scripts/render-config.mjs"], {
+    cwd,
+    encoding: "utf8",
+  });
   assert.equal(result.status, 0);
   const docker = path.join(cwd, "docker");
   fs.writeFileSync(
@@ -63,7 +63,10 @@ test("dev padrão gera credenciais privadas e anuncia loopback", () =>
     );
     assert.equal(
       fs
-        .readFileSync(path.join(cwd, "infra/compose/generated/network/mode"), "utf8")
+        .readFileSync(
+          path.join(cwd, "infra/compose/generated/network/mode"),
+          "utf8",
+        )
         .trim(),
       "dev",
     );
@@ -122,7 +125,10 @@ for (const [previous, requested] of [
       assert.equal(fs.readFileSync(path.join(cwd, ".env"), "utf8"), before);
       assert.equal(
         fs
-          .readFileSync(path.join(cwd, "infra/compose/generated/network/mode"), "utf8")
+          .readFileSync(
+            path.join(cwd, "infra/compose/generated/network/mode"),
+            "utf8",
+          )
           .trim(),
         requested,
       );
@@ -130,7 +136,10 @@ for (const [previous, requested] of [
   );
 test("configure e check recusam mudar prd para dev sem tocar Docker", () =>
   fixture((cwd, env) => {
-    fs.writeFileSync(path.join(cwd, "infra/compose/generated/network/mode"), "prd\n");
+    fs.writeFileSync(
+      path.join(cwd, "infra/compose/generated/network/mode"),
+      "prd\n",
+    );
     for (const script of ["configure.sh", "check.sh"]) {
       assert.notEqual(
         spawnSync("bash", ["scripts/" + script], { cwd, env, stdio: "ignore" })
@@ -150,4 +159,39 @@ test("TURN em dev é recusado antes de gerar configuração", () =>
       }).status,
       0,
     );
+  }));
+
+test("compose não inicia modo divergente e permite inspecionar/parar a stack", () =>
+  fixture((cwd, env) => {
+    fs.writeFileSync(
+      path.join(cwd, "infra/compose/generated/network/mode"),
+      "prd\n",
+    );
+    fs.writeFileSync(
+      path.join(cwd, "docker"),
+      "#!/usr/bin/env bash\nprintf called > docker-called\n",
+      { mode: 0o700 },
+    );
+    for (const command of ["up", "start", "restart", "run", "exec"]) {
+      assert.notEqual(
+        spawnSync("bash", ["scripts/compose.sh", command], {
+          cwd,
+          env,
+          stdio: "ignore",
+        }).status,
+        0,
+      );
+      assert.equal(fs.existsSync(path.join(cwd, "docker-called")), false);
+    }
+    for (const command of ["config", "logs", "down"]) {
+      assert.equal(
+        spawnSync("bash", ["scripts/compose.sh", command], {
+          cwd,
+          env,
+          stdio: "ignore",
+        }).status,
+        0,
+      );
+      fs.rmSync(path.join(cwd, "docker-called"));
+    }
   }));

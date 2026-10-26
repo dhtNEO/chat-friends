@@ -3,6 +3,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/modes.sh
 mode=$(chat_mode "${CHAT_MODE-dev}")
+saved=$(chat_saved_mode)
+if [[ -n "$saved" && "$saved" != "$mode" ]]; then
+  case "${1:-}" in
+    config|ps|logs|top|images|version|down|stop|kill) ;;
+    *) echo "Modo ativo: $saved. Pare a stack e use configure.sh na troca de modo antes deste comando." >&2; exit 1 ;;
+  esac
+fi
 args=(--env-file .env)
 for file in infra/compose/generated/runtime.env infra/compose/generated/network/network.env; do
   if [[ -f "$file" ]]; then args+=(--env-file "$file"); fi
