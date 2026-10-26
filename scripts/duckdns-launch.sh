@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
-log=infra/compose/generated/duckdns/launchagent.log
+log=infra/compose/generated/duckdns-logs/launchagent.log
 mkdir -p "$(dirname "$log")"
 if [[ -f "$log" && $(wc -c < "$log") -ge 1048576 ]]; then
  rm -f "$log.3"

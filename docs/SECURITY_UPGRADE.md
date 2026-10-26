@@ -56,7 +56,7 @@ Implementação na branch `work`, 26/10/2026. Execute a atualização em manuten
    ./scripts/install-duckdns-launchagent.sh
    ```
 
-   O log privado fica em `generated/duckdns/launchagent.log`, com até três cópias de aproximadamente 1 MiB. A atualização deve ocorrer mesmo com Private Relay ativo; ele não protege conexões de entrada.
+   O log privado fica em `generated/duckdns-logs/launchagent.log`, com até três cópias de aproximadamente 1 MiB. A atualização deve ocorrer mesmo com Private Relay ativo; ele não protege conexões de entrada.
 
 ### Alteração nos arquivos gerados
 
@@ -101,3 +101,5 @@ O IP público no DuckDNS e o nome no certificado são normais para hospedagem re
 Revisar avisos de segurança semanalmente e após alertas relevantes; executar CI/scans ao atualizar, renovar exceções somente com evidência e registrar versões do Mac/OrbStack/roteador privadamente. Guardar 7 backups diários e 4 semanais é uma proposta de retenção: apagar somente após confirmar cópia externa e teste de restauração. RPO 24 h/RTO 4 h são metas a medir com host/backup disponíveis, não garantias contra perda física ou DDoS.
 
 As publicações prd do aplicativo/SFU são explicitamente IPv4. Isso não altera nem comprova o firewall IPv6 dos demais serviços do Mac.
+
+Na primeira atualização, snapshots completos antigos e arquivos temporários desconhecidos do DuckDNS são preservados em `generated/operator-backups`, fora do mount do helper. Os snapshots ativos passam a conter somente parâmetros de rede. A configuração usa o mesmo lock do atualizador para evitar concorrência nessa migração. Logs ficam separados em `generated/duckdns-logs`. Proteja também os arquivos arquivados e aplique retenção somente após verificar o backup.

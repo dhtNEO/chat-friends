@@ -97,7 +97,7 @@ Depois de testar externamente:
 ./scripts/install-duckdns-launchagent.sh
 ```
 
-O LaunchAgent roda a cada cinco minutos após login, com caminhos absolutos e sem token no plist. OrbStack deve estar ativo; falhas são retomadas em execução posterior. Sem autostart antes de login. Remoção: `./scripts/install-duckdns-launchagent.sh remove`. Logs sanitizados ficam em `generated/duckdns/launchagent.log`; revisar/limpar em manutenção, sem rotação automática desse arquivo.
+O LaunchAgent roda a cada cinco minutos após login, com caminhos absolutos e sem token no plist. OrbStack deve estar ativo; falhas são retomadas em execução posterior. Sem autostart antes de login. Remoção: `./scripts/install-duckdns-launchagent.sh remove`. Logs sanitizados ficam em `generated/duckdns-logs/launchagent.log`; rotação automática pelo wrapper mantém até três cópias de aproximadamente 1 MiB.
 
 ## Teste externo e acesso local
 

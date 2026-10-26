@@ -15,6 +15,7 @@ duck_remove_operation() {
 }
 duck_node() {
   local network=${DUCKDNS_NETWORK:-bridge}
+  [[ -f infra/compose/generated/helper.env ]] || { echo "Execute configure.sh em manutenção antes de usar o helper atualizado." >&2; return 1; }
   "$duck_docker" run --rm -i --name "$duck_operation" --label "chatfriends.duckdns.lock=$duck_lock_id" --network "$network" \
     -e NO_PROXY=localhost,127.0.0.1,backend,db,livekit,web,edge -e no_proxy=localhost,127.0.0.1,backend,db,livekit,web,edge \
     --read-only --cap-drop ALL --security-opt no-new-privileges:true --pids-limit 128 --memory 256m --cpus 0.5 \
