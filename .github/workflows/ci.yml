@@ -38,6 +38,7 @@ jobs:
         working-directory: backend
       - name: Scan resolved Java SBOM
         run: |
+          test -f backend/target/bom.json
           docker run --rm -v "$PWD:/work:ro" -v "$RUNNER_TEMP:/reports" aquasec/trivy:0.68.1 sbom --format json --output /reports/java-vulns.json /work/backend/target/bom.json
           python3 scripts/vulnerability-gate.py "$RUNNER_TEMP/java-vulns.json"
   frontend:
@@ -84,7 +85,10 @@ jobs:
           cd frontend
           npm ci
           npx playwright install --with-deps chromium
-          npm test
+          PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/browser-report.json" npm test -- --reporter=list,json
+      - name: Browser diagnostics (redacted)
+        if: always()
+        run: node scripts/ci-browser-summary.mjs "$RUNNER_TEMP/browser-report.json"
       - run: python3 scripts/tests/runtime-security.py && ./scripts/check-db-privileges.sh
       - run: ./scripts/test-backup.sh
       - name: Scan actual runtime images

@@ -99,3 +99,5 @@ O IP público no DuckDNS e o nome no certificado são normais para hospedagem re
 ## Manutenção
 
 Revisar avisos de segurança semanalmente e após alertas relevantes; executar CI/scans ao atualizar, renovar exceções somente com evidência e registrar versões do Mac/OrbStack/roteador privadamente. Guardar 7 backups diários e 4 semanais é uma proposta de retenção: apagar somente após confirmar cópia externa e teste de restauração. RPO 24 h/RTO 4 h são metas a medir com host/backup disponíveis, não garantias contra perda física ou DDoS.
+
+As publicações prd do aplicativo/SFU são explicitamente IPv4. Isso não altera nem comprova o firewall IPv6 dos demais serviços do Mac.

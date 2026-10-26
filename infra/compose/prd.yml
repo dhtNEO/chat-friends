@@ -5,8 +5,8 @@ services:
       ADMIN_MFA_REQUIRED: "true"
   livekit:
     ports: !override
-      - "7881:7881/tcp"
-      - "7882:7882/udp"
+      - "0.0.0.0:7881:7881/tcp"
+      - "0.0.0.0:7882:7882/udp"
   web:
     networks: !override [api_net, signal_net]
     ports: !override []
@@ -27,7 +27,7 @@ services:
     networks: [ingress_net, api_net, signal_net]
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
-    ports: ["80:80/tcp", "443:443/tcp", "443:443/udp"]
+    ports: ["0.0.0.0:80:80/tcp", "0.0.0.0:443:443/tcp", "0.0.0.0:443:443/udp"]
     environment:
       NO_PROXY: localhost,127.0.0.1,backend,db,livekit,web
       no_proxy: localhost,127.0.0.1,backend,db,livekit,web
