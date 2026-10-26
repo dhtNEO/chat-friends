@@ -10,6 +10,10 @@ for staging in ['false', 'true']:
     result = subprocess.run(['./scripts/compose.sh', 'config', '--format', 'json'],
                             cwd=root, env=env, capture_output=True, check=True)
     config = json.loads(result.stdout)
+    sources = config['services']['web']['environment']['MEDIA_CONNECT_SRC'].split()
+    assert len(sources) == 2 and sources[0].startswith('https://')
+    assert sources[1] == sources[0].replace('https://', 'wss://', 1)
+    assert sources[0].split('://')[1].split(':')[0] == config['services']['edge']['environment']['MEDIA_DOMAIN']
     ports = {(p['target'], p['protocol']) for service in config['services'].values()
              for p in service.get('ports', [])}
     assert ports == {(80, 'tcp'), (443, 'tcp'), (443, 'udp'), (7881, 'tcp'), (7882, 'udp')}
@@ -30,10 +34,12 @@ print('prd: portas limitadas, ACME staging isolado e Caddy válido com CA de pro
 
 # DNS-01 usa segredo de arquivo; nenhuma porta HTTP ou QUIC é publicada.
 for staging in ['false', 'true']:
-    env = dict(os.environ, CHAT_MODE='prd', CHAT_DUCKDNS_DNS01='true', CHAT_ACME_STAGING=staging)
+    env = dict(os.environ, CHAT_MODE='prd', CHAT_DUCKDNS_DNS01='true', CHAT_ACME_STAGING=staging, PUBLIC_HTTPS_PORT='18443')
     result = subprocess.run(['./scripts/compose.sh', 'config', '--format', 'json'], cwd=root, env=env, capture_output=True, check=True)
     config = json.loads(result.stdout)
     edge = config['services']['edge']
+    media = edge['environment']['MEDIA_DOMAIN']
+    assert config['services']['web']['environment']['MEDIA_CONNECT_SRC'] == f'https://{media}:18443 wss://{media}:18443'
     assert {(p['target'],p['protocol']) for p in edge['ports']} == {(443,'tcp')}
     assert edge['secrets'][0]['source'] == 'duckdns_token'
     assert 'DUCKDNS_API_TOKEN' not in edge['environment']

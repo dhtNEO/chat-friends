@@ -8,11 +8,12 @@ O projeto possui somente **dev** (local, padrão) e **prd** (internet). A integr
 |---|---|
 | Backend Java 25/Spring Boot 3.5.16, PostgreSQL separado | 15 testes de integração passaram na implementação; fonte backend preservada nesta limpeza |
 | Modos dev/prd | 22 testes Node, inspeção de portas Compose e migração de marcadores sem alterar `.env`; modos antigos recusados como entrada |
-| Frontend React/TypeScript/Vite | lint/build e oito testes Playwright executados no runner Linux |
+| Frontend React/TypeScript/Vite | lint/build e nove testes Playwright executados no runner Linux |
 | Mídia sintética | áudio bidirecional, permissão negada, chegada/parada de tela e ausência de fantasmas testados |
 | ICE | STUN autenticado em UDP/TCP; problema de loopback do container corrigido sem alterar política gerenciada do Chromium |
 | Admissão de mídia | JWT elevado é reduzido a microfone na conexão; sessão expirada recusada |
 | Edge DNS-01 | Caddy 2.11.4, módulo local filtra erros com token; testes Go e HTTPS :18443 com CA de laboratório explícita |
+| CSP prd | Chromium recebe a política do Caddy real: consulta HTTPS ao domínio de mídia permitida e outro destino bloqueado; resposta remota simulada |
 | Prd no Mac | logs do proprietário confirmaram DNS-01 válido para os dois nomes em staging; depois o proprietário confirmou funcionamento em produção |
 | Atualizador DuckDNS | API/DNS simulados, retry, lock Docker e recuperação de órfãos; confirmação de saúde administrativa na SFU real |
 | Backup/restore | restauração isolada e completa exercitadas na implementação; dados/sessões tratados conforme BACKUP_RESTORE |

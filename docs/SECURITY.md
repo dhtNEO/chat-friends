@@ -5,7 +5,7 @@ Modelo: espaço privado para amigos convidados. Ameaças incluem visitantes anô
 - Senhas BCrypt custo 12, sem senha padrão. Rate limit persistente. Nomes inválidos e senhas longas recusados; limite 72 bytes evita truncamento BCrypt.
 - Sessões JDBC, cookie HttpOnly/SameSite=Strict/Secure em HTTPS, CSRF inclusive login/logout e origem exata WebSocket.
 - Histórico e tokens exigem sessão. Admin verificado pelo Spring Security; identidade da mídia também conferida no banco.
-- React renderiza mensagens como texto, CSP restringe scripts; consultas SQL parametrizadas. Corpos limitados; nenhuma anexação ou HTML.
+- React renderiza mensagens como texto, CSP restringe scripts e, em prd, permite conexões HTTPS/WSS apenas à própria origem e ao domínio/porta de mídia configurados; consultas SQL parametrizadas. Corpos limitados; nenhuma anexação ou HTML.
 - Logs operacionais não registram conteúdo do chat, senhas ou JWTs. Não habilite access logs com query string do LiveKit nem DEBUG de SDKs. LiveKit pode transportar JWT em query de sinalização.
 - `.env`, configurações geradas e backups são ignorados no Git. Arquivos 0600 e diretório gerado 0700. Administrador de Docker/root pode ler segredos; não conceda esse acesso a usuários da aplicação.
 - PostgreSQL/backend somente rede Compose; no modo prd apenas `/rtc` da SFU é encaminhado. API administrativa LiveKit, métricas e Caddy admin não ficam públicos.

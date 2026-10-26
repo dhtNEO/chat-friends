@@ -6,6 +6,8 @@ services:
       - "7882:7882/udp"
   web:
     ports: !override []
+    environment:
+      MEDIA_CONNECT_SRC: "https://${MEDIA_DOMAIN:?}:${PUBLIC_HTTPS_PORT:-443} wss://${MEDIA_DOMAIN:?}:${PUBLIC_HTTPS_PORT:-443}"
   edge:
     image: caddy:2.11.4-alpine
     restart: unless-stopped

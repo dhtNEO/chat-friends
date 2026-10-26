@@ -19,3 +19,9 @@
 | Certificado inválido | DNS/horário/ACME, portas 80/443, cadeia completa e persistência de /data; não usar -k como correção |
 
 Use `scripts/diagnose.sh`; nunca colar `.env`, `docker inspect` completo, `compose config` expandido ou dumps de sessão. `compose config -q` valida sem imprimir segredos. HTTP 200 da página prova frontend, não WebRTC. Teste chamada de outra rede e confirme frames/áudio recebidos.
+
+## Falha de sinalização com CSP em produção
+
+Se o console bloquear `https://DOMINIO-MIDIA:PORTA/rtc/v1/validate` por `connect-src`, reconstrua o serviço web com o Compose atualizado. Em prd, `MEDIA_CONNECT_SRC` permite HTTPS e WSS somente no domínio/porta de mídia configurados. O SDK consulta `/validate` quando o WebSocket inicial falha; essa resposta pode permitir o fallback de protocolo. Bloquear a consulta esconde o motivo original e pode impedir o fallback. Não é necessário liberar `https:` para qualquer destino.
+
+Se persistir após a correção, confira no painel Network o status da sinalização e valide certificado/DNS/acesso externo ao domínio de mídia. Não compartilhar URLs com `access_token`.

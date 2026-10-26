@@ -8,7 +8,7 @@
   X-Content-Type-Options nosniff
   Referrer-Policy same-origin
   Permissions-Policy "camera=(), microphone=(self), display-capture=(self)"
-  Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' ws: wss:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' {$MEDIA_CONNECT_SRC:ws: wss:}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
  }
  @signal path /rtc /rtc/*
  handle @signal {
