@@ -36,7 +36,7 @@ app:
   livekit-secret: ${LIVEKIT_API_SECRET}
   screen-bitrate: ${SCREEN_BITRATE:8000000}
   screen-height: ${SCREEN_HEIGHT:1080}
-  screen-fps: ${SCREEN_FPS:30}
+  screen-fps: ${SCREEN_FPS:60}
 logging:
   level:
     root: WARN

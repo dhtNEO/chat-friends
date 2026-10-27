@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "demo": "vite --mode demo --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "lint": "eslint ."
   },
   "dependencies": {
+    "dockview": "8.4.1",
+    "dockview-core": "8.4.1",
+    "dockview-react": "8.4.1",
     "livekit-client": "2.23.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"

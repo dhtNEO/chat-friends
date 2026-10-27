@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { type RemoteAudioTrack, type Track } from "livekit-client";
+import { Icon } from "./Icon";
+import { Avatar } from "./ui";
 
 export function AudioTrack({
   track,
@@ -40,24 +41,34 @@ export function Screen({
   track,
   name,
   local,
+  avatar,
+  viewers,
   volume,
   deaf,
+  expanded,
+  onExpand,
+  onPopout,
   onVolume,
   onError,
 }: {
   track: Track;
   name: string;
   local: boolean;
+  avatar?: string;
+  viewers: number;
   volume: number;
   deaf: boolean;
+  // Expanding maximizes the dock panel, leaving browser fullscreen separate.
+  expanded: boolean;
+  onExpand: () => void;
+  onPopout: () => void;
   onVolume: (volume: number) => void;
   onError: (message: string) => void;
 }) {
   const video = useRef<HTMLVideoElement>(null),
     container = useRef<HTMLDivElement>(null);
   const previousVolume = useRef(volume || 100);
-  const [expanded, setExpanded] = useState(false),
-    [full, setFull] = useState(false);
+  const [full, setFull] = useState(false);
   const [resolution, setResolution] = useState("");
   useEffect(() => {
     const el = video.current!;
@@ -66,10 +77,17 @@ export function Screen({
       setResolution(
         el.videoWidth ? `${el.videoWidth} × ${el.videoHeight}` : "",
       );
+    // Dragging a dock panel re-inserts the video, which pauses it. It is
+    // muted (sound plays elsewhere), so resuming needs no user gesture.
+    const resume = () => {
+      if (el.isConnected) void el.play().catch(() => {});
+    };
     el.addEventListener("resize", update);
+    el.addEventListener("pause", resume);
     update();
     return () => {
       el.removeEventListener("resize", update);
+      el.removeEventListener("pause", resume);
       track.detach(el);
     };
   }, [track]);
@@ -79,66 +97,94 @@ export function Screen({
     document.addEventListener("fullscreenchange", update);
     return () => document.removeEventListener("fullscreenchange", update);
   }, []);
-  const host = document.getElementById("screen-stage");
-  const content = (
+  const toggleFull = () => {
+    const action = full
+      ? document.exitFullscreen()
+      : container.current?.requestFullscreen();
+    void action?.catch(() =>
+      onError("Não foi possível abrir a tela cheia neste navegador."),
+    );
+  };
+  return (
     <div
       className={"screen " + (expanded ? "screen-expanded" : "")}
       ref={container}
       aria-label="Transmissão"
     >
-      <header className="screen-heading">
-        <strong>
-          Tela de {name}
-          {local ? " · sua prévia" : ""}
-        </strong>
-        <span>{resolution}</span>
-      </header>
       <video ref={video} autoPlay playsInline muted />
-      <div className="screen-toolbar">
-        {!local && (
-          <>
-            <button
-              aria-pressed={volume === 0}
-              onClick={() => {
-                if (volume) previousVolume.current = volume;
-                onVolume(volume ? 0 : previousVolume.current);
-              }}
-            >
-              {volume === 0 ? "Ouvir transmissão" : "Silenciar transmissão"}
-            </button>
-            <label className="stream-volume">
-              Volume da transmissão{" "}
-              <span className="volume-value" aria-hidden="true">
-                {volume}%
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume}
-                onChange={(e) => onVolume(+e.target.value)}
-              />
-            </label>
-            {deaf && <span className="audio-badge">Recepção silenciada</span>}
-          </>
+      <header className="screen-heading">
+        <Avatar name={name} src={avatar} size={34} />
+        <div className="screen-who">
+          <strong>{name}</strong>
+          <span>{local ? "Sua prévia · sem som" : "Transmitindo"}</span>
+        </div>
+        <span className="live-badge">AO VIVO</span>
+        {resolution && (
+          <span className="screen-chip optional">{resolution}</span>
         )}
-        <button aria-pressed={expanded} onClick={() => setExpanded(!expanded)}>
-          {expanded ? "Compactar" : "Expandir"}
-        </button>
-        <button
-          onClick={() => {
-            const action = full
-              ? document.exitFullscreen()
-              : container.current?.requestFullscreen();
-            void action?.catch(() =>
-              onError("Não foi possível abrir a tela cheia neste navegador."),
-            );
-          }}
-        >
-          {full ? "Sair da tela cheia" : "Tela cheia"}
-        </button>
-      </div>
+        <span className="screen-chip" title="Assistindo">
+          <Icon name="people" size={14} /> {viewers}
+        </span>
+        <span className="screen-actions">
+          <button
+            className="icon-button"
+            aria-label={expanded ? "Compactar" : "Expandir"}
+            title={expanded ? "Compactar" : "Expandir"}
+            aria-pressed={expanded}
+            onClick={onExpand}
+          >
+            <Icon name={expanded ? "collapse" : "expand"} />
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Abrir em outra janela"
+            title="Abrir em outra janela (outro monitor)"
+            onClick={onPopout}
+          >
+            <Icon name="popout" />
+          </button>
+          <button
+            className="icon-button"
+            aria-label={full ? "Sair da tela cheia" : "Tela cheia"}
+            title={full ? "Sair da tela cheia" : "Tela cheia"}
+            onClick={toggleFull}
+          >
+            <Icon name="fullscreen" />
+          </button>
+        </span>
+      </header>
+      {!local && (
+        <div className="screen-toolbar">
+          <button
+            className="icon-button"
+            aria-label={
+              volume === 0 ? "Ouvir transmissão" : "Silenciar transmissão"
+            }
+            title={volume === 0 ? "Ouvir transmissão" : "Silenciar transmissão"}
+            aria-pressed={volume === 0}
+            onClick={() => {
+              if (volume) previousVolume.current = volume;
+              onVolume(volume ? 0 : previousVolume.current);
+            }}
+          >
+            <Icon name={volume === 0 ? "volumeOff" : "volume"} />
+          </button>
+          <label className="stream-volume">
+            <span className="sr-only">Volume da transmissão</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => onVolume(+e.target.value)}
+            />
+            <span className="volume-value" aria-hidden="true">
+              {volume}%
+            </span>
+          </label>
+          {deaf && <span className="audio-badge">Recepção silenciada</span>}
+        </div>
+      )}
     </div>
   );
-  return host ? createPortal(content, host) : content;
 }

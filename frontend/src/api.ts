@@ -34,6 +34,25 @@ export async function api<T = void>(
     ? (undefined as T)
     : r.text().then((t) => (t ? JSON.parse(t) : undefined));
 }
+// Raw upload (avatars): same CSRF and error handling as api().
+export async function upload<T>(path: string, blob: Blob): Promise<T> {
+  if (!csrf) await refreshCsrf();
+  const r = await fetch("/api" + path, {
+    method: "POST",
+    headers: { "Content-Type": blob.type, "X-CSRF-TOKEN": csrf },
+    body: blob,
+  });
+  if (!r.ok) {
+    let detail = "";
+    try {
+      detail = (await r.json()).error || "";
+    } catch {
+      /* no JSON */
+    }
+    throw new Error(detail || "Não foi possível enviar a imagem.");
+  }
+  return r.json();
+}
 export async function login(username: string, password: string) {
   await refreshCsrf();
   const r = await fetch("/api/login", {
@@ -58,7 +77,14 @@ export type User = {
   displayName: string;
   admin: boolean;
   enabled: boolean;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  avatarVersion: number | null;
 };
+export type Member = Pick<
+  User,
+  "id" | "username" | "displayName" | "avatarVersion"
+>;
 export type Message = {
   id: number;
   clientId: string;
