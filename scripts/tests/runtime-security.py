@@ -1,5 +1,5 @@
 """Inspect whitelisted fields, never print expanded secrets."""
-import json,subprocess
+import json,socket,subprocess
 from pathlib import Path
 root=Path(__file__).resolve().parents[2]
 def command(*args):return subprocess.check_output(args,cwd=root)
@@ -19,6 +19,18 @@ for name in ['backend','web','livekit']:
  h=c['HostConfig'];assert h['ReadonlyRootfs'] and 'ALL' in h['CapDrop'] and h['PidsLimit']>0,name
  for mount in c['Mounts']:assert 'docker.sock' not in mount['Destination']
 print('Runtime: conta DB separada, redes segmentadas, usuários limitados, rootfs RO e capabilities removidas.')
+
+# With three NICs rewritten to one public node_ip, duplicate ICE candidates can
+# keep the wrong UDP mux. Only media_net receives the published media ports.
+livekit=command('./scripts/compose.sh','ps','-q','livekit').decode().strip()
+networks=json.loads(command('docker','inspect','--format','{{json .NetworkSettings.Networks}}',livekit))
+media_ip=networks[config['networks']['media_net']['name']]['IPAddress']
+bound=set()
+for line in command('docker','exec',livekit,'cat','/proc/net/udp').decode().splitlines()[1:]:
+ address,port=line.split()[1].split(':')
+ if int(port,16)==7882:bound.add(socket.inet_ntoa(bytes.fromhex(address)[::-1]))
+assert bound=={media_ip},'ICE UDP deve escutar somente na interface que recebe a porta Docker publicada'
+print('Mídia: socket ICE UDP restrito à interface da rede de mídia, sem candidatos das redes de controle/sinalização.')
 
 # Probe only this project's database, from the exact public web networks.
 db=json.loads(command('docker','inspect',command('./scripts/compose.sh','ps','-q','db').decode().strip()))[0]

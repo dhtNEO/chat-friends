@@ -10,3 +10,5 @@ RUN --mount=type=cache,id=chat-friends-go-mod,target=/go/pkg/mod,sharing=locked 
 RUN --mount=type=cache,id=chat-friends-go-mod,target=/go/pkg/mod,sharing=locked --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -mod=readonly -trimpath -ldflags="-w -s" -o /usr/bin/livekit-server ./cmd/server
 FROM livekit/livekit-server:v1.13.11
 COPY --from=build /usr/bin/livekit-server /livekit-server
+COPY --chmod=0555 entrypoint.sh /usr/local/bin/chat-livekit-entrypoint
+ENTRYPOINT ["/usr/local/bin/chat-livekit-entrypoint"]

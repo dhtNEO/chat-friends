@@ -122,7 +122,7 @@ rtc:
   udp_port: 7882
   use_external_ip: false
   node_ip: ${JSON.stringify(ip)}
-  # Docker forwards media to eth0, never to the container loopback socket.
+  # The entrypoint selects the default-route/media NIC, never container loopback.
   enable_loopback_candidate: false
 # Enforced bounds in LiveKit v1.13.11. num_tracks/bytes_per_sec only affect
 # node allocation, so they are deliberately not presented as publisher caps.

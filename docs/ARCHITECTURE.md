@@ -92,3 +92,6 @@ Modelo: accounts → messages; accounts → media_connections → session_id; sc
 `migrate` é um job de manutenção com credenciais próprias; o backend permanente usa apenas DML e Flyway desativado. Redes: `database_net` (db/backend/migrador, interna), `api_net` (web/edge/backend, interna), `control_net` (backend/SFU, interna), `signal_net` (web/edge/SFU, interna), `ingress_net` e `media_net` (entrada/saída necessária). Backend não tem ponte externa. Isso limita acesso lateral entre serviços; o bloqueio de conexões iniciadas para a LAN depende do host/firewall e precisa ser validado no OrbStack.
 
 Veja [atualização de segurança](SECURITY_UPGRADE.md) para MFA, limites, arquivos privados e recuperação. O banco de integração `friends_test` usa `friends_tests`, sem credenciais de runtime/DBA entregues ao Maven.
+
+
+O entrypoint da SFU lê a rota IPv4 padrão do contêiner e restringe `rtc.interfaces.includes` à interface de `media_net`, que recebe as portas publicadas. O nome `ethN` não é fixado: a seleção acompanha a rota real. A configuração montada permanece RO; a cópia temporária tem modo 0600. Isso evita que interfaces de sinalização/controle, anunciadas com o mesmo `node_ip`, sejam escolhidas após a deduplicação de candidatos ICE. `runtime-security.py` confirma o socket UDP na rede correta, e Playwright exige respostas STUN autenticadas por UDP e TCP.

@@ -65,6 +65,7 @@ jobs:
       - run: python3 scripts/tests/duckdns-lock.py
       - run: python3 scripts/tests/helper-mounts.py
       - run: ./scripts/up.sh
+      - run: python3 scripts/tests/runtime-security.py && ./scripts/check-db-privileges.sh
       - run: docker build -t chat-friends-edge-duckdns infra/caddy
       - run: python3 scripts/tests/modes-profile.py
       - run: python3 scripts/tests/prd-profile.py
@@ -98,7 +99,6 @@ jobs:
       - name: Browser diagnostics (redacted)
         if: always()
         run: node scripts/ci-browser-summary.mjs "$RUNNER_TEMP/browser-report.json" "$RUNNER_TEMP/browser-phase" "$RUNNER_TEMP/browser-install.log"
-      - run: python3 scripts/tests/runtime-security.py && ./scripts/check-db-privileges.sh
       - run: ./scripts/test-backup.sh
       - name: Scan actual runtime images
         run: |
