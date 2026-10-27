@@ -20,5 +20,5 @@ if ! docker "${node_args[@]}" | ./scripts/compose.sh exec -T db sh -c 'psql -Xq 
 fi
 rm -f infra/compose/generated/test-provision.log
 docker "${node_args[@]}" --env > infra/compose/generated/test.env
-docker run --rm --network "$network" --network chat-friends_ingress_net --env-file infra/compose/generated/test.env -v "$PWD/backend:/src" -v friends-maven:/root/.m2 -w /src maven:3.9.11-eclipse-temurin-25 ./mvnw -B -ntp verify
+docker run --rm --network "$network" --network chat-friends_ingress_net --env-file infra/compose/generated/test.env -v "$PWD/backend:/src" -v friends-maven:/root/.m2 -w /src maven:3.9.11-eclipse-temurin-25 ./mvnw -B -ntp clean verify
 docker run --rm -v "$PWD/frontend:/src" -w /src node:24.22.1-alpine sh -c 'npm ci && npm run lint && npm run build'

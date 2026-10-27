@@ -69,9 +69,8 @@ test("layout móvel mantém conversa e voz acessíveis", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page);
   await expect(page.getByLabel("Mensagem em geral")).toBeVisible();
-  await page
-    .getByRole("button", { name: "Entrar na voz" })
-    .scrollIntoViewIfNeeded();
+  // On phones the panels become tabs.
+  await page.locator(".dv-tab", { hasText: "Sala de estar" }).click();
   await expect(
     page.getByRole("button", { name: "Entrar na voz" }),
   ).toBeVisible();
@@ -129,9 +128,10 @@ test("permissão de microfone recusada mantém chat utilizável", async ({
   });
   await signIn(page);
   await page.getByRole("button", { name: "Entrar na voz" }).click();
-  await expect(page.getByRole("alert")).toContainText("Permissão negada", {
-    timeout: 15000,
-  });
+  // The dock keeps its own empty live region for screen readers.
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Permissão negada" }),
+  ).toBeVisible({ timeout: 15000 });
   const msg = "Chat sem microfone " + Date.now();
   await page.getByLabel("Mensagem em geral").fill(msg);
   await page.getByRole("button", { name: "Enviar mensagem" }).click();

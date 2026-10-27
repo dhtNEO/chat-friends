@@ -14,6 +14,10 @@ Modelo: espaço privado para amigos convidados. Ameaças incluem visitantes anô
 
 Desativação/redefinição elimina todas as sessões da conta no banco, fecha sockets de chat e pede remoção das identidades no LiveKit. Senha alterada pelo usuário faz o mesmo. Logout invalida a sessão atual; UI desconecta mídia e a reconciliação verifica sessão a cada 3 s. Se LiveKit estiver indisponível, remoção é repetida. Uma conexão já estabelecida não termina só porque o token inicial de 90 s expirou.
 
+## Perfil, fotos e preferências locais
+
+Trocar o usuário de login muda a identidade da sessão: o backend apaga as sessões JDBC da conta, fecha WebSockets e remove conexões de mídia, como na troca de senha. Fotos de perfil ficam no PostgreSQL (entram no backup), limitadas a 16 KB e aos tipos PNG/JPEG/WebP conferidos pelos bytes iniciais; SVG e outros tipos são recusados. Só usuários autenticados as leem, e só de contas ativas; respostas da API mantêm `X-Content-Type-Options: nosniff` e CSP `default-src 'none'`. Sons personalizados e tamanho da interface ficam apenas no `localStorage` do navegador, nunca no servidor; são tocados como `blob:`, permitido por `media-src`.
+
 ## Exclusividade de tela: garantia e lacuna conhecida
 
 A lease única é serializada por lock transacional PostgreSQL. Concessão exige participante conectado e sessão ativa; fontes iniciais apenas microfone. Transmissor anterior é revogado antes do próximo. Falha de revogação bloqueia concessão. Heartbeat expira em 30 s; ausência de conexão/sessão e eventos disparam reconciliação. Não há mock nesse fluxo.

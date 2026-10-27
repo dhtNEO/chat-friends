@@ -52,7 +52,9 @@ test("autenticador, recuperação e revogação da própria sessão pela interfa
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar no espaço" }).click();
   await expect(page.getByRole("heading", { name: /geral/ })).toBeVisible();
-  await page.getByRole("button", { name: "Minha conta" }).click();
+  await page
+    .getByRole("button", { name: "Configurações", exact: true })
+    .click();
   await page.getByRole("button", { name: "Ativar autenticador" }).click();
   const gate = page.locator(".security-page");
   await gate.getByLabel("Senha atual", { exact: true }).fill(password);
@@ -82,8 +84,15 @@ test("autenticador, recuperação e revogação da própria sessão pela interfa
     .getByLabel("Código do autenticador ou de recuperação")
     .fill(recovery);
   await page.getByRole("button", { name: "Confirmar código" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Verificar acesso" }),
+  ).toHaveCount(0);
+  // The dock restores the previously selected account tab after sign-in.
+  await page.getByRole("button", { name: "Conversa", exact: true }).click();
   await expect(page.getByRole("heading", { name: /geral/ })).toBeVisible();
-  await page.getByRole("button", { name: "Minha conta" }).click();
+  await page
+    .getByRole("button", { name: "Configurações", exact: true })
+    .click();
   await expect(page.getByText("Esta sessão", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Encerrar sessão" }).click();
   await expect(

@@ -134,7 +134,7 @@ public class Media {
                   "height",
                   Math.clamp(height, 360, 1080),
                   "fps",
-                  Math.clamp(fps, 5, 30)));
+                  Math.clamp(fps, 5, 60)));
         });
   }
 

@@ -8,8 +8,13 @@ Mesma origem do frontend. JSON UTF-8, exceto login (form) e webhook (JSON bruto)
 | GET /api/csrf | público, `{token,headerName}` |
 | POST /api/login | form `username,password`; 204 ou 401/429 |
 | POST /api/logout | 204; invalida sessão |
-| GET /api/me | `{user:{id,username,displayName,admin,enabled},spaceName}` |
+| GET /api/me | `{user:{id,username,displayName,admin,enabled,primaryColor,secondaryColor,avatarVersion},spaceName}` |
 | POST /api/password | `{currentPassword,password}`; invalida todas as sessões e solicita expulsão |
+| GET /api/members | contas ativas: `[{id,username,displayName,avatarVersion}]` |
+| PATCH /api/profile | `{displayName?,username?,primaryColor?,secondaryColor?}`; cores `#rrggbb` ou `""` para padrão; devolve `{user,signedOut}`. Trocar `username` (único, mesmo formato da criação) encerra todas as sessões da conta |
+| POST /api/profile/avatar | corpo binário `image/png`, `image/jpeg` ou `image/webp` (conferidos pelos bytes iniciais), até 16 KB; o navegador recorta e reduz antes |
+| DELETE /api/profile/avatar | remove a foto |
+| GET /api/avatars/ID | imagem da conta ativa; `Cache-Control: private, max-age=31536000` (a URL leva `?v=avatarVersion`) |
 | GET /api/messages | últimas 50, ordem crescente |
 | GET /api/messages?before=ID | até 50 anteriores, ordem crescente |
 | GET /api/messages?after=ID | até 100 posteriores; repetir até página menor que 100 |
@@ -33,7 +38,7 @@ Mensagem: `{id,clientId,authorId,author,body,createdAt}`. `createdAt` ISO-8601 U
 
 Usuário: 3–32 caracteres `[a-z0-9][a-z0-9_.-]{2,31}`. Nome 1–64. Senha 12 caracteres a 72 bytes UTF-8, BCrypt custo 12. Login limitado a 8 tentativas/5 min por nome e 100/5 min por IP visto pelo backend (atrás do proxy, limite compartilhado). Não confiamos em X-Forwarded-For arbitrário.
 
-WebSocket `/ws`: sessão autenticada, `Origin` exatamente APP_ORIGIN. Cliente envia texto `ping` a cada 10 s; servidor responde `{"type":"pong"}`. Eventos: `{"type":"message","message":...}` e `{"type":"presence","users":["username"]}`. Presença deduplicada por conta entre abas. Não é protocolo de envio do chat. Ao reconectar recuperar histórico HTTP; WebSocket não é fila durável.
+WebSocket `/ws`: sessão autenticada, `Origin` exatamente APP_ORIGIN. Cliente envia texto `ping` a cada 10 s; servidor responde `{"type":"pong"}`. Eventos: `{"type":"message","message":...}`, `{"type":"presence","users":["username"]}` e `{"type":"profile"}` (alguém mudou nome, foto ou cores: recarregar `/api/members` e `/api/me`). Presença deduplicada por conta entre abas. Não é protocolo de envio do chat. Ao reconectar recuperar histórico HTTP; WebSocket não é fila durável.
 
 401: sem sessão/conta desativada. 403: CSRF, origem ou autorização. 400: entrada inválida. 409: conflito/lease/sala cheia. 429: limite. 503: SFU indisponível ou revogação pendente. A interface não deve repetir POST de chat com novo UUID quando a resposta é incerta. Atualizar senha/desativar pode ter sido aplicado mesmo se a expulsão de mídia retornar 503; a reconciliação continuará.
 

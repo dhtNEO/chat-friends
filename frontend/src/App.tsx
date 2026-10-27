@@ -1,17 +1,42 @@
 import {
   useCallback,
   useEffect,
+  useId,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
 } from "react";
-import { api, login, type User, type Message } from "./api";
+import { createPortal } from "react-dom";
 import {
-  MfaGate,
-  AccountSecurity,
-  type SecurityState,
-} from "./AccountSecurity";
+  DockviewReact,
+  type DockviewApi,
+  type DockviewReadyEvent,
+} from "dockview-react";
+import "dockview-react/dist/styles/dockview.css";
+import { api, login, type Member, type User, type Message } from "./api";
+import { MfaGate, type SecurityState } from "./AccountSecurity";
 import { Voice } from "./Voice";
+import { Icon, type IconName } from "./Icon";
+import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
+import { Profile } from "./Profile";
+import { Logo } from "./Logo";
+import { applyTheme } from "./theme";
+import {
+  Empty,
+  Slot,
+  SlotContext,
+  compactQuery,
+  isCompact,
+  kindOf,
+  openChat,
+  openPanel,
+  resetLayout,
+  restoreLayout,
+  saveLayout,
+  theme,
+  type PanelKind,
+} from "./Dock";
 export default function App() {
   const [me, setMe] = useState<{
       user: User;
@@ -19,7 +44,8 @@ export default function App() {
       security: SecurityState;
     } | null>(null),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
   const load = useCallback(async () => {
     try {
       setMe(await api("/me"));
@@ -38,8 +64,20 @@ export default function App() {
     void load();
     return () => window.removeEventListener("session-ended", expired);
   }, [load]);
+  useEffect(() => {
+    applyTheme(me?.user.primaryColor, me?.user.secondaryColor);
+  }, [me]);
   if (loading) return <main className="loading">Preparando o seu espaço…</main>;
-  if (!me) return <Login onLogin={load} />;
+  if (!me)
+    return (
+      <Login
+        notice={notice}
+        onLogin={async () => {
+          setNotice("");
+          await load();
+        }}
+      />
+    );
   if (me.security.mfaPending || me.security.enrollmentRequired)
     return <MfaGate state={me.security} onDone={load} />;
   return (
@@ -47,14 +85,22 @@ export default function App() {
       me={me}
       error={error}
       onError={setError}
-      onLogout={() => {
+      onRefresh={load}
+      onLogout={(message = "") => {
         setMe(null);
         setError("");
+        setNotice(message);
       }}
     />
   );
 }
-function Login({ onLogin }: { onLogin: () => Promise<void> }) {
+function Login({
+  notice,
+  onLogin,
+}: {
+  notice: string;
+  onLogin: () => Promise<void>;
+}) {
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
     [error, setError] = useState(""),
@@ -76,7 +122,7 @@ function Login({ onLogin }: { onLogin: () => Promise<void> }) {
     <main className="login-page">
       <div className="login-art">
         <div className="brand">
-          <span className="brand-icon">a</span> entre amigos
+          <Logo /> entre amigos
         </div>
         <span className="eyebrow">SEU CANTO DA INTERNET</span>
         <h1>
@@ -126,6 +172,7 @@ function Login({ onLogin }: { onLogin: () => Promise<void> }) {
               placeholder="Sua senha"
             />
           </label>
+          {notice && !error && <p role="status">{notice}</p>}
           {error && (
             <p role="alert" className="error">
               {error}
@@ -148,25 +195,104 @@ function Workspace({
   me,
   error,
   onError,
+  onRefresh,
   onLogout,
 }: {
   me: { user: User; spaceName: string };
   error: string;
   onError: (s: string) => void;
-  onLogout: () => void;
+  onRefresh: () => Promise<void>;
+  onLogout: (notice?: string) => void;
 }) {
+  const [members, setMembers] = useState<Member[]>([]);
+  const loadMembers = useCallback(
+    () =>
+      api<Member[]>("/members")
+        .then(setMembers)
+        .catch(() => {}),
+    [],
+  );
+  useEffect(() => {
+    void loadMembers();
+  }, [loadMembers]);
+  const people = useMemo(
+    () => ({
+      byId: new Map(members.map((m) => [m.id, m])),
+      byUsername: new Map(members.map((m) => [m.username, m])),
+    }),
+    [members],
+  );
   const [messages, setMessages] = useState<Message[]>([]),
     [online, setOnline] = useState<string[]>([]),
     [connected, setConnected] = useState(false),
-    [body, setBody] = useState(""),
     [more, setMore] = useState(true),
-    [panel, setPanel] = useState(""),
     [pending, setPending] = useState<{ clientId: string; body: string }[]>([]);
+  const [slots, setSlots] = useState<Record<string, HTMLElement>>({}),
+    [dock, setDock] = useState<DockviewApi | null>(null),
+    [stageMaximized, setStageMaximized] = useState(false);
   const initialized = useRef(false);
   const latest = useRef(0),
-    queue = useRef(pending),
-    bottom = useRef<HTMLDivElement>(null);
+    queue = useRef(pending);
   queue.current = pending;
+  const hosts = useRef(new Map<string, { el: HTMLElement; frames: number }>());
+  const attach = useCallback((id: string) => {
+    let host = hosts.current.get(id);
+    if (!host) {
+      const el = document.createElement("div");
+      el.className = "slot";
+      host = { el, frames: 0 };
+      hosts.current.set(id, host);
+    }
+    const current = host;
+    current.frames++;
+    setSlots((old) =>
+      old[id] === current.el ? old : { ...old, [id]: current.el },
+    );
+    const detach = () => {
+      current.frames--;
+      // Dockview may remount a panel right away; only drop truly closed ones.
+      setTimeout(() => {
+        if (current.frames || hosts.current.get(id) !== current) return;
+        hosts.current.delete(id);
+        setSlots((old) => {
+          const next = { ...old };
+          delete next[id];
+          return next;
+        });
+      });
+    };
+    return { el: current.el, detach };
+  }, []);
+  const streaming = useRef(false);
+  const ready = useCallback(
+    (event: DockviewReadyEvent) => {
+      restoreLayout(event.api);
+      // Layouts are per browser; another account may have left this open.
+      const admin = event.api.getPanel("admin");
+      if (admin && !me.user.admin) event.api.removePanel(admin);
+      setDock(event.api);
+    },
+    [me.user.admin],
+  );
+  useEffect(() => {
+    if (!dock) return;
+    const saving = dock.onDidLayoutChange(() => saveLayout(dock));
+    const maximized = dock.onDidMaximizedGroupChange(() =>
+      setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized()),
+    );
+    // Phone and desktop keep separate layouts; switch when crossing over.
+    const media = matchMedia(compactQuery),
+      switchLayout = () => {
+        restoreLayout(dock);
+        if (streaming.current) openPanel(dock, "voice");
+      };
+    media.addEventListener("change", switchLayout);
+    return () => {
+      saving.dispose();
+      maximized.dispose();
+      media.removeEventListener("change", switchLayout);
+    };
+  }, [dock]);
   const merge = useCallback(
     (items: Message[]) => {
       setMessages((old) =>
@@ -234,6 +360,10 @@ function Workspace({
         if (event.type === "message") merge([event.message]);
         if (event.type === "presence") setOnline(event.users);
         if (event.type === "pong") lastPong = Date.now();
+        if (event.type === "profile") {
+          void loadMembers();
+          void onRefresh();
+        }
       };
       ws.onclose = () => {
         clearInterval(ping);
@@ -249,14 +379,8 @@ function Workspace({
       clearInterval(ping);
       ws?.close();
     };
-  }, [merge]);
-  const browsingHistory = useRef(false);
-  useEffect(() => {
-    if (!browsingHistory.current)
-      bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, pending.length]);
+  }, [merge, loadMembers, onRefresh]);
   async function older() {
-    browsingHistory.current = true;
     try {
       const rows = await api<Message[]>("/messages?before=" + messages[0]?.id);
       merge(rows);
@@ -265,218 +389,583 @@ function Workspace({
       onError((e as Error).message);
     }
   }
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!body.trim()) return;
-    browsingHistory.current = false;
+  function post(body: string) {
     const msg = { clientId: crypto.randomUUID(), body };
     setPending((old) => [...old, msg]);
-    setBody("");
     void send(msg);
   }
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-icon">a</span>
-          <span>
-            {me.spaceName}
-            <small>UM ESPAÇO SÓ NOSSO</small>
+  const [drawer, setDrawer] = useState(false),
+    [compact, setCompact] = useState(isCompact),
+    [roster, setRoster] = useState<HTMLElement | null>(null),
+    [quick, setQuick] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const media = matchMedia(compactQuery),
+      update = () => {
+        setCompact(media.matches);
+        setDrawer(false);
+      };
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const open = (kind: PanelKind) => {
+    setDrawer(compact && kind === "nav");
+    if (dock && !(compact && kind === "nav")) openPanel(dock, kind);
+  };
+  const close = (id: string) => {
+    const panel = dock?.getPanel(id);
+    if (panel) dock?.removePanel(panel);
+  };
+  const chats = Object.keys(slots).filter((id) => kindOf(id) === "chat");
+  const sidebar = (
+    <aside className="sidebar" aria-label="Navegação">
+      <div className="brand">
+        <Logo />
+        <span>
+          {me.spaceName}
+          <small>Um espaço só nosso</small>
+        </span>
+      </div>
+      <div className="channel-section">
+        <span className="eyebrow">CANAIS DE TEXTO</span>
+        <button
+          className={"channel" + (chats.length ? " selected" : "")}
+          onClick={() => open("chat")}
+        >
+          <Icon name="hash" size={18} /> geral
+        </button>
+      </div>
+      <div className="channel-section">
+        <span className="eyebrow">CANAIS DE VOZ</span>
+        <div ref={setRoster} />
+      </div>
+      <footer className="me">
+        <Avatar name={me.user.displayName} src={avatarSrc(me.user)} size={34} />
+        <div className="me-name">
+          <strong>{me.user.displayName}</strong>
+          <small>@{me.user.username}</small>
+        </div>
+        <div className="quick" ref={setQuick} />
+      </footer>
+    </aside>
+  );
+  function content(id: string) {
+    const kind = kindOf(id);
+    // On phones the channel list lives in the drawer instead.
+    if (kind === "nav") return compact ? null : sidebar;
+    if (kind === "chat")
+      return (
+        <ChatView
+          me={me.user}
+          connected={connected}
+          messages={messages}
+          pending={pending}
+          more={more}
+          onOlder={() => void older()}
+          onSend={post}
+          onRetry={(p) => void send(p)}
+        />
+      );
+    if (kind === "members")
+      return (
+        <section className="members" aria-label="Membros">
+          <span className="eyebrow">
+            MEMBROS — {online.length} ONLINE DE {members.length}
           </span>
-        </div>
-        <div className="sidebar-section">
-          <span className="eyebrow">NOSSO ESPAÇO</span>
-          <button className="channel selected" onClick={() => setPanel("")}>
-            <span>#</span> geral <i />
-          </button>
-          <a className="channel" href="#voice">
-            <span>◌</span> Sala de estar
-          </a>
-        </div>
-        <div className="online">
-          <span className="eyebrow">NA PÁGINA · {online.length}</span>
-          {online.map((name) => (
-            <div className="online-user" key={name}>
-              <span className="mini-avatar">
-                {name.slice(0, 2).toUpperCase()}
-              </span>
-              {name}
-              <span className="dot green" />
-            </div>
-          ))}
-        </div>
-        <div className="sidebar-note">
-          <span>✳</span>
-          <p>
-            O melhor daqui
-            <br />é quem está aqui.
+          {[...members]
+            .sort(
+              (a, b) =>
+                Number(online.includes(b.username)) -
+                  Number(online.includes(a.username)) ||
+                a.displayName.localeCompare(b.displayName),
+            )
+            .map((m) => (
+              <div
+                className={
+                  "member" + (online.includes(m.username) ? "" : " offline")
+                }
+                key={m.id}
+              >
+                <Avatar name={m.displayName} src={avatarSrc(m)} size={32} />
+                <span className="member-name">
+                  {m.displayName}
+                  <small>@{m.username}</small>
+                </span>
+                <span
+                  className={
+                    "dot" + (online.includes(m.username) ? " green" : "")
+                  }
+                />
+              </div>
+            ))}
+          <p className="muted">
+            Online é quem está com o espaço aberto. Quem está na voz aparece na
+            barra lateral, embaixo da sala.
           </p>
-        </div>
-        <div className="account">
-          <span className="avatar">
-            {me.user.displayName.slice(0, 2).toUpperCase()}
-          </span>
-          <div>
-            <strong>{me.user.displayName}</strong>
-            <button className="text-button" onClick={() => setPanel("account")}>
-              Minha conta
-            </button>
-          </div>
+        </section>
+      );
+    if (kind === "account")
+      return (
+        <Profile
+          me={me.user}
+          onSaved={() => void onRefresh()}
+          onSignedOut={() =>
+            onLogout("Usuário alterado. Entre com o novo nome de usuário.")
+          }
+          onLogout={() => onLogout()}
+          onError={onError}
+        />
+      );
+    if (kind === "admin")
+      return (
+        <Settings
+          panel={kind}
+          onClose={() => {
+            close(id);
+            open("chat");
+          }}
+          onError={onError}
+          onLogout={onLogout}
+        />
+      );
+    return null;
+  }
+  return (
+    <PeopleContext value={people}>
+      <div
+        className={
+          "app-shell" +
+          (drawer ? " drawer-open" : "") +
+          (compact ? " compact" : "")
+        }
+      >
+        {compact && <div className="drawer">{sidebar}</div>}
+        <nav className="activity-bar" aria-label="Painéis">
+          {!compact && <Logo size={34} />}
+          <ActivityButton
+            icon="menu"
+            label={compact ? "Abrir menu" : "Mostrar canais"}
+            title="Canais"
+            active={compact ? drawer : !!slots.nav}
+            onClick={() => {
+              if (compact) setDrawer(!drawer);
+              else if (slots.nav) close("nav");
+              else open("nav");
+            }}
+          />
+          <ActivityButton
+            icon="speaker"
+            label="Sala de voz"
+            title="Sala de estar"
+            active={!!slots.voice}
+            onClick={() => open("voice")}
+          />
+          <ActivityButton
+            icon="chat"
+            label="Conversa"
+            title="Conversa #geral"
+            active={Object.keys(slots).some((id) => kindOf(id) === "chat")}
+            onClick={() => open("chat")}
+          />
+          <ActivityButton
+            icon="split"
+            label="Nova conversa ao lado"
+            title="Abrir outra conversa ao lado"
+            onClick={() => dock && openChat(dock)}
+          />
+          <ActivityButton
+            icon="people"
+            label="Membros"
+            title="Membros"
+            active={!!slots.members}
+            badge={online.length}
+            onClick={() => open("members")}
+          />
+          <span className="activity-spacer" />
+          <ActivityButton
+            icon="reset"
+            label="Restaurar layout"
+            title="Restaurar layout padrão"
+            onClick={() => dock && resetLayout(dock)}
+          />
+          {me.user.admin && (
+            <ActivityButton
+              icon="shield"
+              label="Gerenciar contas"
+              title="Gerenciar contas"
+              active={!!slots.admin}
+              onClick={() => open("admin")}
+            />
+          )}
           <button
-            className="icon-button"
-            aria-label="Sair"
+            className={"activity" + (slots.account ? " active" : "")}
+            aria-label="Configurações"
+            title="Minha conta e aparência"
+            onClick={() => open("account")}
+          >
+            <Avatar
+              name={me.user.displayName}
+              src={avatarSrc(me.user)}
+              size={28}
+            />
+          </button>
+          <ActivityButton
+            icon="logout"
+            label="Sair"
+            title="Sair"
             onClick={() =>
               void api("/logout", "POST")
-                .then(onLogout)
+                .then(() => onLogout())
                 .catch((e) => onError(e.message))
             }
-          >
-            ↗
-          </button>
-        </div>
-        {me.user.admin && (
-          <button className="admin-link" onClick={() => setPanel("admin")}>
-            Gerenciar contas
-          </button>
-        )}
-      </aside>
-      <main className="chat">
-        <header className="chat-header">
-          <div>
-            <h1>
-              <span>#</span> geral
-            </h1>
-            <p>O ponto de encontro de todo dia.</p>
-          </div>
-          <span className="connection">
-            <span className={"dot " + (connected ? "green" : "")} />
-            {connected ? "Conectado" : "Reconectando…"}
-          </span>
-        </header>
-        {error && (
-          <div className="error-banner" role="alert">
-            {error}
-            <button aria-label="Fechar aviso" onClick={() => onError("")}>
-              ×
-            </button>
-          </div>
-        )}
-        <div id="screen-stage" />
-        {panel ? (
-          <Settings
-            panel={panel}
-            onClose={() => setPanel("")}
-            onError={onError}
-            onLogout={onLogout}
           />
-        ) : (
-          <>
-            <div
-              className="messages"
-              aria-label="Mensagens"
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                browsingHistory.current =
-                  el.scrollHeight - el.scrollTop - el.clientHeight > 100;
-              }}
-            >
-              <div className="welcome">
-                <div className="welcome-symbol">#</div>
-                <span className="eyebrow">A CONVERSA COMEÇA AQUI</span>
-                <h2>Esse é o nosso lugar.</h2>
-                <p>
-                  Um oi, uma partida, uma história pra contar.
-                  <br />
-                  Fique à vontade.
-                </p>
-              </div>
-              {more && messages.length >= 50 && (
-                <button className="load-more" onClick={() => void older()}>
-                  Carregar mensagens anteriores
-                </button>
-              )}
-              <div role="log" aria-live="polite" aria-relevant="additions">
-                {messages.map((m) => (
-                  <article className="message" key={m.id}>
-                    <span
-                      className={
-                        "avatar " + (m.authorId === me.user.id ? "self" : "")
-                      }
-                    >
-                      {m.author.slice(0, 2).toUpperCase()}
-                    </span>
-                    <div>
-                      <header>
-                        <strong>{m.author}</strong>
-                        <time
-                          dateTime={m.createdAt}
-                          title={new Date(m.createdAt).toLocaleString("pt-BR")}
-                        >
-                          {new Date(m.createdAt).toLocaleString("pt-BR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </time>
-                      </header>
-                      <p>{m.body}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-              {pending.map((p) => (
-                <div className="pending" key={p.clientId}>
-                  <p>{p.body}</p>
-                  <span>Aguardando confirmação · </span>
-                  <button onClick={() => void send(p)}>Tentar novamente</button>
-                </div>
-              ))}
-              <div ref={bottom} />
-            </div>
-            <form className="composer" onSubmit={submit}>
-              <label htmlFor="message" className="sr-only">
-                Mensagem em geral
-              </label>
-              <div>
-                <input
-                  id="message"
-                  placeholder="Converse com seus amigos…"
-                  maxLength={4000}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  autoComplete="off"
-                />
-                <button
-                  className="send"
-                  aria-label="Enviar mensagem"
-                  disabled={!body.trim()}
-                >
-                  ↑
-                </button>
-              </div>
-              <footer>
-                <span>Enter para enviar · texto simples</span>
-                <span>{body.length}/4000</span>
-              </footer>
-            </form>
-          </>
+        </nav>
+        {drawer && (
+          <div
+            className="scrim"
+            aria-hidden="true"
+            onClick={() => setDrawer(false)}
+          />
         )}
-      </main>
-      <aside className="right-panel" id="voice">
+        <div
+          className="workbench"
+          onDoubleClick={(e) => {
+            // Double-clicking a tab maximizes it, as in the editor.
+            const panel = dock?.activePanel;
+            if (!panel || !(e.target as Element).closest(".dv-tab")) return;
+            if (panel.api.isMaximized()) panel.api.exitMaximized();
+            else panel.api.maximize();
+          }}
+        >
+          {error && (
+            <div className="error-banner" role="alert">
+              {error}
+              <button aria-label="Fechar aviso" onClick={() => onError("")}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          )}
+          <SlotContext value={attach}>
+            <DockviewReact
+              className="dock"
+              theme={theme}
+              components={{ slot: Slot }}
+              watermarkComponent={Empty}
+              onReady={ready}
+            />
+          </SlotContext>
+        </div>
+        {Object.entries(slots).map(([id, el]) =>
+          createPortal(content(id), el, id),
+        )}
         <Voice
           key={me.user.id}
           userId={me.user.id}
           admin={me.user.admin}
+          hosts={{ stage: slots.voice ?? null, roster, quick }}
+          maximized={stageMaximized}
+          onOpen={() => open("voice")}
+          onStreaming={(active) => {
+            streaming.current = active;
+            if (active) open("voice");
+          }}
+          onMaximize={() => {
+            const panel = dock?.getPanel("voice");
+            if (!panel) return;
+            if (panel.api.isMaximized()) panel.api.exitMaximized();
+            else panel.api.maximize();
+          }}
           onError={onError}
         />
-        <div className="privacy-note">
-          <span>◇</span> Privado, do nosso jeito.
-          <br />
-          <small>Só pessoas convidadas têm acesso.</small>
+      </div>
+    </PeopleContext>
+  );
+}
+function ActivityButton({
+  icon,
+  label,
+  title,
+  active = false,
+  badge,
+  onClick,
+}: {
+  icon: IconName;
+  label: string;
+  title: string;
+  active?: boolean;
+  badge?: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={"activity" + (active ? " active" : "")}
+      aria-label={label}
+      aria-pressed={active}
+      title={title}
+      onClick={onClick}
+    >
+      <Icon name={icon} />
+      {!!badge && <small>{badge}</small>}
+    </button>
+  );
+}
+const EMOJIS = [
+  "😀",
+  "😂",
+  "🤣",
+  "😅",
+  "😊",
+  "😍",
+  "😎",
+  "🤔",
+  "😴",
+  "😭",
+  "😡",
+  "🥲",
+  "🤯",
+  "🥳",
+  "😏",
+  "🙃",
+  "👍",
+  "👎",
+  "👏",
+  "🙏",
+  "💪",
+  "🔥",
+  "✨",
+  "🎉",
+  "❤️",
+  "💜",
+  "💀",
+  "👀",
+  "🎮",
+  "🕹️",
+  "🏆",
+  "🎯",
+  "⚔️",
+  "🛡️",
+  "🍕",
+  "🍺",
+  "☕",
+  "🌙",
+  "✅",
+  "❌",
+];
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+function dayLabel(d: Date) {
+  const today = new Date(),
+    yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (sameDay(d, today)) return "Hoje";
+  if (sameDay(d, yesterday)) return "Ontem";
+  return d.toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: d.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
+}
+function ChatView({
+  me,
+  connected,
+  messages,
+  pending,
+  more,
+  onOlder,
+  onSend,
+  onRetry,
+}: {
+  me: User;
+  connected: boolean;
+  messages: Message[];
+  pending: { clientId: string; body: string }[];
+  more: boolean;
+  onOlder: () => void;
+  onSend: (body: string) => void;
+  onRetry: (p: { clientId: string; body: string }) => void;
+}) {
+  const [body, setBody] = useState("");
+  const inputId = useId();
+  const directory = usePeople();
+  // Show today's name and photo, even on old messages.
+  const author = (m: Message) => {
+    const who = directory.byId.get(m.authorId);
+    return { name: who?.displayName ?? m.author, src: avatarSrc(who) };
+  };
+  const list = useRef<HTMLDivElement>(null),
+    input = useRef<HTMLInputElement>(null),
+    browsingHistory = useRef(false),
+    scrolled = useRef(false);
+  // Scroll only the list: scrollIntoView would also shift the dock containers.
+  useEffect(() => {
+    const el = list.current;
+    if (!el || browsingHistory.current) return;
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: scrolled.current ? "smooth" : "instant",
+    });
+    scrolled.current = true;
+  }, [messages.length, pending.length]);
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!body.trim()) return;
+    browsingHistory.current = false;
+    onSend(body);
+    setBody("");
+  }
+  function insert(emoji: string) {
+    const el = input.current,
+      start = el?.selectionStart ?? body.length,
+      end = el?.selectionEnd ?? body.length;
+    setBody(body.slice(0, start) + emoji + body.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  }
+  return (
+    <section className="chat">
+      <header className="chat-header">
+        <div>
+          <h1>
+            <Icon name="hash" size={18} /> geral
+          </h1>
+          <p>O ponto de encontro de todo dia.</p>
         </div>
-      </aside>
-    </div>
+        <span className="connection">
+          <span className={"dot " + (connected ? "green" : "")} />
+          {connected ? "Conectado" : "Reconectando…"}
+        </span>
+      </header>
+      <div
+        className="messages"
+        aria-label="Mensagens"
+        ref={list}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          browsingHistory.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight > 100;
+        }}
+      >
+        {!(more && messages.length >= 50) && (
+          <div className="welcome">
+            <div className="welcome-symbol">
+              <Icon name="hash" size={28} />
+            </div>
+            <h2>Esse é o nosso lugar.</h2>
+            <p>Um oi, uma partida, uma história pra contar. Fique à vontade.</p>
+          </div>
+        )}
+        {more && messages.length >= 50 && (
+          <button
+            className="load-more"
+            onClick={() => {
+              browsingHistory.current = true;
+              onOlder();
+            }}
+          >
+            Carregar mensagens anteriores
+          </button>
+        )}
+        <div role="log" aria-live="polite" aria-relevant="additions">
+          {messages.map((m, i) => {
+            const at = new Date(m.createdAt),
+              prev = messages[i - 1],
+              prevAt = prev && new Date(prev.createdAt),
+              newDay = !prevAt || !sameDay(at, prevAt),
+              // Consecutive lines from one person within 5 min read as one.
+              continued =
+                !newDay &&
+                prev.authorId === m.authorId &&
+                at.getTime() - prevAt.getTime() < 5 * 60 * 1000;
+            const time = (
+              <time dateTime={m.createdAt} title={at.toLocaleString("pt-BR")}>
+                {at.toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </time>
+            );
+            return (
+              <div key={m.id}>
+                {newDay && (
+                  <div className="day-separator" role="separator">
+                    <span>{dayLabel(at)}</span>
+                  </div>
+                )}
+                <article
+                  className={
+                    "message" +
+                    (continued ? " continued" : "") +
+                    (m.authorId === me.id ? " mine" : "")
+                  }
+                >
+                  {continued ? (
+                    <span className="message-gutter">{time}</span>
+                  ) : (
+                    <Avatar
+                      name={author(m).name}
+                      src={author(m).src}
+                      size={38}
+                    />
+                  )}
+                  <div>
+                    {!continued && (
+                      <header>
+                        <strong>{author(m).name}</strong>
+                        {time}
+                      </header>
+                    )}
+                    <p>{m.body}</p>
+                  </div>
+                </article>
+              </div>
+            );
+          })}
+        </div>
+        {pending.map((p) => (
+          <div className="pending" key={p.clientId}>
+            <p>{p.body}</p>
+            <span>Aguardando confirmação · </span>
+            <button onClick={() => onRetry(p)}>Tentar novamente</button>
+          </div>
+        ))}
+      </div>
+      <form className="composer" onSubmit={submit}>
+        <label htmlFor={inputId} className="sr-only">
+          Mensagem em geral
+        </label>
+        <div className="composer-box">
+          <input
+            id={inputId}
+            ref={input}
+            placeholder="Conversar em #geral…"
+            maxLength={4000}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            autoComplete="off"
+          />
+          <Popover label="Emojis" icon="smile" className="emoji-picker">
+            <div className="emoji-grid">
+              {EMOJIS.map((emoji) => (
+                <button type="button" key={emoji} onClick={() => insert(emoji)}>
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </Popover>
+          <button
+            className="send"
+            aria-label="Enviar mensagem"
+            disabled={!body.trim()}
+          >
+            <Icon name="send" size={18} />
+          </button>
+        </div>
+        <footer>
+          <span>Enter para enviar · texto simples</span>
+          <span>{body.length}/4000</span>
+        </footer>
+      </form>
+    </section>
   );
 }
 function Settings({
@@ -522,7 +1011,6 @@ function Settings({
       <button className="text-button" onClick={onClose}>
         ← Voltar à conversa
       </button>
-      <AccountSecurity />
       <h2>{panel === "admin" ? "Gerenciar contas" : "Alterar minha senha"}</h2>
       <p className="muted">
         Senhas precisam ter pelo menos 12 caracteres (máximo de 72 bytes).

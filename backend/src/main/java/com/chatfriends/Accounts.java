@@ -20,19 +20,34 @@ public class Accounts implements UserDetailsService {
   }
 
   public record Account(
-      UUID id, String username, String displayName, boolean admin, boolean enabled) {}
+      UUID id,
+      String username,
+      String displayName,
+      boolean admin,
+      boolean enabled,
+      String primaryColor,
+      String secondaryColor,
+      Long avatarVersion) {}
 
   Account map(java.sql.ResultSet r, int n) throws java.sql.SQLException {
+    Long avatar = r.getObject("avatar_version", Long.class);
     return new Account(
         r.getObject("id", UUID.class),
         r.getString("username"),
         r.getString("display_name"),
         r.getBoolean("admin"),
-        r.getBoolean("enabled"));
+        r.getBoolean("enabled"),
+        r.getString("primary_color"),
+        r.getString("secondary_color"),
+        avatar);
   }
 
+  static final String SELECT =
+      "select a.*,v.version as avatar_version from accounts a"
+          + " left join avatars v on v.account_id=a.id ";
+
   public Account get(String name) {
-    return db.query("select * from accounts where username=?", this::map, name).stream()
+    return db.query(SELECT + "where a.username=?", this::map, name).stream()
         .findFirst()
         .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED));
   }
@@ -44,7 +59,7 @@ public class Accounts implements UserDetailsService {
   }
 
   public List<Account> all() {
-    return db.query("select * from accounts order by username", this::map);
+    return db.query(SELECT + "order by a.username", this::map);
   }
 
   public UserDetails loadUserByUsername(String name) {
@@ -69,12 +84,17 @@ public class Accounts implements UserDetailsService {
       throw new ResponseStatusException(BAD_REQUEST, "Senha: 12 caracteres a 72 bytes");
   }
 
+  static boolean validUsername(String name) {
+    return name != null && name.matches("[a-z0-9][a-z0-9_.-]{2,31}");
+  }
+
+  static boolean validDisplayName(String display) {
+    return display != null && !display.isBlank() && display.length() <= 64;
+  }
+
   public Account create(String name, String display, String password, boolean admin) {
-    if (name == null
-        || !name.matches("[a-z0-9][a-z0-9_.-]{2,31}")
-        || display == null
-        || display.isBlank()
-        || display.length() > 64) throw new ResponseStatusException(BAD_REQUEST, "Nome inválido");
+    if (!validUsername(name) || !validDisplayName(display))
+      throw new ResponseStatusException(BAD_REQUEST, "Nome inválido");
     passwordValid(password);
     if (db.queryForObject("select count(*) from accounts where username=?", Integer.class, name)
         > 0) throw new ResponseStatusException(CONFLICT, "Conta já existe");

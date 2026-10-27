@@ -46,7 +46,7 @@ Implementação na branch `work`, 26/10/2026. Execute a atualização em manuten
    CHAT_MODE=prd ./scripts/diagnose-duckdns.sh
    ```
 
-   `up.sh` constrói as imagens, inicia o DB, provisiona roles/grants no banco existente e executa o job `migrate`. Só então sobe o runtime. Nenhum segredo do migrador vai para o backend. A migração V3 encerra sessões/conexões anteriores, preservando contas e mensagens; V4 acrescenta o controle de ciclo de vida da mídia. Não desfaça esse isolamento devolvendo superusuário ao backend.
+   `up.sh` constrói as imagens, inicia o DB, provisiona roles/grants no banco existente e executa o job `migrate`. Só então sobe o runtime. Nenhum segredo do migrador vai para o backend. O histórico V3 existente é preservado: `profiles` na main ou `account_security` na work. O migrador seleciona o SQL original e valida seu checksum, sem `repair` nem renumeração do histórico. V4 acrescenta o ciclo de vida da mídia e V5 completa perfis e segurança conforme as tabelas faltantes. Sessões anteriores ao hardening são encerradas; contas, mensagens, avatares e MFA já cadastrado são preservados. Instalações novas usam V3 de perfis. Não copie somente os SQLs: a seleção do histórico faz parte do migrador Java. Não desfaça esse isolamento devolvendo superusuário ao backend.
 
 4. No primeiro login do administrador em prd, confirme a senha, cadastre a chave TOTP no autenticador e confirme o código. Guarde os oito códigos de recuperação offline. O espaço só abre depois dessa etapa. Demais usuários podem ativar MFA em **Minha conta → Segurança**. A mesma área lista/encerra sessões e permite confirmar identidade para repetir uma operação administrativa que expirou.
 

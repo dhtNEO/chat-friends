@@ -13,7 +13,9 @@ class SessionSecurityTest {
     var accounts = mock(Accounts.class);
     var mfa = mock(Mfa.class);
     when(accounts.active("admin"))
-        .thenReturn(new Accounts.Account(UUID.randomUUID(), "admin", "Admin", true, true));
+        .thenReturn(
+            new Accounts.Account(
+                UUID.randomUUID(), "admin", "Admin", true, true, null, null, null));
     var policy = new SessionSecurity(accounts, mfa, true, 28800);
     var q = new MockHttpServletRequest("GET", "/api/admin/accounts");
     var session = new MockHttpSession();
