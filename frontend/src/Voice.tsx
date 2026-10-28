@@ -9,6 +9,7 @@ import {
   type RemoteAudioTrack,
   type LocalAudioTrack,
   type Participant,
+  type AudioCaptureOptions,
 } from "livekit-client";
 import { api, type Lease } from "./api";
 import { MicrophoneGain } from "./MicrophoneGain";
@@ -19,6 +20,8 @@ import { Avatar, Popover, avatarSrc, usePeople } from "./ui";
 import { PopoutStage, usePopout } from "./Popout";
 import { loadSounds, playEffect, type Effect } from "./sounds";
 import { Music, MUSIC_IDENTITY } from "./Music";
+import { useSpeaking } from "./speaking";
+import { publishVoice } from "./voiceStore";
 type Connection = {
   identity: string;
   url: string;
@@ -34,8 +37,15 @@ const PRESETS: Record<
   normal: { height: 720, fps: 30, bitrate: 4000000 },
   low: { height: 480, fps: 15, bitrate: 1000000 },
 };
+// Signaling goes through the page's own host: its proxy also routes /rtc
+// through media admission. A separate media host under duckdns.org counts as
+// a third-party WebSocket, which EasyPrivacy (uBlock Origin, Brave) blocks.
+const signalUrl = () =>
+  (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
 function mediaError(e: unknown) {
   const name = e instanceof Error ? e.name : "";
+  if (typeof RTCPeerConnection === "undefined")
+    return "WebRTC está desativado neste navegador (por exemplo, AdGuard “Bloquear WebRTC”). Libere este site para usar a voz.";
   return name === "NotAllowedError"
     ? "Permissão negada. Autorize o microfone ou a tela nas configurações do navegador."
     : name === "NotFoundError"
@@ -163,7 +173,7 @@ export function Voice({
       }
     };
     void poll();
-    const timer = setInterval(() => void poll(), 5000);
+    const timer = setInterval(() => void poll(), 3000);
     const heartbeat = setInterval(() => {
       const c = connection.current,
         l = lease.current;
@@ -200,10 +210,16 @@ export function Voice({
       const r = new Room({
         adaptiveStream: true,
         dynacast: true,
-        webAudioMix: true,
+        // RNNoise needs 48 kHz; the whole call mix runs at that rate.
+        webAudioMix: {
+          audioContext: new AudioContext({
+            sampleRate: 48000,
+            latencyHint: "interactive",
+          }),
+        },
         audioCaptureDefaults: {
           deviceId: device,
-          noiseSuppression: settings.noise,
+          noiseSuppression: settings.noise && settings.noiseMode === "browser",
           echoCancellation: true,
           autoGainControl: false,
         },
@@ -247,7 +263,7 @@ export function Voice({
             () => {},
           );
       });
-      await r.connect(c.url, c.token);
+      await r.connect(signalUrl(), c.token);
       await r.startAudio();
       await api("/media/audio", "PUT", { identity: c.identity, deaf });
       setJoined(true);
@@ -278,14 +294,17 @@ export function Voice({
     const tracks = await r.localParticipant.createTracks({
       audio: {
         deviceId: device,
-        noiseSuppression: settings.noise,
+        noiseSuppression: settings.noise && settings.noiseMode === "browser",
         echoCancellation: true,
         autoGainControl: false,
       },
     });
     const track = tracks[0] as LocalAudioTrack;
     try {
-      micProcessor.current = new MicrophoneGain(settings.microphone);
+      micProcessor.current = new MicrophoneGain(
+        settings.microphone,
+        settings.noise && settings.noiseMode === "strong",
+      );
       await track.setProcessor(micProcessor.current);
       await r.localParticipant.publishTrack(track, {
         source: Track.Source.Microphone,
@@ -295,15 +314,32 @@ export function Voice({
       throw error;
     }
   }
+  // Silencing what you hear also closes your microphone, like Discord;
+  // hearing again restores the microphone as it was before.
+  const micBeforeDeaf = useRef(false);
+  async function setMicOpen(r: Room, open: boolean) {
+    if (open) await enableMicrophone(r);
+    else await r.localParticipant.setMicrophoneEnabled(false);
+    setMic(r.localParticipant.isMicrophoneEnabled);
+  }
+  async function setDeafened(next: boolean) {
+    const c = connection.current;
+    if (!c) return;
+    // Apply locally at once; publish the display state independently of playback.
+    setDeaf(next);
+    sound.current.deaf = next;
+    await api("/media/audio", "PUT", { identity: c.identity, deaf: next });
+  }
   async function toggleMic() {
     const r = room.current;
     if (!r) return;
     setAudioBusy(true);
     try {
-      if (mic) await r.localParticipant.setMicrophoneEnabled(false);
-      else await enableMicrophone(r);
-      setMic(r.localParticipant.isMicrophoneEnabled);
-      effect(r.localParticipant.isMicrophoneEnabled ? "unmute" : "mute");
+      const open = !r.localParticipant.isMicrophoneEnabled;
+      await setMicOpen(r, open);
+      // Talking means wanting to hear the answer.
+      if (open && sound.current.deaf) await setDeafened(false);
+      effect(open ? "unmute" : "mute");
       setDevices(await Room.getLocalDevices("audioinput"));
     } catch (e) {
       onError(mediaError(e));
@@ -312,39 +348,70 @@ export function Voice({
     }
   }
   async function toggleDeaf() {
-    const c = connection.current;
-    if (!c) return;
+    const r = room.current;
+    if (!r || !connection.current) return;
     setAudioBusy(true);
-    const next = !deaf;
-    // Apply locally at once; publish the display state independently of playback.
-    setDeaf(next);
-    sound.current.deaf = next;
+    const next = !sound.current.deaf;
     effect(next ? "mute" : "unmute");
     try {
-      await api("/media/audio", "PUT", { identity: c.identity, deaf: next });
+      if (next) {
+        micBeforeDeaf.current = r.localParticipant.isMicrophoneEnabled;
+        if (micBeforeDeaf.current) await setMicOpen(r, false);
+      } else if (micBeforeDeaf.current) await setMicOpen(r, true);
+      await setDeafened(next);
     } catch (e) {
       onError(mediaError(e));
     } finally {
       setAudioBusy(false);
     }
   }
+  // Held key opens the microphone; release (or losing focus) closes it.
+  const pttOpen = useRef(false);
+  async function pushToTalk(down: boolean) {
+    const r = room.current;
+    if (!r || down === pttOpen.current) return;
+    pttOpen.current = down;
+    if (down && sound.current.deaf) return;
+    try {
+      await setMicOpen(r, down);
+    } catch (e) {
+      onError(mediaError(e));
+    }
+  }
+  const streamBeforeMute = useRef(100);
+  function changeDevice(id: string) {
+    setDevice(id);
+    void room.current
+      ?.switchActiveDevice("audioinput", id)
+      .catch((err) => onError(mediaError(err)));
+  }
+  // Strong suppression (RNNoise) runs inside our microphone processor; the
+  // browser's own filter is then turned off so they do not fight.
+  async function changeNoiseMode(mode: "strong" | "browser") {
+    setSettings((old) => ({ ...old, noiseMode: mode }));
+    await applyNoise(settings.noise, mode);
+  }
+  async function applyNoise(on: boolean, mode: "strong" | "browser") {
+    const track = room.current?.localParticipant.getTrackPublication(
+      Track.Source.Microphone,
+    )?.track as LocalAudioTrack | undefined;
+    await micProcessor.current?.setDenoise(on && mode === "strong");
+    await track?.applyConstraints({
+      noiseSuppression: on && mode === "browser",
+      echoCancellation: true,
+      autoGainControl: false,
+    });
+  }
   async function changeNoise(next: boolean) {
     const previous = settings.noise;
     setSettings((old) => ({ ...old, noise: next }));
     setAudioBusy(true);
     try {
-      const track = room.current?.localParticipant.getTrackPublication(
-        Track.Source.Microphone,
-      )?.track as LocalAudioTrack | undefined;
-      await track?.applyConstraints({
-        noiseSuppression: next,
-        echoCancellation: true,
-        autoGainControl: false,
-      });
+      await applyNoise(next, settings.noiseMode);
       if (room.current)
         room.current.options.audioCaptureDefaults = {
           ...room.current.options.audioCaptureDefaults,
-          noiseSuppression: next,
+          noiseSuppression: next && settings.noiseMode === "browser",
         };
     } catch (e) {
       setSettings((old) => ({ ...old, noise: previous }));
@@ -362,12 +429,19 @@ export function Voice({
       c = connection.current;
     if (!r || !c) return;
     // Capture is called from the user gesture, before the network request.
-    const preset = PRESETS[quality] ?? PRESETS.normal;
-    const height = Math.min(c.screen.height, preset.height);
-    const fps = Math.min(c.screen.fps, preset.fps);
-    const bitrate = Math.min(c.screen.bitrate, preset.bitrate);
+    const { height, fps, bitrate } = limits(quality, c);
     const tracks = await createLocalScreenTracks({
-      audio: true,
+      // Games hide the pointer themselves; the capture would draw it back.
+      video: (settings.hideCursor ? { cursor: "never" } : true) as true,
+      // System audio would also capture the call playing on this PC, so
+      // everyone would hear themselves; exclude this page's own sound.
+      audio: {
+        restrictOwnAudio: true,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      } as AudioCaptureOptions,
+      contentHint: fps >= 60 ? "motion" : undefined,
       resolution: {
         width: Math.round((height * 16) / 9),
         height,
@@ -396,6 +470,8 @@ export function Voice({
             maxBitrate: bitrate,
             maxFramerate: fps,
           },
+          // Keep frame rate for games when the link gets tight.
+          degradationPreference: fps >= 60 ? "maintain-framerate" : "balanced",
           simulcast: false,
         });
         t.on("ended", () => {
@@ -407,6 +483,41 @@ export function Voice({
     } catch (e) {
       await release().catch(() => {});
       throw e;
+    }
+  }
+  function limits(q: string, c: Connection) {
+    const preset = PRESETS[q] ?? PRESETS.normal;
+    return {
+      height: Math.min(c.screen.height, preset.height),
+      fps: Math.min(c.screen.fps, preset.fps),
+      bitrate: Math.min(c.screen.bitrate, preset.bitrate),
+    };
+  }
+  // Changing quality mid-stream adjusts the capture and the encoder in place,
+  // without asking for the screen again.
+  async function changeQuality(next: string) {
+    setQuality(next);
+    const c = connection.current,
+      video = screenTracks.current.find((t) => t.kind === Track.Kind.Video);
+    if (!sharing || !c || !video) return;
+    const { height, fps, bitrate } = limits(next, c);
+    try {
+      await video.mediaStreamTrack.applyConstraints({
+        width: { ideal: Math.round((height * 16) / 9) },
+        height: { ideal: height },
+        frameRate: fps,
+      });
+      const sender = video.sender;
+      if (sender) {
+        const params = sender.getParameters();
+        for (const encoding of params.encodings ?? []) {
+          encoding.maxBitrate = bitrate;
+          encoding.maxFramerate = fps;
+        }
+        await sender.setParameters(params);
+      }
+    } catch (e) {
+      onError(mediaError(e));
     }
   }
   const participants: Participant[] = room.current
@@ -447,6 +558,14 @@ export function Voice({
     notifyStreaming.current(streaming);
   }, [streaming]);
   const featured = live.find((t) => t.identity === focus) ?? live[0];
+  const voices = participants.flatMap((p) => {
+    const track = p.getTrackPublication(Track.Source.Microphone)?.track
+      ?.mediaStreamTrack;
+    return track && p.identity !== MUSIC_IDENTITY
+      ? [{ identity: p.identity, track }]
+      : [];
+  });
+  const talking = useSpeaking(voices, joined);
   // Identities are "accountId:connection"; names and photos follow profiles.
   const account = (identity: string) =>
     directory.byId.get(identity.split(":")[0]);
@@ -457,7 +576,7 @@ export function Voice({
           .map((p) => ({
             identity: p.identity,
             name: p.name || "Amigo",
-            speaking: p.isSpeaking,
+            speaking: talking.has(p.identity) || p.isSpeaking,
             micMuted: !p.isMicrophoneEnabled,
             deaf:
               p === room.current?.localParticipant
@@ -480,6 +599,35 @@ export function Voice({
         state.lease.identity === identity;
   const personVolume = (identity: string) =>
     settings.people[identity.split(":")[0]] ?? 100;
+  useEffect(() => {
+    publishVoice({
+      joined,
+      mic,
+      deaf,
+      sharing,
+      audioBusy,
+      devices,
+      device,
+      noiseSupported,
+      toggleMic,
+      toggleDeaf,
+      pushToTalk,
+      leave,
+      toggleStreamSound: () =>
+        setSettings((old) => {
+          if (old.stream) streamBeforeMute.current = old.stream;
+          return { ...old, stream: old.stream ? 0 : streamBeforeMute.current };
+        }),
+      setDevice: changeDevice,
+      setNoise: changeNoise,
+      setNoiseMode: changeNoiseMode,
+      setMicVolume: (value) => {
+        micProcessor.current?.setVolume(value);
+        setSettings((old) => ({ ...old, microphone: value }));
+      },
+    });
+  });
+  useEffect(() => () => publishVoice(null), []);
   const fullHd = (connection.current?.screen.height ?? 1080) >= 1080,
     sixty = (connection.current?.screen.fps ?? 60) >= 60;
   const featuredName = featured
@@ -560,24 +708,39 @@ export function Voice({
                 setAdjusting(adjusting === p.identity ? null : p.identity);
               }}
             >
-              <Avatar
-                name={p.name}
-                src={p.src}
-                size={52}
-                speaking={p.speaking}
-              />
+              <span className="tile-avatar">
+                <Avatar
+                  name={p.name}
+                  src={p.src}
+                  size={52}
+                  speaking={p.speaking && !p.micMuted}
+                />
+                <StatusBadges micMuted={p.micMuted} deaf={p.deaf} />
+              </span>
               {isLive(p.identity) && (
                 <span className="live-badge">AO VIVO</span>
+              )}
+              {joined && p.identity !== self && (
+                <button
+                  className="tile-volume-toggle"
+                  aria-label={`Ajustar volume de ${p.name}`}
+                  title={`Volume de ${p.name}: ${personVolume(p.identity)}%`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAdjusting(adjusting === p.identity ? null : p.identity);
+                  }}
+                >
+                  <Icon
+                    name={personVolume(p.identity) ? "volume" : "volumeOff"}
+                    size={14}
+                  />
+                </button>
               )}
               <div className="tile-footer">
                 <strong>
                   {p.name}
                   {p.identity === self ? " (você)" : ""}
                 </strong>
-                <span className="tile-icons">
-                  {p.micMuted && <Icon name="micOff" size={15} />}
-                  {p.deaf && <Icon name="headphonesOff" size={15} />}
-                </span>
                 <span className="sr-only">
                   {p.micMuted ? "Mic desligado" : "Mic ligado"} ·{" "}
                   {p.deaf ? "Áudio silenciado" : "Ouvindo"}
@@ -647,13 +810,7 @@ export function Voice({
                   Microfone
                   <select
                     value={device}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setDevice(id);
-                      void room.current
-                        ?.switchActiveDevice("audioinput", id)
-                        .catch((err) => onError(mediaError(err)));
-                    }}
+                    onChange={(e) => changeDevice(e.target.value)}
                   >
                     <option value="default">Padrão do sistema</option>
                     {devices
@@ -718,12 +875,32 @@ export function Voice({
                   <input
                     type="checkbox"
                     checked={settings.noise}
-                    disabled={audioBusy || !noiseSupported}
+                    disabled={
+                      audioBusy ||
+                      (settings.noiseMode === "browser" && !noiseSupported)
+                    }
                     onChange={(e) => void changeNoise(e.target.checked)}
                   />{" "}
                   Supressão de ruído
                 </label>
-                {!noiseSupported && (
+                <label>
+                  Tipo de supressão
+                  <select
+                    value={settings.noiseMode}
+                    disabled={audioBusy}
+                    onChange={(e) =>
+                      void changeNoiseMode(
+                        e.target.value as "strong" | "browser",
+                      )
+                    }
+                  >
+                    <option value="strong">
+                      Forte (RNNoise, no seu navegador)
+                    </option>
+                    <option value="browser">Leve (do navegador)</option>
+                  </select>
+                </label>
+                {settings.noiseMode === "browser" && !noiseSupported && (
                   <small>Supressão nativa indisponível neste navegador.</small>
                 )}
                 <small>
@@ -760,8 +937,7 @@ export function Voice({
                   <select
                     aria-label="Qualidade"
                     value={quality}
-                    disabled={sharing}
-                    onChange={(e) => setQuality(e.target.value)}
+                    onChange={(e) => void changeQuality(e.target.value)}
                   >
                     <option value="fullhd60" disabled={!fullHd || !sixty}>
                       1080p · 60 fps · até 8 Mbps
@@ -779,7 +955,27 @@ export function Voice({
                     SCREEN_FPS=60 no servidor.
                   </small>
                 )}
-                <small>Áudio da tela depende do navegador e sistema.</small>
+                <label className="noise-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.hideCursor}
+                    onChange={(e) =>
+                      setSettings((old) => ({
+                        ...old,
+                        hideCursor: e.target.checked,
+                      }))
+                    }
+                  />{" "}
+                  Esconder o cursor do mouse
+                </label>
+                <small>
+                  Vale a partir da próxima transmissão. A qualidade muda na
+                  hora, sem parar de transmitir.
+                </small>
+                <small>
+                  Áudio da tela depende do navegador e sistema. O som desta
+                  página (a chamada) fica de fora quando o navegador permite.
+                </small>
               </Popover>
             </div>
             {admin && state.lease.identity && (
@@ -826,13 +1022,17 @@ export function Voice({
             key={p.identity}
             className={p.speaking && !p.micMuted ? "speaking" : ""}
           >
-            <Avatar name={p.name} src={p.src} size={22} speaking={p.speaking} />
+            <Avatar
+              name={p.name}
+              src={p.src}
+              size={22}
+              speaking={p.speaking && !p.micMuted}
+            />
             <span className="roster-name">{p.name}</span>
             {isLive(p.identity) && (
               <span className="live-badge small">AO VIVO</span>
             )}
-            {p.micMuted && <Icon name="micOff" size={14} />}
-            {p.deaf && <Icon name="headphonesOff" size={14} />}
+            <StatusBadges micMuted={p.micMuted} deaf={p.deaf} inline />
           </li>
         ))}
       </ul>
@@ -895,5 +1095,32 @@ export function Voice({
         />
       ))}
     </>
+  );
+}
+
+// Red badges, like Discord: crossed microphone and crossed headphones.
+function StatusBadges({
+  micMuted,
+  deaf,
+  inline = false,
+}: {
+  micMuted: boolean;
+  deaf: boolean;
+  inline?: boolean;
+}) {
+  if (!micMuted && !deaf) return null;
+  return (
+    <span className={"status-badges" + (inline ? " inline" : "")}>
+      {micMuted && (
+        <span className="status-badge" title="Microfone desligado">
+          <Icon name="micOff" size={12} />
+        </span>
+      )}
+      {deaf && (
+        <span className="status-badge" title="Áudio silenciado">
+          <Icon name="headphonesOff" size={12} />
+        </span>
+      )}
+    </span>
   );
 }

@@ -12,6 +12,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@sapphi-red/web-noise-suppressor": "0.4.1",
     "dockview": "8.4.1",
     "dockview-core": "8.4.1",
     "dockview-react": "8.4.1",

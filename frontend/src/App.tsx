@@ -20,6 +20,7 @@ import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
 import { Profile } from "./Profile";
+import { loadShortcuts, setShortcuts, useKeyboardShortcuts } from "./Shortcuts";
 import { Lockup, Logo } from "./Logo";
 import { applyTheme } from "./theme";
 import {
@@ -207,6 +208,12 @@ function Workspace({
   onRefresh: () => Promise<void>;
   onLogout: (notice?: string) => void;
 }) {
+  useKeyboardShortcuts();
+  // A person's shortcuts load with their session and never outlive it.
+  useEffect(() => {
+    void loadShortcuts().catch(() => {});
+    return () => setShortcuts(null);
+  }, [me.user.id]);
   const [members, setMembers] = useState<Member[]>([]);
   const loadMembers = useCallback(
     () =>
@@ -708,6 +715,42 @@ function ActivityButton({
     </button>
   );
 }
+// Turns http(s) and www. addresses into links; everything else stays text,
+// so messages can never inject markup.
+const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+[^\s<>"'.,;:!?)\]}]/gi;
+function Linkified({ text }: { text: string }) {
+  const parts: (string | { href: string; label: string })[] = [];
+  let last = 0;
+  for (const match of text.matchAll(URL_PATTERN)) {
+    const label = match[0],
+      start = match.index ?? 0;
+    parts.push(text.slice(last, start));
+    parts.push({
+      href: /^https?:/i.test(label) ? label : "https://" + label,
+      label,
+    });
+    last = start + label.length;
+  }
+  parts.push(text.slice(last));
+  return (
+    <>
+      {parts.map((part, i) =>
+        typeof part === "string" ? (
+          part
+        ) : (
+          <a
+            key={i}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+          >
+            {part.label}
+          </a>
+        ),
+      )}
+    </>
+  );
+}
 const EMOJIS = [
   "😀",
   "😂",
@@ -914,7 +957,9 @@ function ChatView({
                         {time}
                       </header>
                     )}
-                    <p>{m.body}</p>
+                    <p>
+                      <Linkified text={m.body} />
+                    </p>
                   </div>
                 </article>
               </div>

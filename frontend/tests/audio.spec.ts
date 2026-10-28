@@ -92,6 +92,11 @@ async function signIn(page: Page, username: string) {
   await expect(
     page.getByRole("button", { name: "Desligar mic" }),
   ).toBeVisible();
+  // These tests measure gain and volume with a steady synthetic tone, which
+  // RNNoise (the default "strong" filter) would treat as noise.
+  await voiceSettings(page);
+  await page.getByLabel("Tipo de supressão").selectOption("browser");
+  await page.keyboard.press("Escape");
 }
 // Device and volume controls live in the microphone menu of the call bar.
 async function voiceSettings(page: Page) {

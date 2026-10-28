@@ -23,7 +23,7 @@ export const TITLES: Record<PanelKind, string> = {
   voice: "Sala de estar",
   chat: "# geral",
   members: "Membros",
-  account: "Minha conta",
+  account: "Configurações",
   admin: "Gerenciar contas",
 };
 export const kindOf = (id: string) => id.split("-")[0] as PanelKind;
@@ -171,8 +171,14 @@ export function openPanel(api: DockviewApi, kind: PanelKind) {
 }
 
 // Opens another view of #geral beside the last one, like splitting an editor.
+// There is a single channel, so two side-by-side views are the useful maximum.
+const MAX_CHATS = 2;
 export function openChat(api: DockviewApi) {
   const chats = api.panels.filter((p) => kindOf(p.id) === "chat");
+  if (chats.length >= MAX_CHATS) {
+    chats[chats.length - 1].api.setActive();
+    return;
+  }
   let n = 1;
   while (api.getPanel(n === 1 ? "chat" : `chat-${n}`)) n++;
   const id = n === 1 ? "chat" : `chat-${n}`;

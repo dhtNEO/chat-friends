@@ -1,6 +1,6 @@
 # Plano — atalhos pessoais de teclado
 
-Status: backend implementado (migração V6 `user_shortcuts` e `GET`/`PUT /api/me/shortcuts`, ver [API](API.md)); interface e listener no frontend pendentes. Requisito: cada usuário configura seus próprios atalhos. Executar antes do plano de [música compartilhada](MUSIC_PLAYER_PLAN.md), aproveitando a mesma base de ações e preferências.
+Status: backend (V6, `/api/me/shortcuts`) e interface implementados em **Configurações → Atalhos**, com push-to-talk. Atalhos globais (dentro do jogo) continuam fora: exigem aplicativo desktop.
 
 ## Comportamento e limite do navegador
 

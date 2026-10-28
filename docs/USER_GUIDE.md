@@ -18,3 +18,14 @@ Capturas históricas do Chromium Linux, anteriores aos novos controles de áudio
 ![Conversa e controles](images/chat.png)
 
 [Captura em tela menor](images/mobile.png)
+
+## Ajustes de outubro de 2026
+
+- **Configurações** (avatar na barra de ícones) agora tem abas: Perfil, Voz e áudio, Atalhos, Aparência, Sons e Segurança. Em **Voz e áudio** ficam microfone, supressão de ruído, volumes e o **volume de cada pessoa** (também pelo ícone de volume no cartão da pessoa, na sala).
+- **Supressão de ruído forte** (padrão): RNNoise roda no seu navegador e tira teclado, ventilador e barulho de fundo. A opção **Leve** usa o filtro do próprio navegador.
+- **Silenciar o áudio também desliga o microfone**, como no Discord; ao voltar a ouvir, o microfone volta como estava. Ligar o microfone enquanto silenciado volta a ouvir.
+- Cartões e lista da sala mostram em vermelho quem está com o **mic desligado** e com o **áudio silenciado**; o anel verde de quem fala é medido no seu navegador e responde na hora.
+- **Atalhos pessoais** (Configurações → Atalhos): cada pessoa grava os seus para mic, áudio, apertar para falar, som da transmissão e sair. Precisam de Ctrl, Alt ou ⌘ (F13–F24 podem ir sozinhas). Funcionam com a página em foco; **não funcionam dentro do jogo**.
+- **Transmissão**: a qualidade pode ser trocada sem parar de transmitir; o cursor do mouse é escondido por padrão (desligue em Opções de transmissão para apresentações); o som desta página fica fora do áudio capturado quando o navegador permite, evitando que todos escutem a própria voz com atraso.
+- Links nas mensagens abrem em outra aba. O chat abre no máximo duas vistas lado a lado.
+- Bloqueadores de anúncio (uBlock Origin, Brave) não impedem mais a entrada na voz: a conexão de voz usa o mesmo endereço do site.
