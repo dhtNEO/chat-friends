@@ -77,7 +77,7 @@ CHAT_MODE=prd ./scripts/admin.sh admin
 
 Abra **`https://NOME-APP.duckdns.org:18443`**. O sufixo `:18443` e o esquema HTTPS são necessários. Caddy renova por DNS-01 enquanto o token/conta/DNS/CA permitem; não há dependência de abertura de 80/443 na WAN.
 
-Mantenha os volumes de certificados e o token protegido. Depois de rotacionar token, recrie o edge em manutenção para ler o novo arquivo. Configurações novas registram `httpsPort` em `generated/duckdns/settings.json`; ausente significa 18443. Alterar essa porta exige atualizar a regra do roteador e startup completo. `PUBLIC_HTTPS_PORT` e URLs do `.env` são gerados a partir dessa configuração, não apenas editados manualmente.
+Mantenha os volumes de certificados e o token protegido. Depois de rotacionar token, recrie o edge em manutenção para ler o novo arquivo. Configurações novas registram `httpsPort` em `generated/duckdns/settings.json`; ausente significa 18443. Alterar essa porta exige atualizar a regra do roteador e startup completo. `PUBLIC_HTTPS_PORT` e URLs de `generated/network/network.env` são gerados a partir dessa configuração, não apenas editados manualmente.
 
 ## Atualizações, diagnóstico e agendamento
 
@@ -97,7 +97,7 @@ Depois de testar externamente:
 ./scripts/install-duckdns-launchagent.sh
 ```
 
-O LaunchAgent roda a cada cinco minutos após login, com caminhos absolutos e sem token no plist. OrbStack deve estar ativo; falhas são retomadas em execução posterior. Sem autostart antes de login. Remoção: `./scripts/install-duckdns-launchagent.sh remove`. Logs sanitizados ficam em `generated/duckdns/launchagent.log`; revisar/limpar em manutenção, sem rotação automática desse arquivo.
+O LaunchAgent roda a cada cinco minutos após login, com caminhos absolutos e sem token no plist. OrbStack deve estar ativo; falhas são retomadas em execução posterior. Sem autostart antes de login. Remoção: `./scripts/install-duckdns-launchagent.sh remove`. Logs sanitizados ficam em `generated/duckdns-logs/launchagent.log`; rotação automática pelo wrapper mantém até três cópias de aproximadamente 1 MiB.
 
 ## Teste externo e acesso local
 
@@ -115,4 +115,6 @@ Implementação testada com mocks DNS/API, provider Go com falhas que contêm to
 
 ## Atualização dos controles de áudio e Full HD
 
-Fazer backup em prd, atualizar o checkout e manter os segredos do `.env`. Para habilitar Full HD em instalações antigas, editar somente `SCREEN_HEIGHT=1080`, `SCREEN_BITRATE=8000000` e `SCREEN_FPS=60` (ou 30 para poupar banda), depois executar `CHAT_MODE=prd ./scripts/up.sh`. A migração Flyway V2 é automática e adiciona o estado de recepção às conexões, sem apagar contas ou mensagens. Não há novas portas, serviços ou configuração DuckDNS. No navegador, escolher 1080p antes de compartilhar e recarregar sem cache após o deploy. Validar som/volume/mudo com outro participante; 1080p/8 Mbps são tetos solicitados, não promessa de qualidade/carga.
+Fazer backup em prd, atualizar o checkout e manter os segredos do `.env`. Para habilitar Full HD em instalações antigas, editar somente `SCREEN_HEIGHT=1080`, `SCREEN_BITRATE=8000000` e `SCREEN_FPS=60` (ou 30 para poupar banda), depois executar `CHAT_MODE=prd ./scripts/up.sh`. As migrações Flyway são executadas pelo job temporário antes do runtime; V2 adiciona o estado de recepção às conexões, sem apagar contas ou mensagens. A configuração de vídeo mantém as portas; a atualização de segurança acrescenta o migrador temporário e redes descritos em SECURITY_UPGRADE.md. No navegador, escolher 1080p antes de compartilhar e recarregar sem cache após o deploy. Validar som/volume/mudo com outro participante; 1080p/8 Mbps são tetos solicitados, não promessa de qualidade/carga.
+
+Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.

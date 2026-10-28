@@ -2,6 +2,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ "${1:-init}" == init || "${1:-init}" == --retry ]] || { echo 'Uso: duckdns-init.sh [--retry]' >&2; exit 1; }
+# Generate private operator configuration before the helper; helpers only receive media credentials.
+if [[ ! -f .env ]]; then ./scripts/configure.sh dev; fi
+if [[ ! -f infra/compose/generated/helper.env ]]; then
+  ./scripts/configure.sh "$(source scripts/modes.sh; chat_saved_mode)"
+fi
+mkdir -p infra/compose/generated/network
 source scripts/duckdns-common.sh
 duck_lock
 for service in backend web livekit edge; do
@@ -25,4 +31,6 @@ printf '%s\n' "$app" "$media" "$email" "$wan" "$https_port" | duck_node init
 fi
 if [[ ! -f .env ]]; then ./scripts/configure.sh dev; fi
 duck_node prepare >/dev/null
+printf "prd\n" > infra/compose/generated/mode
+chmod 600 infra/compose/generated/mode
 echo 'DNS confirmado e configuração preparada. Abra as portas previstas no guia e inicie CHAT_MODE=prd ./scripts/up.sh.'

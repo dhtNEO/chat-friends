@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
-import { publicIPv4, hostname, email, portSuffix } from "./network-config.mjs";
+import { securityConfig } from "./security-config.mjs";
+import {
+  publicIPv4,
+  hostname,
+  email,
+  portSuffix,
+  parseEnv,
+} from "./network-config.mjs";
 const mode = process.argv[2] ?? "dev";
 if (!["dev", "prd"].includes(mode)) throw new Error("Modo deve ser dev ou prd");
 if (mode !== "prd" && process.env.CHAT_TURN === "true")
@@ -35,8 +42,27 @@ const values = Object.fromEntries(
       return [l.slice(0, i), l.slice(i + 1)];
     }),
 );
+const networkFile = "infra/compose/generated/network/network.env";
+if (fs.existsSync(networkFile)) {
+  const allowed = new Set([
+    "APP_DOMAIN",
+    "MEDIA_DOMAIN",
+    "ACME_EMAIL",
+    "PUBLIC_HTTPS_PORT",
+    "APP_ORIGIN",
+    "LIVEKIT_PUBLIC_URL",
+    "COOKIE_SECURE",
+    "LIVEKIT_NODE_IP",
+    "LIVEKIT_INTERNAL_URL",
+  ]);
+  const overrides = parseEnv(fs.readFileSync(networkFile, "utf8"));
+  if (Object.keys(overrides).some((key) => !allowed.has(key)))
+    throw new Error("Arquivo de rede contém parâmetro não permitido");
+  Object.assign(values, overrides);
+}
+if (process.env.CHAT_HELPER !== "true") securityConfig(values);
 for (const key of [
-  "POSTGRES_PASSWORD",
+  ...(process.env.CHAT_HELPER === "true" ? [] : ["POSTGRES_PASSWORD"]),
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
 ])
@@ -85,25 +111,27 @@ if (mode === "prd") {
   )
     throw new Error("URLs devem corresponder aos domínios");
 }
-fs.mkdirSync("infra/compose/generated", { recursive: true, mode: 0o700 });
-fs.chmodSync("infra/compose/generated", 0o700);
-// A scoped control key; the worker never receives the LiveKit signing secret.
-fs.writeFileSync("infra/compose/generated/music-secret", crypto
-  .createHmac("sha256", values.LIVEKIT_API_SECRET)
-  .update("chat-friends:music-control:v1").digest("hex"), { mode: 0o644 });
-// The private 0700 parent protects the host path; the nonroot container reads only this bind.
-fs.chmodSync("infra/compose/generated/music-secret", 0o644);
-fs.writeFileSync(
-  "infra/compose/generated/livekit.yaml",
-  `port: 7880
+fs.mkdirSync("infra/compose/generated/network", {
+  recursive: true,
+  mode: 0o700,
+});
+let mediaYaml = `port: 7880
 bind_addresses: ["0.0.0.0"]
 rtc:
   tcp_port: 7881
   udp_port: 7882
   use_external_ip: false
   node_ip: ${JSON.stringify(ip)}
-  # Docker forwards media to eth0, never to the container loopback socket.
+  # The entrypoint selects the default-route/media NIC, never container loopback.
   enable_loopback_candidate: false
+# Enforced bounds in LiveKit v1.13.11. num_tracks/bytes_per_sec only affect
+# node allocation, so they are deliberately not presented as publisher caps.
+enable_data_tracks: false
+limit:
+  subscription_limit_video: 1
+  subscription_limit_audio: 16
+  signal_message_size_limit: 65536
+  max_api_request_body_size: 131072
 room:
   max_participants: 17
   empty_timeout: 60
@@ -114,11 +142,7 @@ webhook:
   urls: ["http://backend:8080/api/livekit/webhook"]
 logging:
   level: warn
-`,
-  { mode: 0o600 },
-);
-fs.writeFileSync("infra/compose/generated/mode", mode + "\n", { mode: 0o600 });
-fs.chmodSync(".env", 0o600);
+`;
 if (process.env.CHAT_TURN === "true") {
   const domain = values.TURN_DOMAIN;
   if (
@@ -130,9 +154,7 @@ if (process.env.CHAT_TURN === "true") {
   for (const file of ["fullchain.pem", "privkey.pem"])
     if (!fs.existsSync("infra/compose/generated/turn-certs/" + file))
       throw new Error("Certificado TURN ausente: " + file);
-  fs.appendFileSync(
-    "infra/compose/generated/livekit.yaml",
-    `turn:
+  mediaYaml += `turn:
   enabled: true
   domain: ${JSON.stringify(domain)}
   tls_port: 5349
@@ -140,7 +162,28 @@ if (process.env.CHAT_TURN === "true") {
   cert_file: /etc/turn-certs/fullchain.pem
   key_file: /etc/turn-certs/privkey.pem
   external_tls: false
-`,
+`;
+}
+function writePrivate(file, data) {
+  const temp = file + "." + crypto.randomUUID() + ".tmp";
+  fs.writeFileSync(temp, data, { mode: 0o600, flag: "wx" });
+  fs.renameSync(temp, file);
+}
+writePrivate("infra/compose/generated/network/livekit.yaml", mediaYaml);
+if (process.env.CHAT_HELPER !== "true") {
+  writePrivate("infra/compose/generated/livekit.yaml", mediaYaml);
+  writePrivate("infra/compose/generated/mode", mode + "\n");
+  // A scoped control key; the worker never receives the LiveKit signing secret.
+  fs.chmodSync("infra/compose/generated", 0o700);
+  writePrivate(
+    "infra/compose/generated/music-secret",
+    crypto
+      .createHmac("sha256", values.LIVEKIT_API_SECRET)
+      .update("chat-friends:music-control:v1")
+      .digest("hex"),
   );
+  // The private 0700 parent protects the host path; the nonroot container reads only this bind.
+  fs.chmodSync("infra/compose/generated/music-secret", 0o644);
+  fs.chmodSync(".env", 0o600);
 }
 console.log("Configuração validada e gerada; segredos não exibidos.");

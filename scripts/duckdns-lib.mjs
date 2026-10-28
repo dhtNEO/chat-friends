@@ -93,9 +93,15 @@ export async function verifyDNS(
 export function fingerprint(root) {
   return crypto
     .createHash("sha256")
-    .update(fs.readFileSync(path.join(root, ".env")))
     .update(
-      fs.readFileSync(path.join(root, "infra/compose/generated/livekit.yaml")),
+      fs.readFileSync(
+        path.join(root, "infra/compose/generated/network/network.env"),
+      ),
+    )
+    .update(
+      fs.readFileSync(
+        path.join(root, "infra/compose/generated/network/livekit.yaml"),
+      ),
     )
     .digest("hex");
 }
@@ -144,9 +150,15 @@ export async function prepare(
       "API aceita, mas DNS A/AAAA ainda não está consistente; nenhuma configuração aplicada",
     );
   }
-  const envFile = path.join(root, ".env");
-  const original = fs.readFileSync(envFile, "utf8");
-  const values = parseEnv(original);
+  const envFile = path.join(
+    root,
+    "infra/compose/generated/network/network.env",
+  );
+  const base = fs.readFileSync(path.join(root, ".env"), "utf8");
+  const original = fs.existsSync(envFile)
+    ? fs.readFileSync(envFile, "utf8")
+    : "";
+  const values = { ...parseEnv(base), ...parseEnv(original) };
   if (
     !initial &&
     (values.APP_DOMAIN !== config.appDomain ||
@@ -191,13 +203,15 @@ export async function prepare(
   const staging = fs.mkdtempSync(path.join(dir, "render-"));
   let yaml;
   try {
-    fs.writeFileSync(path.join(staging, ".env"), next, { mode: 0o600 });
+    fs.writeFileSync(path.join(staging, ".env"), base + "\n" + next, {
+      mode: 0o600,
+    });
     const rendered = spawnSync(
       process.execPath,
       [path.join(root, "scripts/render-config.mjs"), "prd"],
       {
         cwd: staging,
-        env: { ...process.env, CHAT_TURN: "false" },
+        env: { ...process.env, CHAT_TURN: "false", CHAT_HELPER: "true" },
         stdio: "ignore",
       },
     );
@@ -206,12 +220,16 @@ export async function prepare(
         "Configuração prd recusada; arquivos anteriores preservados",
       );
     yaml = fs.readFileSync(
-      path.join(staging, "infra/compose/generated/livekit.yaml"),
+      path.join(staging, "infra/compose/generated/network/livekit.yaml"),
     );
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });
   }
-  const yamlFile = path.join(root, "infra/compose/generated/livekit.yaml");
+  fs.mkdirSync(path.dirname(envFile), { recursive: true, mode: 0o700 });
+  const yamlFile = path.join(
+    root,
+    "infra/compose/generated/network/livekit.yaml",
+  );
   if (next !== original) {
     const goodEnv = path.join(dir, "last-good.env"),
       goodYaml = path.join(dir, "last-good-livekit.yaml");
@@ -235,7 +253,6 @@ export async function prepare(
   }
   if (!fs.existsSync(yamlFile) || !fs.readFileSync(yamlFile).equals(yaml))
     atomic(yamlFile, yaml);
-  atomic(path.join(root, "infra/compose/generated/mode"), "prd\n");
   if (next !== original) atomic(envFile, next);
   const desired = { ip, fingerprint: fingerprint(root) };
   atomic(path.join(dir, "pending.json"), JSON.stringify(desired));
@@ -260,11 +277,15 @@ export function commit(root) {
     );
   atomic(
     path.join(dir, "last-good.env"),
-    fs.readFileSync(path.join(root, ".env")),
+    fs.readFileSync(
+      path.join(root, "infra/compose/generated/network/network.env"),
+    ),
   );
   atomic(
     path.join(dir, "last-good-livekit.yaml"),
-    fs.readFileSync(path.join(root, "infra/compose/generated/livekit.yaml")),
+    fs.readFileSync(
+      path.join(root, "infra/compose/generated/network/livekit.yaml"),
+    ),
   );
   atomic(path.join(dir, "applied.json"), JSON.stringify(pending));
 }

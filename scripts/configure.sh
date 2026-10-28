@@ -8,4 +8,9 @@ if [[ -n "$saved" && "$saved" != "$mode" && "${CHAT_ALLOW_MODE_CHANGE:-false}" !
   echo 'Troca entre dev e prd exige parada, backup e CHAT_ALLOW_MODE_CHANGE=true.' >&2
   exit 1
 fi
-docker run --rm -e CHAT_TURN="${CHAT_TURN:-false}" --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work node:24.14.0-alpine node scripts/render-config.mjs "$mode"
+# Serialize upgrade/configuration against the scheduled DNS worker.
+if [[ -f infra/compose/generated/duckdns/settings.json ]]; then
+  source scripts/duckdns-common.sh
+  duck_lock
+fi
+docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true --pids-limit 128 --memory 256m -e CHAT_TURN="${CHAT_TURN:-false}" --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work node:24.22.1-alpine node scripts/render-config.mjs "$mode"

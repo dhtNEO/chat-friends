@@ -29,6 +29,7 @@ async function fixture(fn) {
   fs.mkdirSync(path.join(cwd, "scripts"));
   for (const name of [
     "render-config.mjs",
+    "security-config.mjs",
     "network-config.mjs",
     "duckdns-update.mjs",
     "duckdns-lib.mjs",
@@ -108,9 +109,10 @@ test("bootstrap publica os dois nomes, preserva segredos e precisa de aplicaçã
   fixture(async (cwd) => {
     const dep = network();
     assert.equal(await prepare(cwd, { initial: true, ...dep }), "restart");
-    const env = fs.readFileSync(path.join(cwd, ".env"), "utf8");
+    const env = fs.readFileSync(path.join(cwd, "infra/compose/generated/network/network.env"), "utf8");
     assert.match(env, /COOKIE_SECURE=true/);
-    assert.ok(env.includes(original.split("\n")[0]));
+    assert.equal(fs.readFileSync(path.join(cwd,".env"),"utf8"),original);
+    assert.ok(!env.includes("POSTGRES_PASSWORD"));
     assert.equal(dep.calls.filter((v) => v.domain).length, 2);
     assert.equal(
       fs.existsSync(path.join(cwd, directory, "applied.json")),
@@ -185,7 +187,7 @@ test("render inválido preserva configuração anterior; commit recusa mutação
     assert.equal(fs.readFileSync(path.join(cwd, ".env"), "utf8"), before);
     fs.writeFileSync(path.join(cwd, ".env"), original);
     await prepare(cwd, { initial: true, ...network() });
-    fs.appendFileSync(path.join(cwd, ".env"), "# changed\n");
+    fs.appendFileSync(path.join(cwd, "infra/compose/generated/network/network.env"), "# changed\n");
     assert.throws(() => commit(cwd));
   }));
 test("saúde administrativa usa JWT restrito e só confirma resposta da SFU", () =>
@@ -234,7 +236,7 @@ test("CLI não vaza token em stdout/stderr nem permite modo desconhecido", () =>
 test("prd recusa IP privado, nomes iguais, email inválido e origem insegura", () =>
   fixture(async (cwd) => {
     await prepare(cwd, { initial: true, ...network() });
-    const good = fs.readFileSync(path.join(cwd, ".env"), "utf8");
+    const good = fs.readFileSync(path.join(cwd, "infra/compose/generated/network/network.env"), "utf8");
     for (const bad of [
       good.replace(
         "LIVEKIT_NODE_IP=177.12.34.56",
@@ -244,10 +246,11 @@ test("prd recusa IP privado, nomes iguais, email inválido e origem insegura", (
       good.replace("ACME_EMAIL=test@example.org", "ACME_EMAIL=invalid"),
       good.replace("COOKIE_SECURE=true", "COOKIE_SECURE=false"),
     ]) {
-      fs.writeFileSync(path.join(cwd, ".env"), bad);
+      fs.writeFileSync(path.join(cwd, "infra/compose/generated/network/network.env"), bad);
       assert.notEqual(
         spawnSync(process.execPath, ["scripts/render-config.mjs", "prd"], {
           cwd,
+          env: {...process.env,CHAT_HELPER:"true"},
           stdio: "ignore",
         }).status,
         0,
@@ -305,7 +308,7 @@ test("LaunchAgent escapa caminhos, usa binário absoluto e não contém token", 
 test("DuckDNS gera HTTPS/WSS na porta 18443, sem mudar portas internas da SFU", () =>
   fixture(async (cwd) => {
     await prepare(cwd, { initial: true, ...network() });
-    const env = fs.readFileSync(path.join(cwd, ".env"), "utf8");
+    const env = fs.readFileSync(path.join(cwd, "infra/compose/generated/network/network.env"), "utf8");
     assert.match(env, /APP_ORIGIN=https:\/\/test-app.duckdns.org:18443/);
     assert.match(
       env,
@@ -313,7 +316,7 @@ test("DuckDNS gera HTTPS/WSS na porta 18443, sem mudar portas internas da SFU", 
     );
     assert.match(env, /PUBLIC_HTTPS_PORT=18443/);
     const yaml = fs.readFileSync(
-      path.join(cwd, "infra/compose/generated/livekit.yaml"),
+      path.join(cwd, "infra/compose/generated/network/livekit.yaml"),
       "utf8",
     );
     assert.match(yaml, /tcp_port: 7881/);
@@ -338,7 +341,7 @@ test("migração de 443 exige startup completo; job não muda origem sozinho", (
       await prepare(cwd, { allowOriginChange: true, ...network() }),
       "restart",
     );
-    assert.match(fs.readFileSync(path.join(cwd, ".env"), "utf8"), /:18443/);
+    assert.match(fs.readFileSync(path.join(cwd, "infra/compose/generated/network/network.env"), "utf8"), /:18443/);
   }));
 test("porta personalizada é validada; 443 permanece compatível", () => {
   for (const httpsPort of [0, 80, 65536, -1, "18443/path", "018443", "https"])

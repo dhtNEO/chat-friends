@@ -79,15 +79,17 @@ async function probe(
     const udp = protocol === "udp" ? createSocket("udp4") : undefined;
     const tcp = protocol === "tcp" ? new Socket() : undefined;
     let finished = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const finish = (result: string) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
+      clearTimeout(retry);
       udp?.close();
       tcp?.destroy();
       resolve(result);
     };
-    const timer = setTimeout(() => finish("timeout ICE"), 3000);
+    const timer = setTimeout(() => finish("timeout ICE"), 6000);
     const receive = (response: Buffer) => {
       // Ignore server checks and unrelated transactions on this same socket.
       if (validResponse(response, packet, password)) finish("STUN autenticado");
@@ -95,7 +97,16 @@ async function probe(
     if (udp) {
       udp.on("error", () => finish("erro de socket UDP"));
       udp.on("message", receive);
-      udp.send(packet, 7882, host);
+      // STUN over UDP retransmits the same transaction from the same socket
+      // (RFC 5389 §7.2.1). A lost datagram must not invalidate a working port.
+      let delay = 500;
+      const send = () => {
+        if (finished) return;
+        udp.send(packet, 7882, host);
+        retry = setTimeout(send, delay);
+        delay = Math.min(delay * 2, 2000);
+      };
+      send();
     }
     if (tcp) {
       let pending = Buffer.alloc(0);
@@ -129,7 +140,10 @@ test("portas Docker de mídia respondem ao ICE autenticado por UDP e TCP", async
   expect(
     (
       await page.request.post("/api/login", {
-        form: { username: "admin", password },
+        form: {
+          username: process.env.TEST_ADMIN_USERNAME || "admin",
+          password,
+        },
         headers: { "X-CSRF-TOKEN": csrf },
       })
     ).status(),
@@ -147,17 +161,26 @@ test("portas Docker de mídia respondem ao ICE autenticado por UDP e TCP", async
   await page.goto("/");
   await page.getByRole("button", { name: "Entrar na voz" }).click();
   try {
+    await expect(page.getByText("Voz conectada", { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
     await page.waitForFunction(
       () =>
         window.iceTestPeers.some(
-          (peer) => peer.localDescription?.sdp && peer.remoteDescription?.sdp,
+          (peer) =>
+            peer.connectionState === "connected" &&
+            peer.localDescription?.sdp &&
+            peer.remoteDescription?.sdp,
         ),
       undefined,
       { timeout: 10000 },
     );
     const credentials = await page.evaluate(() => {
       const peer = window.iceTestPeers.find(
-        (p) => p.localDescription?.sdp && p.remoteDescription?.sdp,
+        (p) =>
+          p.connectionState === "connected" &&
+          p.localDescription?.sdp &&
+          p.remoteDescription?.sdp,
       )!;
       const local = peer.localDescription!;
       const remote = peer.remoteDescription!.sdp;
@@ -184,10 +207,8 @@ test("portas Docker de mídia respondem ao ICE autenticado por UDP e TCP", async
         result: await probe(protocol, packet, credentials.password, host),
       })),
     );
-    expect(results).toEqual([
-      { protocol: "udp", result: "STUN autenticado" },
-      { protocol: "tcp", result: "STUN autenticado" },
-    ]);
+    for (const { protocol, result } of results)
+      expect(result, `ICE ${protocol}: ${result}`).toBe("STUN autenticado");
   } finally {
     // Safe CI diagnostics: states only, without addresses, tokens or SDP.
     console.log(

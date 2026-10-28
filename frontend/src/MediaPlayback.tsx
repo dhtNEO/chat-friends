@@ -25,6 +25,11 @@ export function AudioTrack({
   // webAudioMix owns playback. Muting only the HTML element does NOT mute its graph.
   useEffect(() => {
     track.setVolume(volume);
+    // Some browsers ignore volume on media elements (iOS); muting always works.
+    // With Web Audio mixing LiveKit keeps the element at volume 0 and muted
+    // (sound goes through its gain node), so only unmute a playing element.
+    const el = ref.current;
+    if (el) el.muted = volume === 0 || el.volume === 0;
   }, [track, volume]);
   return (
     <audio

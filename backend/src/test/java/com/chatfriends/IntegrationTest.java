@@ -19,7 +19,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
-@SpringBootTest(properties = {"app.reconcile-initial-delay=600000"})
+@SpringBootTest(
+    properties = {
+      "app.reconcile-initial-delay=600000",
+      "app.mfa-key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    })
 @AutoConfigureMockMvc
 class IntegrationTest {
   @Autowired Accounts accounts;
@@ -27,11 +31,23 @@ class IntegrationTest {
   @Autowired Media media;
   @Autowired MockMvc mvc;
   @MockitoBean LiveKitGateway live;
+  @Autowired Events events;
+  @Autowired Mfa mfa;
+  @Autowired RequestBudget requestBudget;
+  final Map<String, org.springframework.test.web.servlet.request.RequestPostProcessor>
+      profileLogins = new HashMap<>();
   @MockitoBean MusicGateway musicBot;
   @Autowired Music music;
 
   @BeforeEach
   void setup() {
+    profileLogins.clear();
+    media.invalidateState();
+    synchronized (requestBudget) {
+      ((Map<?, ?>)
+              org.springframework.test.util.ReflectionTestUtils.getField(requestBudget, "buckets"))
+          .clear();
+    }
     accounts.db.execute(
         "TRUNCATE messages,media_connections,accounts,rate_limits,spring_session CASCADE");
     accounts.db.execute("UPDATE screen_lease SET identity=NULL,lease_id=NULL,expires_at=NULL");
@@ -246,7 +262,7 @@ class IntegrationTest {
         "update media_connections set expires_at=now()-interval '1 second' where"
             + " identity='ana-audio'");
     assertEquals(
-        401,
+        409,
         assertThrows(
                 ResponseStatusException.class,
                 () -> media.audio(() -> "ana", ana, new Media.AudioPreferences("ana-audio", true)))
@@ -267,6 +283,7 @@ class IntegrationTest {
     assertEquals(
         Map.of("height", 1080, "bitrate", 8000000, "fps", 60),
         media.join(() -> "ana", request).get("screen"));
+    media.leave(() -> "ana", request, new Media.Connection("previous-tab"));
     media.height = 9000;
     media.bitrate = Integer.MAX_VALUE;
     media.fps = 120;
@@ -463,32 +480,257 @@ class IntegrationTest {
 
   @Test
   void nonAdminCannotManageAccountsAndDisabledCannotRead() throws Exception {
-    mvc.perform(
-            get("/api/admin/accounts")
-                .with(
-                    org.springframework.security.test.web.servlet.request
-                        .SecurityMockMvcRequestPostProcessors.user("ana")
-                        .roles("USER")))
-        .andExpect(status().isForbidden());
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    mvc.perform(get("/api/admin/accounts").cookie(cookie)).andExpect(status().isForbidden());
     accounts.db.update("update accounts set enabled=false where username='ana'");
-    mvc.perform(
-            get("/api/messages")
-                .with(
-                    org.springframework.security.test.web.servlet.request
-                        .SecurityMockMvcRequestPostProcessors.user("ana")
-                        .roles("USER")))
-        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isUnauthorized());
   }
 
-  static org.springframework.test.web.servlet.request.RequestPostProcessor as(String name) {
-    return org.springframework.security.test.web.servlet.request
-        .SecurityMockMvcRequestPostProcessors.user(name)
-        .roles("USER");
+  jakarta.servlet.http.Cookie loginCookie(String user, String password) throws Exception {
+    var csrf = mvc.perform(get("/api/csrf")).andExpect(status().isOk()).andReturn().getResponse();
+    String token =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .readTree(csrf.getContentAsString())
+            .get("token")
+            .asText();
+    var login =
+        mvc.perform(
+                post("/api/login")
+                    .cookie(csrf.getCookie("SESSION"))
+                    .header("X-CSRF-TOKEN", token)
+                    .param("username", user)
+                    .param("password", password))
+            .andExpect(status().isNoContent())
+            .andReturn()
+            .getResponse();
+    return login.getCookie("SESSION");
   }
 
-  static org.springframework.test.web.servlet.request.RequestPostProcessor csrf() {
-    return org.springframework.security.test.web.servlet.request
-        .SecurityMockMvcRequestPostProcessors.csrf();
+  MockHttpSession authSession() {
+    var s = new MockHttpSession();
+    s.setAttribute(SessionSecurity.ISSUED, System.currentTimeMillis());
+    s.setAttribute(SessionSecurity.REAUTH, System.currentTimeMillis());
+    return s;
+  }
+
+  @Test
+  void replayDoesNotBroadcastAgain() throws Exception {
+    var socket = mock(org.springframework.web.socket.WebSocketSession.class);
+    when(socket.getId()).thenReturn("replay-test");
+    when(socket.getPrincipal()).thenReturn(() -> "ana");
+    events.sockets.put(socket.getId(), socket);
+    try {
+      var id = UUID.randomUUID();
+      for (int i = 0; i < 6; i++) chat.send("ana", id, "same");
+      verify(socket, times(1)).sendMessage(any());
+    } finally {
+      events.sockets.remove(socket.getId());
+    }
+  }
+
+  @Test
+  void expiredHeartbeatCannotReviveConnection() {
+    var q = connection("ana", "expired");
+    accounts.db.update(
+        "update media_connections set expires_at=now()-interval '1 second' where"
+            + " identity='expired'");
+    assertEquals(
+        409,
+        assertThrows(
+                ResponseStatusException.class,
+                () -> media.heartbeat(() -> "ana", q, new Media.Connection("expired")))
+            .getStatusCode()
+            .value());
+    assertFalse(media.validConnection("expired"));
+  }
+
+  @Test
+  void websocketQuotaRejectsFifthSocket() throws Exception {
+    List<org.springframework.web.socket.WebSocketSession> opened = new ArrayList<>();
+    try {
+      for (int i = 0; i < 5; i++) {
+        var s = mock(org.springframework.web.socket.WebSocketSession.class);
+        when(s.getId()).thenReturn("quota-" + i);
+        when(s.getPrincipal()).thenReturn(() -> "ana");
+        opened.add(s);
+        events.afterConnectionEstablished(s);
+      }
+      verify(opened.get(4)).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
+      assertEquals(4, events.sockets.size());
+    } finally {
+      for (var s : opened)
+        events.afterConnectionClosed(s, org.springframework.web.socket.CloseStatus.NORMAL);
+    }
+  }
+
+  @Test
+  void mfaEncryptsSecretsRejectsReplayAndConsumesRecovery() {
+    String secret = mfa.generate();
+    long now = java.time.Instant.now().getEpochSecond() / 30;
+    String code = Mfa.totp(secret, now);
+    var recovery = mfa.enroll("ana", secret, code);
+    assertEquals(8, recovery.size());
+    String stored =
+        accounts.db.queryForObject(
+            "select secret from account_mfa where account_id=?",
+            String.class,
+            accounts.get("ana").id());
+    assertNotEquals(secret, stored);
+    assertThrows(ResponseStatusException.class, () -> mfa.verify("ana", code));
+    mfa.verify("ana", recovery.getFirst());
+    assertThrows(ResponseStatusException.class, () -> mfa.verify("ana", recovery.getFirst()));
+    assertEquals(7, accounts.db.queryForObject("select count(*) from mfa_recovery", Integer.class));
+  }
+
+  @Test
+  void absoluteSessionExpiresDespiteRecentAccess() throws Exception {
+    var session = authSession();
+    session.setAttribute(SessionSecurity.ISSUED, System.currentTimeMillis() - 28801000L);
+    var q = new MockHttpServletRequest("GET", "/api/me");
+    q.setSession(session);
+    var response = new org.springframework.mock.web.MockHttpServletResponse();
+    assertFalse(new SessionSecurity(accounts, mfa, false, 28800).authorize(q, response, "ana"));
+    assertEquals(401, response.getStatus());
+  }
+
+  @Test
+  void passwordLoginWithMfaCannotReadBeforeSecondFactorAndRotatesSession() throws Exception {
+    String secret = mfa.generate();
+    var codes =
+        mfa.enroll("ana", secret, Mfa.totp(secret, java.time.Instant.now().getEpochSecond() / 30));
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    mvc.perform(get("/api/me").cookie(cookie))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.security.mfaPending").value(true));
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isForbidden());
+    var csrf = mvc.perform(get("/api/csrf").cookie(cookie)).andReturn().getResponse();
+    String token =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .readTree(csrf.getContentAsString())
+            .get("token")
+            .asText();
+    var verified =
+        mvc.perform(
+                post("/api/security/mfa/verify")
+                    .cookie(cookie)
+                    .header("X-CSRF-TOKEN", token)
+                    .contentType("application/json")
+                    .content("{\"code\":\"" + codes.getFirst() + "\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    var rotated = verified.getCookie("SESSION");
+    assertNotNull(rotated);
+    assertNotEquals(cookie.getValue(), rotated.getValue());
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/messages").cookie(rotated)).andExpect(status().isOk());
+  }
+
+  @Test
+  void leftParticipantDoesNotHoldTheAccountQuotaAndDelayedEventCannotKickActiveOne() {
+    connection("ana", "left");
+    when(live.participants()).thenReturn(List.of(participant("left", false)));
+    media.reconcile();
+    assertTrue(media.validConnection("left"));
+    media.departed("left");
+    assertTrue(media.validConnection("left"));
+    when(live.participants()).thenReturn(List.of());
+    media.reconcile();
+    assertFalse(media.validConnection("left"));
+    var q = connection("ana", "fast-left");
+    media.departed("fast-left");
+    assertFalse(media.validConnection("fast-left"));
+  }
+
+  @Test
+  void anonymousSessionBudgetPrecedesJdbcCreationEvenWithSpoofedHeaders() throws Exception {
+    int allowed = 0;
+    for (int i = 0; i < 60; i++) {
+      final int attempt = i;
+      var result =
+          mvc.perform(
+                  get("/api/csrf")
+                      .with(
+                          q -> {
+                            q.setRemoteAddr("203.0.113.254");
+                            q.addHeader("X-Forwarded-For", "192.0.2." + attempt);
+                            q.addHeader("X-Chat-Client-IP", "192.0.2." + attempt);
+                            return q;
+                          }))
+              .andReturn()
+              .getResponse();
+      if (result.getStatus() == 200) allowed++;
+      else assertEquals(429, result.getStatus());
+    }
+    assertEquals(40, allowed);
+    assertEquals(
+        40, accounts.db.queryForObject("select count(*) from spring_session", Integer.class));
+  }
+
+  @Test
+  void enrollmentSecretIsEncryptedEvenWhilePendingAndConfirmationRotatesSession() throws Exception {
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    var csrf = mvc.perform(get("/api/csrf").cookie(cookie)).andReturn().getResponse();
+    var json = new com.fasterxml.jackson.databind.ObjectMapper();
+    String token = json.readTree(csrf.getContentAsString()).get("token").asText();
+    var setup =
+        mvc.perform(
+                post("/api/security/mfa/setup")
+                    .cookie(cookie)
+                    .header("X-CSRF-TOKEN", token)
+                    .contentType("application/json")
+                    .content("{\"password\":\"test-only-password-ana\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    String secret = json.readTree(setup.getContentAsString()).get("secret").asText();
+    var stored =
+        accounts.db.queryForObject(
+            "select attribute_bytes from spring_session_attributes where"
+                + " attribute_name='mfa.pending'",
+            byte[].class);
+    assertFalse(new String(stored, java.nio.charset.StandardCharsets.ISO_8859_1).contains(secret));
+    String code = Mfa.totp(secret, java.time.Instant.now().getEpochSecond() / 30);
+    var confirmed =
+        mvc.perform(
+                post("/api/security/mfa/confirm")
+                    .cookie(cookie)
+                    .header("X-CSRF-TOKEN", token)
+                    .contentType("application/json")
+                    .content("{\"code\":\"" + code + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.recoveryCodes.length()").value(8))
+            .andReturn()
+            .getResponse();
+    var rotated = confirmed.getCookie("SESSION");
+    assertNotNull(rotated);
+    assertNotEquals(cookie.getValue(), rotated.getValue());
+    mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/messages").cookie(rotated)).andExpect(status().isOk());
+  }
+
+  org.springframework.test.web.servlet.request.RequestPostProcessor as(String name)
+      throws Exception {
+    if (profileLogins.containsKey(name)) return profileLogins.get(name);
+    var cookie = loginCookie(name, "test-only-password-" + name);
+    var response =
+        mvc.perform(get("/api/csrf").cookie(cookie))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    String token =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .readTree(response.getContentAsString())
+            .get("token")
+            .asText();
+    org.springframework.test.web.servlet.request.RequestPostProcessor authenticated =
+        request -> {
+          request.setCookies(cookie);
+          request.addHeader("X-CSRF-TOKEN", token);
+          return request;
+        };
+    profileLogins.put(name, authenticated);
+    return authenticated;
   }
 
   @Test
@@ -496,7 +738,6 @@ class IntegrationTest {
     mvc.perform(
             patch("/api/profile")
                 .with(as("ana"))
-                .with(csrf())
                 .contentType("application/json")
                 .content(
                     "{\"displayName\":\"Ana Clara\",\"primaryColor\":\"#FF8800\","
@@ -509,21 +750,14 @@ class IntegrationTest {
     assertEquals("#22c55e", ana.secondaryColor());
     for (String body :
         new String[] {
-          "{\"primaryColor\":\"red\"}",
-          "{\"displayName\":\" \"}",
-          "{\"username\":\"Ana!\"}"
+          "{\"primaryColor\":\"red\"}", "{\"displayName\":\" \"}", "{\"username\":\"Ana!\"}"
         })
       mvc.perform(
-              patch("/api/profile")
-                  .with(as("ana"))
-                  .with(csrf())
-                  .contentType("application/json")
-                  .content(body))
+              patch("/api/profile").with(as("ana")).contentType("application/json").content(body))
           .andExpect(status().isBadRequest());
     mvc.perform(
             patch("/api/profile")
                 .with(as("ana"))
-                .with(csrf())
                 .contentType("application/json")
                 .content("{\"primaryColor\":\"\"}"))
         .andExpect(status().isOk());
@@ -534,33 +768,21 @@ class IntegrationTest {
     System.arraycopy("WEBP".getBytes(), 0, webp, 8, 4);
     mvc.perform(post("/api/profile/avatar").contentType("image/webp").content(webp))
         .andExpect(status().isForbidden());
-    mvc.perform(
-            post("/api/profile/avatar")
-                .with(as("ana"))
-                .with(csrf())
-                .contentType("image/png")
-                .content(webp))
+    mvc.perform(post("/api/profile/avatar").with(as("ana")).contentType("image/png").content(webp))
         .andExpect(status().isBadRequest());
     mvc.perform(
             post("/api/profile/avatar")
                 .with(as("ana"))
-                .with(csrf())
                 .contentType("image/svg+xml")
                 .content("<svg/>"))
         .andExpect(status().isUnsupportedMediaType());
     mvc.perform(
             post("/api/profile/avatar")
                 .with(as("ana"))
-                .with(csrf())
                 .contentType("image/webp")
                 .content(new byte[16001]))
         .andExpect(status().isBadRequest());
-    mvc.perform(
-            post("/api/profile/avatar")
-                .with(as("ana"))
-                .with(csrf())
-                .contentType("image/webp")
-                .content(webp))
+    mvc.perform(post("/api/profile/avatar").with(as("ana")).contentType("image/webp").content(webp))
         .andExpect(status().isOk());
     var id = accounts.get("ana").id();
     assertNotNull(accounts.get("ana").avatarVersion());
@@ -572,8 +794,7 @@ class IntegrationTest {
     mvc.perform(get("/api/members").with(as("bia")))
         .andExpect(jsonPath("$[?(@.username=='ana')].avatarVersion").isNotEmpty())
         .andExpect(jsonPath("$[0].admin").doesNotExist());
-    mvc.perform(delete("/api/profile/avatar").with(as("ana")).with(csrf()))
-        .andExpect(status().isOk());
+    mvc.perform(delete("/api/profile/avatar").with(as("ana"))).andExpect(status().isOk());
     mvc.perform(get("/api/avatars/" + id).with(as("bia"))).andExpect(status().isNotFound());
   }
 
@@ -583,7 +804,6 @@ class IntegrationTest {
     mvc.perform(
             patch("/api/profile")
                 .with(as("ana"))
-                .with(csrf())
                 .contentType("application/json")
                 .content("{\"username\":\"bia\"}"))
         .andExpect(status().isConflict());
@@ -591,7 +811,6 @@ class IntegrationTest {
     mvc.perform(
             patch("/api/profile")
                 .with(as("ana"))
-                .with(csrf())
                 .contentType("application/json")
                 .content("{\"username\":\"ana.nova\"}"))
         .andExpect(status().isOk())
@@ -602,5 +821,141 @@ class IntegrationTest {
         accounts.db.queryForObject(
             "select count(*) from spring_session where principal_name='ana'", Integer.class));
     assertThrows(ResponseStatusException.class, () -> accounts.get("ana"));
+  }
+
+  static String shortcuts(String platform, long revision, String bindings) {
+    return "{\"platform\":\"" + platform + "\",\"revision\":" + revision
+        + ",\"enabled\":true,\"allowWhileTyping\":true,\"bindings\":[" + bindings + "]}";
+  }
+
+  static String binding(String action, String code, boolean ctrl, boolean alt, boolean meta) {
+    return "{\"action\":\"" + action + "\",\"code\":\"" + code + "\",\"ctrl\":" + ctrl
+        + ",\"alt\":" + alt + ",\"shift\":false,\"meta\":" + meta + "}";
+  }
+
+  @Test
+  void shortcutsAreSavedPerAccountAndPlatformWithRevisionCheck() throws Exception {
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("ana")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.platform").value("mac"))
+        .andExpect(jsonPath("$.revision").value(0))
+        .andExpect(jsonPath("$.enabled").value(true))
+        .andExpect(jsonPath("$.allowWhileTyping").value(false))
+        .andExpect(jsonPath("$.bindings.length()").value(0));
+    String mic = binding("toggleMic", "KeyM", true, true, false);
+    String deaf = binding("toggleDeaf", "F13", false, false, false);
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("ana"))
+                .contentType("application/json")
+                .content(shortcuts("mac", 0, mic + "," + deaf)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.revision").value(1))
+        .andExpect(jsonPath("$.allowWhileTyping").value(true));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("ana")))
+        .andExpect(jsonPath("$.revision").value(1))
+        .andExpect(jsonPath("$.bindings[0].action").value("toggleMic"))
+        .andExpect(jsonPath("$.bindings[0].code").value("KeyM"))
+        .andExpect(jsonPath("$.bindings[0].ctrl").value(true))
+        .andExpect(jsonPath("$.bindings[0].alt").value(true))
+        .andExpect(jsonPath("$.bindings[0].meta").value(false))
+        .andExpect(jsonPath("$.bindings[1].code").value("F13"));
+    // Other profile and other account stay untouched.
+    mvc.perform(get("/api/me/shortcuts?platform=other").with(as("ana")))
+        .andExpect(jsonPath("$.revision").value(0));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("bia")))
+        .andExpect(jsonPath("$.revision").value(0))
+        .andExpect(jsonPath("$.bindings.length()").value(0));
+    // Stale revisions (including a second "first save") never overwrite.
+    for (long stale : new long[] {0, 2})
+      mvc.perform(
+              put("/api/me/shortcuts")
+                  .with(as("ana"))
+                  .contentType("application/json")
+                  .content(shortcuts("mac", stale, "")))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.error").value("Atalhos alterados em outra sessão; recarregue"));
+    // A body accountId is ignored: bia's save lands on bia only.
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("bia"))
+                .contentType("application/json")
+                .content(
+                    shortcuts("mac", 0, mic)
+                        .replaceFirst(
+                            "\\{", "{\"accountId\":\"" + accounts.get("ana").id() + "\",")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.revision").value(1));
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("ana"))
+                .contentType("application/json")
+                .content(shortcuts("mac", 1, "")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.revision").value(2))
+        .andExpect(jsonPath("$.bindings.length()").value(0));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("bia")))
+        .andExpect(jsonPath("$.bindings.length()").value(1));
+    assertEquals(
+        2,
+        accounts.db.queryForObject(
+            "select revision from user_shortcuts where account_id=? and platform='mac'",
+            Long.class,
+            accounts.get("ana").id()));
+  }
+
+  @Test
+  void shortcutValidationRejectsUnsafeOrAmbiguousBindings() throws Exception {
+    String mic = binding("toggleMic", "KeyM", true, false, false);
+    var many = new StringJoiner(",");
+    for (int i = 0; i < 13; i++) many.add(binding("toggleMic", "Digit" + (i % 10), true, false, false));
+    for (String body :
+        new String[] {
+          shortcuts("linux", 0, mic),
+          shortcuts("mac", -1, mic),
+          shortcuts("mac", 0, binding("exec", "KeyM", true, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "KeyM", false, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "F12", false, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "ControlLeft", true, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "MetaRight", false, false, true)),
+          shortcuts("mac", 0, binding("toggleMic", "Key M", true, false, false)),
+          shortcuts("mac", 0, mic + "," + binding("toggleDeaf", "KeyM", true, false, false)),
+          shortcuts("mac", 0, mic + "," + binding("toggleMic", "KeyN", true, false, false)),
+          shortcuts("mac", 0, many.toString()),
+          "{\"platform\":\"mac\",\"revision\":0}"
+        })
+      mvc.perform(
+              put("/api/me/shortcuts")
+                  .with(as("ana"))
+                  .contentType("application/json")
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/me/shortcuts?platform=win").with(as("ana")))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/me/shortcuts").with(as("ana"))).andExpect(status().isBadRequest());
+    assertEquals(0, accounts.db.queryForObject("select count(*) from user_shortcuts", Integer.class));
+  }
+
+  @Test
+  void shortcutsRequireCompleteAuthenticatedSessionAndCsrf() throws Exception {
+    String body = shortcuts("mac", 0, binding("toggleMic", "KeyM", true, false, false));
+    mvc.perform(get("/api/me/shortcuts?platform=mac")).andExpect(status().isUnauthorized());
+    mvc.perform(put("/api/me/shortcuts").contentType("application/json").content(body))
+        .andExpect(status().isForbidden());
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    mvc.perform(
+            put("/api/me/shortcuts").cookie(cookie).contentType("application/json").content(body))
+        .andExpect(status().isForbidden());
+    String secret = mfa.generate();
+    mfa.enroll("bia", secret, Mfa.totp(secret, java.time.Instant.now().getEpochSecond() / 30));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("bia")))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("bia"))
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isForbidden());
+    assertEquals(0, accounts.db.queryForObject("select count(*) from user_shortcuts", Integer.class));
   }
 }

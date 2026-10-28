@@ -5,22 +5,22 @@ import jakarta.servlet.http.*;
 import java.io.IOException;
 import org.springframework.context.annotation.*;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.*;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 public class Security {
   @Bean
-  static PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder(12);
-  }
-
-  @Bean
-  SecurityFilterChain chain(HttpSecurity h, RateLimit rate, Accounts accounts) throws Exception {
+  SecurityFilterChain chain(
+      HttpSecurity h,
+      Accounts accounts,
+      RequestBudget budget,
+      SessionSecurity sessions,
+      @org.springframework.beans.factory.annotation.Value("${app.proxy-key:}") String proxyKey)
+      throws Exception {
     var csrf = new HttpSessionCsrfTokenRepository();
     h.csrf(
             c ->
@@ -44,7 +44,11 @@ public class Security {
         .formLogin(
             f ->
                 f.loginProcessingUrl("/api/login")
-                    .successHandler((q, s, a) -> s.setStatus(204))
+                    .successHandler(
+                        (q, s, a) -> {
+                          sessions.login(q.getSession(), a.getName());
+                          s.setStatus(204);
+                        })
                     .failureHandler((q, s, e) -> s.sendError(401)))
         .logout(
             l ->
@@ -66,8 +70,8 @@ public class Security {
                   String name = q.getParameter("username");
                   if (name == null
                       || name.length() > 32
-                      || !rate.allow("login:" + name, 8, 300)
-                      || !rate.allow("ip:" + q.getRemoteAddr(), 100, 300)) {
+                      || !budget.allow(
+                          "loginname:" + name.toLowerCase(java.util.Locale.ROOT), 8, 300)) {
                     s.sendError(429);
                     return;
                   }
@@ -95,6 +99,17 @@ public class Security {
                         org.springframework.security.authentication.AnonymousAuthenticationToken)) {
                   try {
                     accounts.active(auth.getName());
+                    if (!sessions.authorize(q, s, auth.getName())) return;
+                    if (!budget.allow("user:" + auth.getName(), 600, 60)) {
+                      s.setHeader("Retry-After", "60");
+                      s.sendError(429);
+                      return;
+                    }
+                    if (q.getRequestURI().equals("/api/media/state")
+                        && !budget.allow("state:" + auth.getName(), 120, 60)) {
+                      s.sendError(429);
+                      return;
+                    }
                   } catch (Exception e) {
                     s.sendError(401);
                     return;
@@ -104,6 +119,8 @@ public class Security {
               }
             },
             UsernamePasswordAuthenticationFilter.class);
+    h.addFilterBefore(
+        new RequestGuard(budget, proxyKey), org.springframework.security.web.csrf.CsrfFilter.class);
     return h.build();
   }
 }

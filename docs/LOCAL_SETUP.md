@@ -20,4 +20,8 @@ Ambiente cloud Codex com proxy: pode exigir CA corporativa e proxy para builds, 
 
 Modo de desenvolvimento: `CHAT_MODE=dev` (padrão). Para produção no mesmo Mac, usar `CHAT_MODE=prd` e seguir [DuckDNS](DUCKDNS_SETUP.md). Não trocar de modo mantendo origens/cookie/IP do outro ambiente; veja [migração](MIGRATION.md).
 
-Instalações existentes mantêm o `.env`. Para habilitar Full HD, definir `SCREEN_HEIGHT=1080` e `SCREEN_BITRATE=8000000` (com `SCREEN_FPS=60` para liberar 60 fps) antes de iniciar novamente com o modo correto. Não substituir o `.env` inteiro: ele contém os segredos atuais.
+Instalações existentes mantêm o `.env`. Para habilitar Full HD, definir `SCREEN_HEIGHT=1080` e `SCREEN_BITRATE=8000000` (com `SCREEN_FPS=60`, ou 30 para poupar banda) antes de iniciar novamente com o modo correto. Não substituir o `.env` inteiro: ele contém os segredos atuais.
+
+Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.
+
+Os testes de rede foram validados com Docker Engine 28 e Compose >= 2.24.4; mantenha o OrbStack atualizado. Java/Node não são necessários no host.

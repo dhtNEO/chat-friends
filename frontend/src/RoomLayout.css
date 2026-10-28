@@ -226,8 +226,11 @@
   z-index: 2;
 }
 .room-block .tile .live-badge {
+  top: auto;
+  bottom: 2.15rem;
   right: auto;
   left: 0.4rem;
+  pointer-events: none;
 }
 .room-empty-people {
   padding: 0.8rem;

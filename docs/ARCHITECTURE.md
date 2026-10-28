@@ -86,3 +86,12 @@ Reconciliação a cada 3 s, também acionada por webhook assinado. Eventos dupli
 Não há transação distribuída PostgreSQL/LiveKit. Concessão externa seguida de falha de commit pode deixar permissão órfã por alguns segundos; reconciliador a remove. JWTs renovados pela SFU podem carregar permissões elevadas; a admissão de sinalização os substitui por grants só de microfone. [SECURITY](SECURITY.md) registra as fronteiras desse controle. Não confundir uma única lease autorizada com garantia adversarial de uma única track em cada instante.
 
 Modelo: accounts → messages; accounts → media_connections → session_id; screen_lease tem uma linha. Sessões JDBC persistem no PostgreSQL. Senhas não são recuperáveis. Backup inclui contas, histórico, esquema; restauração apaga sessões/conexões/leases por segurança.
+
+## Separação operacional
+
+`migrate` é um job de manutenção com credenciais próprias; o backend permanente usa apenas DML e Flyway desativado. Redes: `database_net` (db/backend/migrador, interna), `api_net` (web/edge/backend, interna), `control_net` (backend/SFU/bot de música, interna), `signal_net` (web/edge/SFU, interna), `ingress_net` e `media_net` (entrada/saída necessária; o bot de música usa `media_net` para mídia e para buscar no YouTube). Backend não tem ponte externa. Isso limita acesso lateral entre serviços; o bloqueio de conexões iniciadas para a LAN depende do host/firewall e precisa ser validado no OrbStack.
+
+Veja [atualização de segurança](SECURITY_UPGRADE.md) para MFA, limites, arquivos privados e recuperação. O banco de integração `friends_test` usa `friends_tests`, sem credenciais de runtime/DBA entregues ao Maven.
+
+
+O entrypoint da SFU lê a rota IPv4 padrão do contêiner e restringe `rtc.interfaces.includes` à interface de `media_net`, que recebe as portas publicadas. O nome `ethN` não é fixado: a seleção acompanha a rota real. A configuração montada permanece RO; a cópia temporária tem modo 0600. Isso evita que interfaces de sinalização/controle, anunciadas com o mesmo `node_ip`, sejam escolhidas após a deduplicação de candidatos ICE. `runtime-security.py` confirma o socket UDP na rede correta, e Playwright exige respostas STUN autenticadas por UDP e TCP.

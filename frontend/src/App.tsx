@@ -22,11 +22,13 @@ import {
   type User,
   type Message,
 } from "./api";
+import { MfaGate, type SecurityState } from "./AccountSecurity";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
 import { Profile } from "./Profile";
-import { Logo } from "./Logo";
+import { loadShortcuts, setShortcuts, useKeyboardShortcuts } from "./Shortcuts";
+import { Lockup, Logo } from "./Logo";
 import { applyTheme } from "./theme";
 import {
   Empty,
@@ -44,7 +46,11 @@ import {
   type PanelKind,
 } from "./Dock";
 export default function App() {
-  const [me, setMe] = useState<{ user: User; spaceName: string } | null>(null),
+  const [me, setMe] = useState<{
+      user: User;
+      spaceName: string;
+      security: SecurityState;
+    } | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -69,7 +75,13 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
+    const expired = () => {
+      setMe(null);
+      setError("");
+    };
+    window.addEventListener("session-ended", expired);
     void load();
+    return () => window.removeEventListener("session-ended", expired);
   }, [load]);
   useEffect(() => {
     applyTheme(me?.user.primaryColor, me?.user.secondaryColor);
@@ -85,6 +97,8 @@ export default function App() {
         }}
       />
     );
+  if (me.security.mfaPending || me.security.enrollmentRequired)
+    return <MfaGate state={me.security} onDone={load} />;
   return (
     <Workspace
       me={me}
@@ -125,30 +139,33 @@ function Login({
   }
   return (
     <main className="login-page">
-      <div className="login-art">
-        <div className="brand">
-          <Logo /> entre amigos
-        </div>
-        <span className="eyebrow">SEU CANTO DA INTERNET</span>
+      <section className="login-hero">
+        <Lockup width={440} />
         <h1>
-          Boa conversa.
+          Sua galera.
           <br />
-          Boa companhia.
+          Sua <span>house</span>.
+          <br />
+          Seu jogo.
         </h1>
-        <p>
-          Um espaço só de vocês.
-          <br />
-          Para jogar, compartilhar e ficar mais um pouco.
-        </p>
-        <div className="orbit">
-          <i />
-          <i />
-          <i />
-          <span>✳</span>
-        </div>
-        <div className="login-foot">Sem distrações. Com seus amigos.</div>
-      </div>
-      <section className="login-form">
+        <p>Voz, tela ao vivo, música e chat num espaço só de vocês.</p>
+        <ul className="login-features">
+          {(
+            [
+              ["speaker", "Voz"],
+              ["screen", "Tela ao vivo"],
+              ["music", "Bot de música"],
+              ["chat", "Chat"],
+            ] as [IconName, string][]
+          ).map(([icon, label]) => (
+            <li key={label}>
+              <Icon name={icon} size={18} />
+              {label}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="login-card">
         <span className="eyebrow">BOM TER VOCÊ POR AQUI</span>
         <h2>Entre e fique à vontade.</h2>
         <p className="muted">
@@ -209,6 +226,12 @@ function Workspace({
   onRefresh: () => Promise<void>;
   onLogout: (notice?: string) => void;
 }) {
+  useKeyboardShortcuts();
+  // A person's shortcuts load with their session and never outlive it.
+  useEffect(() => {
+    void loadShortcuts().catch(() => {});
+    return () => setShortcuts(null);
+  }, [me.user.id]);
   const [members, setMembers] = useState<Member[]>([]);
   const loadMembers = useCallback(
     () =>
@@ -424,11 +447,8 @@ function Workspace({
   const sidebar = (
     <aside className="sidebar" aria-label="Navegação">
       <div className="brand">
-        <Logo />
-        <span>
-          {me.spaceName}
-          <small>Um espaço só nosso</small>
-        </span>
+        <Lockup width={190} />
+        <small>{me.spaceName}</small>
       </div>
       <div className="channel-section">
         <span className="eyebrow">CANAIS DE TEXTO</span>
@@ -713,6 +733,42 @@ function ActivityButton({
     </button>
   );
 }
+// Turns http(s) and www. addresses into links; everything else stays text,
+// so messages can never inject markup.
+const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+[^\s<>"'.,;:!?)\]}]/gi;
+function Linkified({ text }: { text: string }) {
+  const parts: (string | { href: string; label: string })[] = [];
+  let last = 0;
+  for (const match of text.matchAll(URL_PATTERN)) {
+    const label = match[0],
+      start = match.index ?? 0;
+    parts.push(text.slice(last, start));
+    parts.push({
+      href: /^https?:/i.test(label) ? label : "https://" + label,
+      label,
+    });
+    last = start + label.length;
+  }
+  parts.push(text.slice(last));
+  return (
+    <>
+      {parts.map((part, i) =>
+        typeof part === "string" ? (
+          part
+        ) : (
+          <a
+            key={i}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+          >
+            {part.label}
+          </a>
+        ),
+      )}
+    </>
+  );
+}
 const EMOJIS = [
   "😀",
   "😂",
@@ -919,7 +975,9 @@ function ChatView({
                         {time}
                       </header>
                     )}
-                    <p>{m.body}</p>
+                    <p>
+                      <Linkified text={m.body} />
+                    </p>
                   </div>
                 </article>
               </div>

@@ -80,6 +80,11 @@ const signedIn = {
     avatarVersion: null,
   },
   spaceName: "Espaço de teste",
+  security: {
+    mfaEnabled: false,
+    mfaPending: false,
+    enrollmentRequired: false,
+  },
 };
 
 test("login aceito com sessão persistida abre a conversa", async ({ page }) => {
@@ -101,6 +106,55 @@ test("login aceito com sessão persistida abre a conversa", async ({ page }) => 
     page.getByRole("heading", { name: "Entre e fique à vontade." }),
   ).toHaveCount(0);
 });
+
+for (const scenario of [
+  {
+    name: "MFA pendente",
+    mfaPending: true,
+    enrollmentRequired: false,
+    heading: "Verificar acesso",
+  },
+  {
+    name: "cadastro MFA obrigatório",
+    mfaPending: false,
+    enrollmentRequired: true,
+    heading: "Proteger sua conta",
+  },
+]) {
+  test(`login aceito com ${scenario.name} exige proteção antes de abrir o espaço`, async ({
+    page,
+  }) => {
+    let loginAccepted = false;
+    await loginForm(
+      page,
+      async (route) => {
+        loginAccepted = true;
+        await route.fulfill({ status: 204 });
+      },
+      undefined,
+      (route) =>
+        loginAccepted
+          ? route.fulfill({
+              json: {
+                ...signedIn,
+                security: {
+                  mfaEnabled: scenario.mfaPending,
+                  mfaPending: scenario.mfaPending,
+                  enrollmentRequired: scenario.enrollmentRequired,
+                },
+              },
+            })
+          : route.fulfill({ status: 401 }),
+    );
+    await expect(
+      page.getByRole("heading", { name: scenario.heading }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Mensagem em geral")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Sala de voz", exact: true }),
+    ).toHaveCount(0);
+  });
+}
 
 test("nova tentativa após falha temporária entra sem manter o erro anterior", async ({
   page,

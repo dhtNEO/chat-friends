@@ -11,4 +11,5 @@ DELETE FROM spring_session;
 DELETE FROM media_connections;
 UPDATE screen_lease SET identity=NULL,lease_id=NULL,expires_at=NULL;
 SQL
+./scripts/provision-db.sh
 ./scripts/compose.sh up -d --wait

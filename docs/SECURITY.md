@@ -14,6 +14,12 @@ Modelo: espaço privado para amigos convidados. Ameaças incluem visitantes anô
 
 Desativação/redefinição elimina todas as sessões da conta no banco, fecha sockets de chat e pede remoção das identidades no LiveKit. Senha alterada pelo usuário faz o mesmo. Logout invalida a sessão atual; UI desconecta mídia e a reconciliação verifica sessão a cada 3 s. Se LiveKit estiver indisponível, remoção é repetida. Uma conexão já estabelecida não termina só porque o token inicial de 90 s expirou.
 
+## Voz no navegador: sinalização e WebAssembly
+
+A sinalização do LiveKit usa o mesmo host da página (`/rtc`, roteado pelo proxy web com `forward_auth` em `/api/livekit/admit`). Com app e mídia em hosts diferentes sob `duckdns.org` (sufixo público), o WebSocket contava como de terceiro e a regra `||duckdns.org^$third-party,websocket` da EasyPrivacy (padrão no uBlock Origin, uBO Lite e Brave) impedia entrar na voz. O host de mídia continua configurado e funcionando para compatibilidade.
+
+A CSP inclui `'wasm-unsafe-eval'` em `script-src` apenas para compilar o WebAssembly do RNNoise (supressão de ruído local). Não habilita `eval` de JavaScript nem scripts externos. Se uma CSP sem essa permissão for servida, o app detecta a falha ao compilar e mantém o microfone sem o filtro, em vez de transmitir silêncio. O áudio filtrado não sai do navegador para nenhum serviço.
+
 ## Perfil, fotos e preferências locais
 
 Trocar o usuário de login muda a identidade da sessão: o backend apaga as sessões JDBC da conta, fecha WebSockets e remove conexões de mídia, como na troca de senha. Fotos de perfil ficam no PostgreSQL (entram no backup), limitadas a 16 KB e aos tipos PNG/JPEG/WebP conferidos pelos bytes iniciais; SVG e outros tipos são recusados. Só usuários autenticados as leem, e só de contas ativas; respostas da API mantêm `X-Content-Type-Options: nosniff` e CSP `default-src 'none'`. Sons personalizados e tamanho da interface ficam apenas no `localStorage` do navegador, nunca no servidor; são tocados como `blob:`, permitido por `media-src`.
@@ -33,3 +39,7 @@ Os testes de corrida verificam duas reservas normais, expiração, revogação a
 Faça backup; coloque em manutenção; pare web/backend/livekit. Gere novas chaves LiveKit e segredo de banco fora do Git. Trocar senha PostgreSQL exige `ALTER ROLE` pelo canal administrativo seguro **e** atualização de `.env`: mudar env sozinho não altera senha de um volume existente. Reinicie SFU (encerra chamadas), gere config, recrie serviços; invalide sessões se houver comprometimento. Não copie segredos para scripts, histórico ou Terraform. Em caso de vazamento, trate backups/relatórios de testes como possivelmente afetados.
 
 Reporte vulnerabilidade de forma privada ao proprietário; não abra issue pública com token, senha, dump ou dados pessoais. Sem processo de divulgação público configurado ainda.
+
+## Endurecimento operacional
+
+Veja [SECURITY_UPGRADE.md](SECURITY_UPGRADE.md): migração de privilégios do banco, MFA obrigatório para administradores em prd, expiração/revogação de sessões, limites de requests e sockets, segmentação, helper com escrita mínima, backups autenticados e procedimentos de incidente. DNS/IP públicos são esperados; autoridade DNS, sessões e chaves continuam privados. As verificações de roteador/Mac/ARM64 e bloqueio de acesso à LAN precisam de aceite do proprietário.

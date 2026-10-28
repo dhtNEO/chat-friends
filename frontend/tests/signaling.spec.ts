@@ -15,7 +15,10 @@ test("proxy retira permissão de tela de JWT elevado e rejeita conexão expirada
   expect(
     (
       await request.post("/api/login", {
-        form: { username: "admin", password },
+        form: {
+          username: process.env.TEST_ADMIN_USERNAME || "admin",
+          password,
+        },
         headers: { "X-CSRF-TOKEN": csrf },
       })
     ).status(),

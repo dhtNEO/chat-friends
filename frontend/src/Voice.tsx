@@ -9,6 +9,7 @@ import {
   type RemoteAudioTrack,
   type LocalAudioTrack,
   type Participant,
+  type AudioCaptureOptions,
 } from "livekit-client";
 import { api, type Lease } from "./api";
 import { MicrophoneGain } from "./MicrophoneGain";
@@ -25,6 +26,8 @@ import {
   usePointerOrder,
   useRoomLayout,
 } from "./RoomLayout";
+import { useSpeaking } from "./speaking";
+import { publishVoice } from "./voiceStore";
 type Connection = {
   identity: string;
   url: string;
@@ -40,8 +43,15 @@ const PRESETS: Record<
   normal: { height: 720, fps: 30, bitrate: 4000000 },
   low: { height: 480, fps: 15, bitrate: 1000000 },
 };
+// Signaling goes through the page's own host: its proxy also routes /rtc
+// through media admission. A separate media host under duckdns.org counts as
+// a third-party WebSocket, which EasyPrivacy (uBlock Origin, Brave) blocks.
+const signalUrl = () =>
+  (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
 function mediaError(e: unknown) {
   const name = e instanceof Error ? e.name : "";
+  if (typeof RTCPeerConnection === "undefined")
+    return "WebRTC está desativado neste navegador (por exemplo, AdGuard “Bloquear WebRTC”). Libere este site para usar a voz.";
   return name === "NotAllowedError"
     ? "Permissão negada. Autorize o microfone ou a tela nas configurações do navegador."
     : name === "NotFoundError"
@@ -99,6 +109,23 @@ export function Voice({
     connection = useRef<Connection | null>(null),
     lease = useRef<Lease | null>(null),
     screenTracks = useRef<LocalTrack[]>([]);
+  // The SDK does not own an AudioContext supplied through webAudioMix.
+  // Keep ownership per room so an old disconnect cannot close a new call.
+  const roomAudio = useRef(new WeakMap<Room, AudioContext>());
+  // Unpublished tracks are not tracked or stopped by Room.disconnect yet.
+  const pendingMicrophones = useRef(
+    new WeakMap<
+      Room,
+      Set<{ tracks: LocalTrack[]; processor: MicrophoneGain }>
+    >(),
+  );
+  const lifecycle = useRef({ mounted: true, generation: 0, joining: false });
+  async function closeRoomAudio(r: Room) {
+    const context = roomAudio.current.get(r);
+    roomAudio.current.delete(r);
+    if (context && context.state !== "closed")
+      await context.close().catch(() => {});
+  }
   const [joined, setJoined] = useState(false),
     [busy, setBusy] = useState(false),
     [mic, setMic] = useState(false),
@@ -127,41 +154,62 @@ export function Voice({
     navigator.mediaDevices?.getSupportedConstraints().noiseSuppression === true;
   const bump = () => setVersion((x) => x + 1);
   async function release() {
-    const c = connection.current,
-      l = lease.current;
+    const r = room.current,
+      c = connection.current,
+      l = lease.current,
+      tracks = screenTracks.current;
     lease.current = null;
-    const tracks = screenTracks.current;
-    screenTracks.current = [];
-    for (const t of tracks) {
-      t.stop();
-      if (room.current) await room.current.localParticipant.unpublishTrack(t);
-    }
     screenTracks.current = [];
     setSharing(false);
+    // Stop every capture synchronously; unpublishing may complete later.
+    for (const t of tracks) t.stop();
+    await Promise.allSettled(
+      tracks.map((t) => r?.localParticipant.unpublishTrack(t)),
+    );
     if (c && l)
       await api("/media/screen", "DELETE", {
         identity: c.identity,
         leaseId: l.leaseId,
       });
   }
-  async function leave() {
-    const c = connection.current;
+  async function leave(message = "Fora da chamada") {
+    lifecycle.current.generation++;
+    lifecycle.current.joining = false;
+    const r = room.current,
+      c = connection.current;
+    if (r) {
+      const pending = pendingMicrophones.current.get(r);
+      pendingMicrophones.current.delete(r);
+      for (const job of pending ?? []) {
+        for (const track of job.tracks) track.stop();
+        // setProcessor assigns its processor only after init resolves, so
+        // stopping the raw track alone cannot cancel a pending RNNoise init.
+        void job.processor.destroy().catch(() => {});
+      }
+      r.localParticipant
+        .getTrackPublication(Track.Source.Microphone)
+        ?.track?.stop();
+    }
     if (sound.current.inCall) effect("leave");
     sound.current.inCall = false;
-    try {
-      await release();
-    } finally {
-      connection.current = null;
-      await room.current?.disconnect();
-      room.current = null;
-      setJoined(false);
-      setMic(false);
-      setStatus("Fora da chamada");
-      if (c) await api("/media/leave", "POST", { identity: c.identity });
-    }
+    const released = release();
+    // Detach before awaiting anything: callbacks belong to the old call.
+    room.current = null;
+    connection.current = null;
+    micProcessor.current = null;
+    setJoined(false);
+    setMic(false);
+    setBusy(false);
+    setStatus(message);
+    const disconnected = r?.disconnect();
+    // Local capture/processing must not wait for signaling to finish closing.
+    const audioClosed = r ? closeRoomAudio(r) : undefined;
+    await Promise.allSettled([released, disconnected, audioClosed]);
+    if (c) await api("/media/leave", "POST", { identity: c.identity });
   }
   useEffect(() => {
     let alive = true;
+    lifecycle.current.mounted = true;
     const poll = async () => {
       try {
         const value = await api<typeof state>("/media/state");
@@ -171,13 +219,14 @@ export function Voice({
       }
     };
     void poll();
-    const timer = setInterval(() => void poll(), 5000);
+    const timer = setInterval(() => void poll(), 3000);
     const heartbeat = setInterval(() => {
       const c = connection.current,
         l = lease.current;
       if (c)
         void api("/media/heartbeat", "POST", { identity: c.identity }).catch(
           (e) => {
+            if (connection.current !== c) return;
             onError(mediaError(e));
             void leave().catch(() => {});
           },
@@ -187,12 +236,14 @@ export function Voice({
           identity: c.identity,
           leaseId: l.leaseId,
         }).catch((e) => {
+          if (connection.current !== c || lease.current !== l) return;
           onError(mediaError(e));
           void release().catch(() => {});
         });
     }, 10000);
     return () => {
       alive = false;
+      lifecycle.current.mounted = false;
       clearInterval(timer);
       clearInterval(heartbeat);
       void leave().catch(() => {});
@@ -200,22 +251,43 @@ export function Voice({
     // A single room lifecycle is owned by this component.
   }, []);
   async function join() {
+    if (!lifecycle.current.mounted || lifecycle.current.joining || room.current)
+      return;
+    lifecycle.current.joining = true;
+    const generation = ++lifecycle.current.generation;
+    const current = () =>
+      lifecycle.current.mounted && lifecycle.current.generation === generation;
+    let audioContext: AudioContext | undefined;
+    let joiningRoom: Room | undefined;
     setBusy(true);
     setStatus("Conectando à voz…");
     try {
       const c = await api<Connection>("/media/join", "POST");
+      if (!current()) {
+        await api("/media/leave", "POST", { identity: c.identity }).catch(
+          () => {},
+        );
+        return;
+      }
       connection.current = c;
+      audioContext = new AudioContext({
+        sampleRate: 48000,
+        latencyHint: "interactive",
+      });
       const r = new Room({
         adaptiveStream: true,
         dynacast: true,
-        webAudioMix: true,
+        // RNNoise needs 48 kHz; the whole call mix runs at that rate.
+        webAudioMix: { audioContext },
         audioCaptureDefaults: {
           deviceId: device,
-          noiseSuppression: settings.noise,
+          noiseSuppression: settings.noise && settings.noiseMode === "browser",
           echoCancellation: true,
           autoGainControl: false,
         },
       });
+      joiningRoom = r;
+      roomAudio.current.set(r, audioContext);
       room.current = r;
       for (const event of [
         RoomEvent.ParticipantConnected,
@@ -228,52 +300,66 @@ export function Voice({
         RoomEvent.TrackMuted,
         RoomEvent.TrackUnmuted,
       ])
-        r.on(event, bump);
+        r.on(event, () => {
+          if (room.current === r) bump();
+        });
       r.on(RoomEvent.ParticipantConnected, (p) => {
-        if (p.identity !== MUSIC_IDENTITY) effect("join", true);
+        if (room.current === r && p.identity !== MUSIC_IDENTITY)
+          effect("join", true);
       });
       r.on(RoomEvent.ParticipantDisconnected, (p) => {
-        if (p.identity !== MUSIC_IDENTITY) effect("leave", true);
+        if (room.current === r && p.identity !== MUSIC_IDENTITY)
+          effect("leave", true);
       });
-      r.on(RoomEvent.Reconnecting, () => setStatus("Reconectando à voz…"));
+      r.on(RoomEvent.Reconnecting, () => {
+        if (room.current === r) setStatus("Reconectando à voz…");
+      });
       r.on(RoomEvent.Reconnected, () => {
+        if (room.current !== r) return;
         setStatus("Voz conectada");
         if (lease.current) void release().catch((e) => onError(mediaError(e)));
       });
       r.on(RoomEvent.Disconnected, () => {
-        setJoined(false);
-        setMic(false);
-        setStatus("Conexão de voz encerrada");
-        void release().catch(() => {});
-        const old = connection.current;
-        connection.current = null;
-        // Only an unexpected drop gets here with a connection still set.
-        if (old && sound.current.inCall) effect("leave");
-        sound.current.inCall = false;
-        if (old)
-          void api("/media/leave", "POST", { identity: old.identity }).catch(
-            () => {},
-          );
+        if (room.current !== r) return;
+        void leave("Conexão de voz encerrada").catch(() => {});
       });
-      await r.connect(c.url, c.token);
+      await r.connect(signalUrl(), c.token);
+      if (!current()) return;
       await r.startAudio();
+      if (!current()) return;
       await api("/media/audio", "PUT", { identity: c.identity, deaf });
+      if (!current()) return;
       setJoined(true);
       setStatus("Voz conectada");
       sound.current.inCall = true;
       effect("join");
       try {
         await enableMicrophone(r);
+        if (!current()) return;
         setMic(true);
-        setDevices(await Room.getLocalDevices("audioinput"));
+        const inputs = await Room.getLocalDevices("audioinput");
+        if (current()) setDevices(inputs);
       } catch (e) {
-        onError(mediaError(e));
+        if (current()) onError(mediaError(e));
       }
     } catch (e) {
-      onError(mediaError(e));
-      await leave().catch(() => {});
+      if (current()) {
+        onError(mediaError(e));
+        await leave().catch(() => {});
+      }
     } finally {
-      setBusy(false);
+      if (!current()) {
+        // connect/startAudio may finish after leave or logout already ran.
+        if (joiningRoom) {
+          await joiningRoom.disconnect().catch(() => {});
+          await closeRoomAudio(joiningRoom);
+        } else if (audioContext && audioContext.state !== "closed")
+          await audioContext.close().catch(() => {});
+      }
+      if (lifecycle.current.generation === generation) {
+        lifecycle.current.joining = false;
+        setBusy(false);
+      }
     }
   }
   async function enableMicrophone(r: Room) {
@@ -286,32 +372,73 @@ export function Voice({
     const tracks = await r.localParticipant.createTracks({
       audio: {
         deviceId: device,
-        noiseSuppression: settings.noise,
+        noiseSuppression: settings.noise && settings.noiseMode === "browser",
         echoCancellation: true,
         autoGainControl: false,
       },
     });
+    if (room.current !== r) {
+      tracks.forEach((item) => item.stop());
+      return;
+    }
     const track = tracks[0] as LocalAudioTrack;
+    const processor = new MicrophoneGain(
+      settings.microphone,
+      settings.noise && settings.noiseMode === "strong",
+    );
+    const job = { tracks, processor };
+    let pending = pendingMicrophones.current.get(r);
+    if (!pending) {
+      pending = new Set();
+      pendingMicrophones.current.set(r, pending);
+    }
+    pending.add(job);
     try {
-      micProcessor.current = new MicrophoneGain(settings.microphone);
-      await track.setProcessor(micProcessor.current);
+      micProcessor.current = processor;
+      await track.setProcessor(processor);
+      if (room.current !== r) {
+        tracks.forEach((item) => item.stop());
+        return;
+      }
       await r.localParticipant.publishTrack(track, {
         source: Track.Source.Microphone,
       });
     } catch (error) {
       tracks.forEach((item) => item.stop());
+      void processor.destroy().catch(() => {});
       throw error;
+    } finally {
+      pending.delete(job);
+      if (!pending.size && pendingMicrophones.current.get(r) === pending)
+        pendingMicrophones.current.delete(r);
     }
+  }
+  // Silencing what you hear also closes your microphone, like Discord;
+  // hearing again restores the microphone as it was before.
+  const micBeforeDeaf = useRef(false);
+  async function setMicOpen(r: Room, open: boolean) {
+    if (open) await enableMicrophone(r);
+    else await r.localParticipant.setMicrophoneEnabled(false);
+    if (room.current === r) setMic(r.localParticipant.isMicrophoneEnabled);
+  }
+  async function setDeafened(next: boolean) {
+    const c = connection.current;
+    if (!c) return;
+    // Apply locally at once; publish the display state independently of playback.
+    setDeaf(next);
+    sound.current.deaf = next;
+    await api("/media/audio", "PUT", { identity: c.identity, deaf: next });
   }
   async function toggleMic() {
     const r = room.current;
     if (!r) return;
     setAudioBusy(true);
     try {
-      if (mic) await r.localParticipant.setMicrophoneEnabled(false);
-      else await enableMicrophone(r);
-      setMic(r.localParticipant.isMicrophoneEnabled);
-      effect(r.localParticipant.isMicrophoneEnabled ? "unmute" : "mute");
+      const open = !r.localParticipant.isMicrophoneEnabled;
+      await setMicOpen(r, open);
+      // Talking means wanting to hear the answer.
+      if (open && sound.current.deaf) await setDeafened(false);
+      effect(open ? "unmute" : "mute");
       setDevices(await Room.getLocalDevices("audioinput"));
     } catch (e) {
       onError(mediaError(e));
@@ -320,39 +447,70 @@ export function Voice({
     }
   }
   async function toggleDeaf() {
-    const c = connection.current;
-    if (!c) return;
+    const r = room.current;
+    if (!r || !connection.current) return;
     setAudioBusy(true);
-    const next = !deaf;
-    // Apply locally at once; publish the display state independently of playback.
-    setDeaf(next);
-    sound.current.deaf = next;
+    const next = !sound.current.deaf;
     effect(next ? "mute" : "unmute");
     try {
-      await api("/media/audio", "PUT", { identity: c.identity, deaf: next });
+      if (next) {
+        micBeforeDeaf.current = r.localParticipant.isMicrophoneEnabled;
+        if (micBeforeDeaf.current) await setMicOpen(r, false);
+      } else if (micBeforeDeaf.current) await setMicOpen(r, true);
+      await setDeafened(next);
     } catch (e) {
       onError(mediaError(e));
     } finally {
       setAudioBusy(false);
     }
   }
+  // Held key opens the microphone; release (or losing focus) closes it.
+  const pttOpen = useRef(false);
+  async function pushToTalk(down: boolean) {
+    const r = room.current;
+    if (!r || down === pttOpen.current) return;
+    pttOpen.current = down;
+    if (down && sound.current.deaf) return;
+    try {
+      await setMicOpen(r, down);
+    } catch (e) {
+      onError(mediaError(e));
+    }
+  }
+  const streamBeforeMute = useRef(100);
+  function changeDevice(id: string) {
+    setDevice(id);
+    void room.current
+      ?.switchActiveDevice("audioinput", id)
+      .catch((err) => onError(mediaError(err)));
+  }
+  // Strong suppression (RNNoise) runs inside our microphone processor; the
+  // browser's own filter is then turned off so they do not fight.
+  async function changeNoiseMode(mode: "strong" | "browser") {
+    setSettings((old) => ({ ...old, noiseMode: mode }));
+    await applyNoise(settings.noise, mode);
+  }
+  async function applyNoise(on: boolean, mode: "strong" | "browser") {
+    const track = room.current?.localParticipant.getTrackPublication(
+      Track.Source.Microphone,
+    )?.track as LocalAudioTrack | undefined;
+    await micProcessor.current?.setDenoise(on && mode === "strong");
+    await track?.applyConstraints({
+      noiseSuppression: on && mode === "browser",
+      echoCancellation: true,
+      autoGainControl: false,
+    });
+  }
   async function changeNoise(next: boolean) {
     const previous = settings.noise;
     setSettings((old) => ({ ...old, noise: next }));
     setAudioBusy(true);
     try {
-      const track = room.current?.localParticipant.getTrackPublication(
-        Track.Source.Microphone,
-      )?.track as LocalAudioTrack | undefined;
-      await track?.applyConstraints({
-        noiseSuppression: next,
-        echoCancellation: true,
-        autoGainControl: false,
-      });
+      await applyNoise(next, settings.noiseMode);
       if (room.current)
         room.current.options.audioCaptureDefaults = {
           ...room.current.options.audioCaptureDefaults,
-          noiseSuppression: next,
+          noiseSuppression: next && settings.noiseMode === "browser",
         };
     } catch (e) {
       setSettings((old) => ({ ...old, noise: previous }));
@@ -370,12 +528,19 @@ export function Voice({
       c = connection.current;
     if (!r || !c) return;
     // Capture is called from the user gesture, before the network request.
-    const preset = PRESETS[quality] ?? PRESETS.normal;
-    const height = Math.min(c.screen.height, preset.height);
-    const fps = Math.min(c.screen.fps, preset.fps);
-    const bitrate = Math.min(c.screen.bitrate, preset.bitrate);
+    const { height, fps, bitrate } = limits(quality, c);
     const tracks = await createLocalScreenTracks({
-      audio: true,
+      // Games hide the pointer themselves; the capture would draw it back.
+      video: (settings.hideCursor ? { cursor: "never" } : true) as true,
+      // System audio would also capture the call playing on this PC, so
+      // everyone would hear themselves; exclude this page's own sound.
+      audio: {
+        restrictOwnAudio: true,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      } as AudioCaptureOptions,
+      contentHint: fps >= 60 ? "motion" : undefined,
       resolution: {
         width: Math.round((height * 16) / 9),
         height,
@@ -404,6 +569,8 @@ export function Voice({
             maxBitrate: bitrate,
             maxFramerate: fps,
           },
+          // Keep frame rate for games when the link gets tight.
+          degradationPreference: fps >= 60 ? "maintain-framerate" : "balanced",
           simulcast: false,
         });
         t.on("ended", () => {
@@ -415,6 +582,41 @@ export function Voice({
     } catch (e) {
       await release().catch(() => {});
       throw e;
+    }
+  }
+  function limits(q: string, c: Connection) {
+    const preset = PRESETS[q] ?? PRESETS.normal;
+    return {
+      height: Math.min(c.screen.height, preset.height),
+      fps: Math.min(c.screen.fps, preset.fps),
+      bitrate: Math.min(c.screen.bitrate, preset.bitrate),
+    };
+  }
+  // Changing quality mid-stream adjusts the capture and the encoder in place,
+  // without asking for the screen again.
+  async function changeQuality(next: string) {
+    setQuality(next);
+    const c = connection.current,
+      video = screenTracks.current.find((t) => t.kind === Track.Kind.Video);
+    if (!sharing || !c || !video) return;
+    const { height, fps, bitrate } = limits(next, c);
+    try {
+      await video.mediaStreamTrack.applyConstraints({
+        width: { ideal: Math.round((height * 16) / 9) },
+        height: { ideal: height },
+        frameRate: fps,
+      });
+      const sender = video.sender;
+      if (sender) {
+        const params = sender.getParameters();
+        for (const encoding of params.encodings ?? []) {
+          encoding.maxBitrate = bitrate;
+          encoding.maxFramerate = fps;
+        }
+        await sender.setParameters(params);
+      }
+    } catch (e) {
+      onError(mediaError(e));
     }
   }
   const participants: Participant[] = room.current
@@ -455,6 +657,14 @@ export function Voice({
     notifyStreaming.current(streaming);
   }, [streaming]);
   const featured = live.find((t) => t.identity === focus) ?? live[0];
+  const voices = participants.flatMap((p) => {
+    const track = p.getTrackPublication(Track.Source.Microphone)?.track
+      ?.mediaStreamTrack;
+    return track && p.identity !== MUSIC_IDENTITY
+      ? [{ identity: p.identity, track }]
+      : [];
+  });
+  const talking = useSpeaking(voices, joined);
   // Identities are "accountId:connection"; names and photos follow profiles.
   const account = (identity: string) =>
     directory.byId.get(identity.split(":")[0]);
@@ -466,7 +676,7 @@ export function Voice({
           .map((p) => ({
             identity: p.identity,
             name: p.name || "Amigo",
-            speaking: p.isSpeaking,
+            speaking: talking.has(p.identity) || p.isSpeaking,
             micMuted: !p.isMicrophoneEnabled,
             deaf:
               p === room.current?.localParticipant
@@ -515,6 +725,35 @@ export function Voice({
         state.lease.identity === identity;
   const personVolume = (identity: string) =>
     settings.people[identity.split(":")[0]] ?? 100;
+  useEffect(() => {
+    publishVoice({
+      joined,
+      mic,
+      deaf,
+      sharing,
+      audioBusy,
+      devices,
+      device,
+      noiseSupported,
+      toggleMic,
+      toggleDeaf,
+      pushToTalk,
+      leave,
+      toggleStreamSound: () =>
+        setSettings((old) => {
+          if (old.stream) streamBeforeMute.current = old.stream;
+          return { ...old, stream: old.stream ? 0 : streamBeforeMute.current };
+        }),
+      setDevice: changeDevice,
+      setNoise: changeNoise,
+      setNoiseMode: changeNoiseMode,
+      setMicVolume: (value) => {
+        micProcessor.current?.setVolume(value);
+        setSettings((old) => ({ ...old, microphone: value }));
+      },
+    });
+  });
+  useEffect(() => () => publishVoice(null), []);
   const fullHd = (connection.current?.screen.height ?? 1080) >= 1080,
     sixty = (connection.current?.screen.fps ?? 60) >= 60;
   const featuredName = featured
@@ -606,24 +845,40 @@ export function Voice({
             >
               ⠿
             </button>
-            <Avatar
-              name={p.name}
-              src={p.src}
-              size={Math.round(
-                Math.min(84, Math.max(36, roomLayout.layout.cardSize * 0.34)),
-              )}
-              speaking={p.speaking}
-            />
+            <span className="tile-avatar">
+              <Avatar
+                name={p.name}
+                src={p.src}
+                size={Math.round(
+                  Math.min(84, Math.max(36, roomLayout.layout.cardSize * 0.34)),
+                )}
+                speaking={p.speaking && !p.micMuted}
+              />
+              <StatusBadges micMuted={p.micMuted} deaf={p.deaf} />
+            </span>
             {isLive(p.identity) && <span className="live-badge">AO VIVO</span>}
+            {joined && p.identity !== self && (
+              <button
+                className="tile-volume-toggle"
+                aria-label={`Ajustar volume de ${p.name}`}
+                aria-expanded={adjusting === p.identity}
+                title={`Volume de ${p.name}: ${personVolume(p.identity)}%`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAdjusting(adjusting === p.identity ? null : p.identity);
+                }}
+              >
+                <Icon
+                  name={personVolume(p.identity) ? "volume" : "volumeOff"}
+                  size={14}
+                />
+              </button>
+            )}
             <div className="tile-footer">
               <strong>
                 {p.name}
                 {p.identity === self ? " (você)" : ""}
               </strong>
-              <span className="tile-icons">
-                {p.micMuted && <Icon name="micOff" size={15} />}
-                {p.deaf && <Icon name="headphonesOff" size={15} />}
-              </span>
               <span className="sr-only">
                 {p.micMuted ? "Mic desligado" : "Mic ligado"} ·{" "}
                 {p.deaf ? "Áudio silenciado" : "Ouvindo"}
@@ -722,13 +977,7 @@ export function Voice({
                   Microfone
                   <select
                     value={device}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setDevice(id);
-                      void room.current
-                        ?.switchActiveDevice("audioinput", id)
-                        .catch((err) => onError(mediaError(err)));
-                    }}
+                    onChange={(e) => changeDevice(e.target.value)}
                   >
                     <option value="default">Padrão do sistema</option>
                     {devices
@@ -793,12 +1042,32 @@ export function Voice({
                   <input
                     type="checkbox"
                     checked={settings.noise}
-                    disabled={audioBusy || !noiseSupported}
+                    disabled={
+                      audioBusy ||
+                      (settings.noiseMode === "browser" && !noiseSupported)
+                    }
                     onChange={(e) => void changeNoise(e.target.checked)}
                   />{" "}
                   Supressão de ruído
                 </label>
-                {!noiseSupported && (
+                <label>
+                  Tipo de supressão
+                  <select
+                    value={settings.noiseMode}
+                    disabled={audioBusy}
+                    onChange={(e) =>
+                      void changeNoiseMode(
+                        e.target.value as "strong" | "browser",
+                      )
+                    }
+                  >
+                    <option value="strong">
+                      Forte (RNNoise, no seu navegador)
+                    </option>
+                    <option value="browser">Leve (do navegador)</option>
+                  </select>
+                </label>
+                {settings.noiseMode === "browser" && !noiseSupported && (
                   <small>Supressão nativa indisponível neste navegador.</small>
                 )}
                 <small>
@@ -835,8 +1104,7 @@ export function Voice({
                   <select
                     aria-label="Qualidade"
                     value={quality}
-                    disabled={sharing}
-                    onChange={(e) => setQuality(e.target.value)}
+                    onChange={(e) => void changeQuality(e.target.value)}
                   >
                     <option value="fullhd60" disabled={!fullHd || !sixty}>
                       1080p · 60 fps · até 8 Mbps
@@ -854,7 +1122,27 @@ export function Voice({
                     SCREEN_FPS=60 no servidor.
                   </small>
                 )}
-                <small>Áudio da tela depende do navegador e sistema.</small>
+                <label className="noise-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.hideCursor}
+                    onChange={(e) =>
+                      setSettings((old) => ({
+                        ...old,
+                        hideCursor: e.target.checked,
+                      }))
+                    }
+                  />{" "}
+                  Esconder o cursor do mouse
+                </label>
+                <small>
+                  Vale a partir da próxima transmissão. A qualidade muda na
+                  hora, sem parar de transmitir.
+                </small>
+                <small>
+                  Áudio da tela depende do navegador e sistema. O som desta
+                  página (a chamada) fica de fora quando o navegador permite.
+                </small>
               </Popover>
             </div>
             {admin && state.lease.identity && (
@@ -901,13 +1189,17 @@ export function Voice({
             key={p.identity}
             className={p.speaking && !p.micMuted ? "speaking" : ""}
           >
-            <Avatar name={p.name} src={p.src} size={22} speaking={p.speaking} />
+            <Avatar
+              name={p.name}
+              src={p.src}
+              size={22}
+              speaking={p.speaking && !p.micMuted}
+            />
             <span className="roster-name">{p.name}</span>
             {isLive(p.identity) && (
               <span className="live-badge small">AO VIVO</span>
             )}
-            {p.micMuted && <Icon name="micOff" size={14} />}
-            {p.deaf && <Icon name="headphonesOff" size={14} />}
+            <StatusBadges micMuted={p.micMuted} deaf={p.deaf} inline />
           </li>
         ))}
       </ul>
@@ -970,5 +1262,32 @@ export function Voice({
         />
       ))}
     </>
+  );
+}
+
+// Red badges, like Discord: crossed microphone and crossed headphones.
+function StatusBadges({
+  micMuted,
+  deaf,
+  inline = false,
+}: {
+  micMuted: boolean;
+  deaf: boolean;
+  inline?: boolean;
+}) {
+  if (!micMuted && !deaf) return null;
+  return (
+    <span className={"status-badges" + (inline ? " inline" : "")}>
+      {micMuted && (
+        <span className="status-badge" title="Microfone desligado">
+          <Icon name="micOff" size={12} />
+        </span>
+      )}
+      {deaf && (
+        <span className="status-badge" title="Áudio silenciado">
+          <Icon name="headphonesOff" size={12} />
+        </span>
+      )}
+    </span>
   );
 }

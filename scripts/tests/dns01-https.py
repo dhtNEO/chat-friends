@@ -20,21 +20,26 @@ with tempfile.TemporaryDirectory(dir=root / 'infra/compose/generated') as tempor
                     '-days', '1', '-subj', '/CN=test-app.duckdns.org',
                     '-addext', 'subjectAltName=DNS:test-app.duckdns.org,DNS:test-media.duckdns.org',
                     '-keyout', str(key), '-out', str(cert)], capture_output=True, check=True)
+    token=folder/'token'
+    token.write_text('00000000-0000-0000-0000-000000000000')
+    token.chmod(0o600)
     config = (root / 'infra/compose/Caddyfile.duckdns').read_text()
     start = config.index('(duckdns_tls) {')
     end = config.index('https://{$APP_DOMAIN}:443')
     config = config[:start] + '(duckdns_tls) {\n tls /lab/cert.pem /lab/key.pem\n}\n' + config[end:]
     (folder / 'Caddyfile').write_text(config)
     try:
-        docker('run', '-d', '--name', name, '--network', 'chat-friends_default',
+        docker('run', '-d', '--name', name, '--network', 'chat-friends_ingress_net', '--network', 'chat-friends_api_net', '--network', 'chat-friends_signal_net',
+               '--user', f'{os.getuid()}:{os.getgid()}', '--read-only', '--cap-drop', 'ALL',
+               '--sysctl', 'net.ipv4.ip_unprivileged_port_start=0',
+               '--tmpfs', f'/data:uid={os.getuid()},gid={os.getgid()}', '--tmpfs', f'/config:uid={os.getuid()},gid={os.getgid()}',
                '--network-alias', 'edge', '-p', '127.0.0.1:18443:443',
                '-e', 'APP_DOMAIN=test-app.duckdns.org', '-e', 'MEDIA_DOMAIN=test-media.duckdns.org',
                '-e', 'NO_PROXY=localhost,127.0.0.1,web,backend,livekit,edge',
                '-e', 'no_proxy=localhost,127.0.0.1,web,backend,livekit,edge',
-               '-e', 'DUCKDNS_API_TOKEN=00000000-0000-0000-0000-000000000000',
                '-e', 'ACME_EMAIL=test@example.org', '-e', 'ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory',
-               '-v', str(folder) + ':/lab:ro', '--entrypoint', 'caddy',
-               'chat-friends-edge-duckdns', 'run', '--config', '/lab/Caddyfile', '--adapter', 'caddyfile')
+               '-v', str(folder) + ':/lab:ro', '-v', str(token)+':/run/secrets/duckdns_token:ro',
+               'chat-friends-edge-duckdns', 'caddy', 'run', '--config', '/lab/Caddyfile', '--adapter', 'caddyfile')
         cases = [('test-app.duckdns.org', '/', '200'),
                  ('test-app.duckdns.org', '/api/health', '200'),
                  ('test-media.duckdns.org', '/', '404'),
@@ -52,10 +57,10 @@ with tempfile.TemporaryDirectory(dir=root / 'infra/compose/generated') as tempor
                 time.sleep(0.25)
             assert response.returncode == 0 and response.stdout == expected, f'{host}{route}: expected {expected}, status {response.stdout}, curl {response.returncode}: {response.stderr}'
         # Internal diagnostic validates public FQDN and Host :18443, without hairpin NAT.
-        docker('run', '--rm', '--network', 'chat-friends_default',
+        docker('run', '--rm', '--network', 'chat-friends_ingress_net',
                '-v', str(root) + ':/work:ro', '-v', str(folder) + ':/lab:ro',
                '-e', 'NODE_EXTRA_CA_CERTS=/lab/cert.pem', '-w', '/work',
-               'node:24.14.0-alpine', 'node', '--input-type=module', '-e',
+               'node:24.22.1-alpine', 'node', '--input-type=module', '-e',
                'import {checkHTTPS} from "./scripts/duckdns-https.mjs";'
                'await checkHTTPS("test-app.duckdns.org",":18443","/api/health",200);'
                'let denied=false;try{await checkHTTPS("wrong.example.org",":18443","/",200)}catch{denied=true}'

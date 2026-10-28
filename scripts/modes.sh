@@ -7,8 +7,10 @@ chat_mode() {
   esac
 }
 chat_saved_mode() {
-  [[ -f infra/compose/generated/mode ]] || return 0
-  case "$(cat infra/compose/generated/mode)" in
+  local file=infra/compose/generated/mode
+  [[ -f "$file" ]] || file=infra/compose/generated/network/mode
+  [[ -f "$file" ]] || return 0
+  case "$(cat "$file")" in
     dev|local) printf 'dev\n' ;;
     prd|internet) printf 'prd\n' ;;
     *) echo 'Marcador de modo não suportado; restaure a configuração dev ou prd em manutenção.' >&2; return 1 ;;

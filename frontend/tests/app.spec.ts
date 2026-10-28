@@ -8,7 +8,9 @@ async function signIn(page: import("@playwright/test").Page) {
   const response = await page.request.get("/api/me");
   await page.goto("/");
   if (response.status() !== 200) {
-    await page.getByLabel("Usuário", { exact: true }).fill("admin");
+    await page
+      .getByLabel("Usuário", { exact: true })
+      .fill(process.env.TEST_ADMIN_USERNAME || "admin");
     await page.getByLabel("Senha", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Entrar no espaço" }).click();
   }
@@ -60,10 +62,9 @@ test("admin cria conta, recebe mensagem em tempo real e desativa sessão", async
     .filter({ hasText: "@" + username })
     .getByRole("button", { name: "Desativar" })
     .click();
-  await friend.reload();
   await expect(
     friend.getByRole("heading", { name: "Entre e fique à vontade." }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
   await context.close();
 });
 test("layout móvel mantém conversa e voz acessíveis", async ({ page }) => {
@@ -176,4 +177,78 @@ test("tela sintética chega ao outro participante e a parada remove vídeo", asy
     .getByRole("button", { name: "Sair da voz", exact: true })
     .click();
   await context.close();
+});
+
+test("silenciar o áudio também muta o mic; atalho pessoal alterna o microfone", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.getByRole("button", { name: "Entrar na voz" }).click();
+  await expect(page.getByText("Voz conectada", { exact: true })).toBeVisible({
+    timeout: 15000,
+  });
+  await expect(
+    page.getByRole("button", { name: "Desligar mic", exact: true }),
+  ).toBeVisible();
+  // Like Discord: silencing what you hear closes the microphone too, and
+  // hearing again restores it.
+  await page
+    .getByRole("button", { name: "Silenciar áudio", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Ligar mic", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Ouvir áudio", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Desligar mic", exact: true }),
+  ).toBeVisible();
+
+  await page
+    .getByRole("button", { name: "Configurações", exact: true })
+    .click();
+  await page.getByRole("tab", { name: "Atalhos" }).click();
+  const row = page
+    .locator(".shortcut-list li")
+    .filter({ hasText: "Ligar/desligar microfone" });
+  // A previous interrupted run may have saved this disposable account's binding.
+  const remove = row.getByRole("button", { name: /^Remover/ });
+  if (await remove.count()) {
+    await remove.click();
+    await page.getByRole("button", { name: "Salvar atalhos" }).click();
+    await expect(row.getByText("Sem atalho")).toBeVisible();
+  }
+  await row.getByRole("button", { name: /^(Gravar|Trocar)$/ }).click();
+  await page.keyboard.press("Control+Alt+KeyM");
+  await expect(row.locator("kbd")).toHaveCount(3);
+  await page.getByRole("button", { name: "Salvar atalhos" }).click();
+  await expect(page.getByText("Atalhos salvos.")).toBeVisible();
+  await page.keyboard.press("Control+Alt+KeyM");
+  await expect(
+    page.getByRole("button", { name: "Ligar mic", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Control+Alt+KeyM");
+  await expect(
+    page.getByRole("button", { name: "Desligar mic", exact: true }),
+  ).toBeVisible();
+
+  // Leave the shared admin account without shortcuts for other tests.
+  await row.getByRole("button", { name: /^Remover/ }).click();
+  await page.getByRole("button", { name: "Salvar atalhos" }).click();
+  await expect(row.getByText("Sem atalho")).toBeVisible();
+  await page.getByRole("button", { name: "Sair da voz", exact: true }).click();
+});
+
+test("links nas mensagens abrem em outra aba, sem virar HTML", async ({
+  page,
+}) => {
+  await signIn(page);
+  const text = "olha https://example.org/jogo?id=1 " + Date.now();
+  await page.getByLabel("Mensagem em geral").fill(text);
+  await page.getByRole("button", { name: "Enviar mensagem" }).click();
+  const link = page
+    .getByRole("link", { name: "https://example.org/jogo?id=1" })
+    .last();
+  await expect(link).toHaveAttribute("href", "https://example.org/jogo?id=1");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", /noopener/);
 });

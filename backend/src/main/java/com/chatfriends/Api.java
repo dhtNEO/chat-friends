@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api")
 public class Api {
   final Accounts accounts;
+  final SessionSecurity sessions;
   final Chat chat;
   final Events events;
   final Media media;
@@ -22,8 +23,15 @@ public class Api {
   @Value("${app.name}")
   String name;
 
-  public Api(Accounts accounts, Chat chat, Events events, Media media, TransactionTemplate tx) {
+  public Api(
+      Accounts accounts,
+      Chat chat,
+      Events events,
+      Media media,
+      TransactionTemplate tx,
+      SessionSecurity sessions) {
     this.accounts = accounts;
+    this.sessions = sessions;
     this.chat = chat;
     this.events = events;
     this.media = media;
@@ -42,8 +50,14 @@ public class Api {
   }
 
   @GetMapping("/me")
-  public Map<String, Object> me(Principal p) {
-    return Map.of("user", accounts.active(p.getName()), "spaceName", name);
+  public Map<String, Object> me(Principal p, jakarta.servlet.http.HttpServletRequest q) {
+    return Map.of(
+        "user",
+        accounts.active(p.getName()),
+        "spaceName",
+        name,
+        "security",
+        sessions.status(p.getName(), q.getSession()));
   }
 
   @GetMapping("/messages")

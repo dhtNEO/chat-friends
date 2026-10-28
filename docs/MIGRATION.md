@@ -24,3 +24,5 @@ Não transportar chamadas ativas. Agendar janela; avisar usuários; reduzir TTL 
 Rollback antes de novas escritas no destino: parar destino, restaurar DNS e iniciar origem validada. Depois de novas escritas no destino: **não apontar simplesmente para banco antigo**. Bloquear destino, gerar backup atualizado, restaurar esse estado no host antigo com versão de esquema compatível, validar, só então reabrir origem. Se downgrade de esquema não for seguro, usar versão da aplicação compatível ou reconciliar dados em tarefa específica. Exportar apenas últimas mensagens sem contas/IDs/constraints pode perder integridade. DNS em cache cria período de respostas diferentes; host antigo deve permanecer fechado até decisão clara.
 
 Mantenha relatório de tempo de indisponibilidade, hashes dos backups, contagens/último ID e resultados. Não grave senhas/tokens nem conteúdo privado nesse relatório.
+
+Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.

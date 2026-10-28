@@ -4,6 +4,8 @@ Espaço privado para até 16 conexões: chat persistente, uma sala de voz e uma 
 
 **Dois modos: dev (local) e prd (internet).** O proprietário confirmou o funcionamento em produção no Mac com DuckDNS. Leia [STATUS](docs/STATUS.md) para evidências e limites; capacidade para 16 pessoas precisa de medição.
 
+**Está começando no projeto?** Leia o [guia para desenvolvedores júnior](docs/JUNIOR_DEVELOPER_GUIDE.md): conceitos, instalação, código, banco, chat, mídia, produção e operação, com fluxogramas.
+
 ## Modos de execução
 
 | Modo | Comando | Acesso |
@@ -15,7 +17,7 @@ Espaço privado para até 16 conexões: chat persistente, uma sala de voz e uma 
 
 ## Modo demo (sem conexão real)
 
-Para mexer na interface sem Docker, backend ou LiveKit: `cd frontend && npm ci && npm run demo` e abra http://localhost:5173. Qualquer usuário/senha entra. Amigos simulados conversam, falam na call, entram e saem (para ouvir os efeitos sonoros) e um deles transmite uma tela animada; "Encerrar transmissão travada" (botão ⋯) libera a tela para você testar o compartilhamento com sua tela real, que fica só no seu navegador. Mudanças no código aparecem na hora. Sem Node no host: `docker run --rm -it -p 5173:5173 -v "$PWD/frontend:/src" -w /src -u "$(id -u):$(id -g)" node:24.14.0-alpine sh -c "npm ci && npm run demo"`. A simulação fica em `frontend/src/demo/` e não entra no build de produção.
+Para mexer na interface sem Docker, backend ou LiveKit: `cd frontend && npm ci && npm run demo` e abra http://localhost:5173. Qualquer usuário/senha entra. Amigos simulados conversam, falam na call, entram e saem (para ouvir os efeitos sonoros) e um deles transmite uma tela animada; "Encerrar transmissão travada" (botão ⋯) libera a tela para você testar o compartilhamento com sua tela real, que fica só no seu navegador. Mudanças no código aparecem na hora. Sem Node no host: `docker run --rm -it -p 127.0.0.1:5173:5173 -e npm_config_cache=/tmp/npm-cache -v "$PWD/frontend:/src" -w /src -u "$(id -u):$(id -g)" node:24.22.1-alpine sh -c "npm ci && npm run demo"`. A simulação fica em `frontend/src/demo/` e não entra no build de produção.
 
 ## Início rápido no Mac ou Linux
 
@@ -51,6 +53,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 
 | Tema | Guia |
 |---|---|
+| Aprendizado e visão completa | [Guia para desenvolvedores júnior](docs/JUNIOR_DEVELOPER_GUIDE.md) |
 | Arquitetura e decisões | [ARCHITECTURE](docs/ARCHITECTURE.md), [ADRs](docs/adr/001-foundation.md) |
 | API e segurança | [API](docs/API.md), [SECURITY](docs/SECURITY.md) |
 | Uso | [USER_GUIDE](docs/USER_GUIDE.md) |
@@ -61,5 +64,8 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 | Migração | [MIGRATION](docs/MIGRATION.md) |
 | Testes e limites | [TESTING](docs/TESTING.md), [COMPATIBILITY](docs/COMPATIBILITY.md), [STATUS](docs/STATUS.md) |
 | Problemas | [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) |
+| Próximas funcionalidades (planejadas) | [Atalhos pessoais](docs/SHORTCUTS_PLAN.md), [fila de música compartilhada](docs/MUSIC_PLAYER_PLAN.md) |
 
 O repositório já continha [LICENSE](LICENSE), GPL-3.0. Esse arquivo foi preservado; a intenção de licenciamento do código novo precisa ser confirmada pelo proprietário antes de distribuir. Não houve publicação de imagens ou recursos em nuvem. Dependências e suas licenças: [DEPENDENCIES](docs/DEPENDENCIES.md).
+
+Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](docs/SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.

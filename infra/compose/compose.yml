@@ -1,5 +1,9 @@
 name: chat-friends
 x-defaults: &defaults
+  cap_drop: [ALL]
+  pids_limit: 256
+  read_only: true
+  tmpfs: ["/tmp:size=64m,mode=1777"]
   restart: unless-stopped
   logging:
     driver: json-file
@@ -8,7 +12,13 @@ x-defaults: &defaults
 services:
   db:
     <<: *defaults
-    image: postgres:17.7-alpine
+    image: chat-friends-db
+    build: ../postgres
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    tmpfs: ["/tmp:size=16m,mode=1777", "/var/run/postgresql:size=8m,mode=3775"]
+    networks: [database_net]
+    dns: ["127.0.0.1"]
+    cpus: ${DB_CPUS:-1.0}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-friends}
       POSTGRES_DB: friends
@@ -23,10 +33,19 @@ services:
     mem_limit: 512m
   backend:
     <<: *defaults
+    image: chat-friends-backend
     build: ../../backend
+    networks: [database_net, api_net, control_net]
+    dns: ["127.0.0.1"]
+    cpus: ${BACKEND_CPUS:-2.0}
+    pids_limit: 512
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-friends}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_USER: ${APP_DB_USER:?execute scripts/configure.sh}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?}
+      MIGRATIONS_ENABLED: "false"
+      APP_PROXY_KEY: ${APP_PROXY_KEY:?}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?}
+      ADMIN_MFA_REQUIRED: ${ADMIN_MFA_REQUIRED:-false}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?}
       LIVEKIT_INTERNAL_URL: ${LIVEKIT_INTERNAL_URL:-http://livekit:7880}
@@ -52,6 +71,9 @@ services:
   music:
     <<: *defaults
     build: ../../music-bot
+    # media_net reaches the SFU's media interface and YouTube; control_net is
+    # where the backend drives the queue. Never on the database network.
+    networks: [media_net, control_net]
     environment:
       LIVEKIT_URL: ws://livekit:7880
       MUSIC_SECRET_FILE: /run/secrets/music
@@ -74,7 +96,12 @@ services:
       retries: 6
   livekit:
     <<: *defaults
-    image: livekit/livekit-server:v1.9.12
+    image: chat-friends-livekit
+    build: ../livekit
+    user: "${CHAT_UID:-1000}:${CHAT_GID:-1000}"
+    networks: [media_net, signal_net, control_net]
+    cpus: ${LIVEKIT_CPUS:-4.0}
+    pids_limit: 512
     environment:
       NO_PROXY: localhost,127.0.0.1,backend,db,livekit,web
       no_proxy: localhost,127.0.0.1,backend,db,livekit,web
@@ -87,8 +114,16 @@ services:
     stop_grace_period: 30s
   web:
     <<: *defaults
-    build: ../../frontend
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+    user: "10001:10001"
+    networks: [ingress_net, api_net, signal_net]
+    dns: ["127.0.0.1"]
+    cpus: ${WEB_CPUS:-0.5}
+    tmpfs: ["/tmp:size=16m,mode=1777", "/data:size=8m,uid=10001,gid=10001", "/config:size=8m,uid=10001,gid=10001"]
     environment:
+      APP_PROXY_KEY: ${APP_PROXY_KEY:?}
       NO_PROXY: localhost,127.0.0.1,backend,db,livekit,web
       no_proxy: localhost,127.0.0.1,backend,db,livekit,web
     ports: ["127.0.0.1:8080:8080"]
@@ -100,5 +135,29 @@ services:
       timeout: 5s
       retries: 10
     mem_limit: 128m
+  migrate:
+    <<: *defaults
+    profiles: [maintenance]
+    restart: "no"
+    image: chat-friends-backend
+    networks: [database_net]
+    dns: ["127.0.0.1"]
+    environment:
+      POSTGRES_USER: ${MIGRATION_DB_USER:?}
+      POSTGRES_PASSWORD: ${MIGRATION_DB_PASSWORD:?}
+      MIGRATIONS_ENABLED: "true"
+      LIVEKIT_API_KEY: unused-maintenance
+      LIVEKIT_API_SECRET: unused-maintenance-not-a-runtime-credential
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+    command: ["--migrate-only", "--spring.main.web-application-type=none"]
+    mem_limit: 1g
+    cpus: 2.0
+networks:
+  database_net: {internal: true}
+  api_net: {internal: true}
+  control_net: {internal: true}
+  signal_net: {internal: true}
+  ingress_net: {}
+  media_net: {}
 volumes:
   database:

@@ -1,4 +1,5 @@
 import asyncio
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -141,7 +142,9 @@ class Lifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("Ana", state["queue"][0]["requestedBy"])
         state = await self.player.enqueue("M7lc1UVf-VE", "Ana", "token")
         self.assertEqual("Carregando música…", state["queue"][-1]["title"])
-        self.player.catalog["aqz-KE-bpKQ"] = (0, metadata_result["entries"][0])
+        # monotonic() counts from boot, so "0" is not stale on a fresh CI runner.
+        stale = time.monotonic() - 601
+        self.player.catalog["aqz-KE-bpKQ"] = (stale, metadata_result["entries"][0])
         state = await self.player.enqueue("aqz-KE-bpKQ", "Ana", "token")
         self.assertEqual("Carregando música…", state["queue"][-1]["title"])
 
@@ -155,7 +158,7 @@ class Lifecycle(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         self.player.room = SimpleNamespace(remote_participants={}, disconnect=AsyncMock())
         await self.player.control("pause")
-        self.player.last_listeners = 0
+        self.player.last_listeners = time.monotonic() - 31
         await self.player.check_idle()
         self.assertEqual("idle", self.player.status)
         self.assertIsNone(self.player.current)

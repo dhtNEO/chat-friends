@@ -12,5 +12,5 @@ printf '
 '
 printf '%s' "$password" > "$secret"
 unset password
-# Root somente neste comando efêmero, para ler arquivo 0600 do proprietário.
-./scripts/compose.sh run --rm --no-deps --user 0:0 -v "$secret:/run/admin-password:ro" -e ADMIN_PASSWORD_FILE=/run/admin-password backend --server.port=0 --bootstrap-admin="$username"
+# Comando efêmero com o UID do proprietário para ler o arquivo 0600.
+./scripts/compose.sh run --rm --no-deps --user "$(id -u):$(id -g)" -v "$secret:/run/admin-password:ro" -e ADMIN_PASSWORD_FILE=/run/admin-password backend --server.port=0 --bootstrap-admin="$username"
