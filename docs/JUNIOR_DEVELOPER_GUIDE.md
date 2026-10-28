@@ -1028,7 +1028,7 @@ Avatares são binários limitados a 16 KB, com formatos aceitos e bytes iniciais
 - **Mídia:** reconciliação não é uma proibição atômica de múltiplas tracks; limites solicitados ao encoder não são uma barreira rígida contra cliente modificado.
 - **Disponibilidade:** rate limits não impedem saturação do link doméstico por DDoS. Há um único host, sem alta disponibilidade.
 - **Privacidade:** não há E2EE da aplicação. Transporte cifrado protege a rede, mas servidor/SFU continuam sendo parte da confiança do conteúdo.
-- **Dependências:** duas exceções específicas de Spring MVC 6.2.19 estão registradas para recursos XSLT/SSE não usados, com vencimento em 25/11/2026. Reavaliar o arquivo de exceções ao atualizar; não habilitar esses recursos sem revisão.
+- **Dependências:** duas exceções específicas de Spring MVC 6.2.19 estão registradas para recursos XSLT/SSE não usados, com vencimento em 25/11/2026. Há também triagem temporária de go-jose/v3 restrita ao Caddy, até 11/11/2026, sem versão corrigida upstream e sem os caminhos PKI/JWK ativados nesta configuração; veja [JOSE_TRIAGE](../security/JOSE_TRIAGE.md). Reavaliar o arquivo de exceções ao atualizar; não habilitar esses recursos sem revisão.
 - **Compatibilidade:** Linux/AMD64 sintético não prova ARM64, captura de jogo no Mac, todos os navegadores ou 16 participantes reais.
 
 O DNS público revelar o IP do servidor é normal nessa arquitetura. Isso não é uma autorização para entrar na aplicação nem esconde a necessidade de manter os serviços corrigidos.

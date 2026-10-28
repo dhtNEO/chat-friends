@@ -62,9 +62,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "24.22.1" }
       - run: node --test scripts/tests/*.test.mjs
+      - run: python3 scripts/tests/security-policy-test.py
       - run: python3 scripts/tests/duckdns-lock.py
       - run: python3 scripts/tests/helper-mounts.py
       - run: ./scripts/up.sh
+      - run: python3 scripts/tests/caddy-security.py
       - run: python3 scripts/tests/runtime-security.py && ./scripts/check-db-privileges.sh
       - run: docker build -t chat-friends-edge-duckdns infra/caddy
       - run: python3 scripts/tests/modes-profile.py

@@ -30,3 +30,8 @@ Java mantém Boot 3.5.16/Spring 6.2.19 com Tomcat 10.1.61, Jackson 2.21.8 e JRE 
 
 
 Guava é fixada em `33.7.2-jre` por `dependencyManagement` no backend. A dependência transitiva de `protobuf-java-util` resolvia `32.0.1-jre`; a versão corrigida elimina a vulnerabilidade de desserialização com alocação descontrolada de memória [CVE-2026-102554 / GHSA-xxph-c9ww-hj94](https://github.com/advisories/GHSA-xxph-c9ww-hj94). O advisory afeta versões até 33.7.1 e indica correção em 33.7.2. A alteração mantém o gate HIGH/CRITICAL e não acrescenta exceção de scanner.
+
+
+### JOSE no Caddy — 28/10/2026
+
+O lock compartilhado por web e edge usa `go-jose/v4` 4.1.6, corrigindo CVE-2026-116587. A linha v3 não tem versão corrigida upstream; v3.0.5 continua transitiva via Smallstep. A triagem temporária vale somente para `usr/bin/caddy`/`gobinary`, vence em 11/11/2026 e depende de admin desativado, ausência de PKI/ACME servidor e handlers limitados aos proxies/arquivos atuais. Não é uma correção da biblioteca v3. Evidência, restrições e plano de saída: [JOSE_TRIAGE](../security/JOSE_TRIAGE.md). CI valida os JSONs adaptados dos três Caddyfiles e mantém o bloqueio de outros achados/versões/binários.
