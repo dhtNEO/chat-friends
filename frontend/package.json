@@ -17,13 +17,15 @@
     "dockview-react": "8.6.1",
     "livekit-client": "2.23.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@livekit/protocol": "1.53.0",
     "@playwright/test": "1.64.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.1.2",
     "eslint": "10.13.0",
     "eslint-plugin-react-hooks": "7.1.1",

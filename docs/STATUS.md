@@ -70,3 +70,9 @@ A interface com painéis, perfis, sons e suporte a 60 fps mantém MFA, expiraç�
 Validação da integração em Linux/AMD64: 43 testes Java com PostgreSQL real, 27 testes Node, lint/build do frontend e 13 Playwright aprovados, incluindo áudio sintético, Full HD, CSP, ICE UDP/TCP, MFA/recuperação/revogação e demo. O teste de privilégios confirmou runtime sem DDL nem acesso ao histórico Flyway.
 
 Os SQLs V3 publicados pelas duas branches permanecem idênticos, em locais separados. `MigrationHistory` seleciona o histórico existente e V5 completa as funcionalidades faltantes, sem `repair`, apagar contas/mensagens nem invalidar MFA existente. Os testes verificam instalação nova, atualização de cada histórico, preservação de dados/checksums e rejeição de checksum alterado. Consulte [SECURITY_UPGRADE](SECURITY_UPGRADE.md) antes de atualizar uma instalação existente.
+
+## Cassino recuperado sobre a main — 28/10/2026
+
+Branch `cassino` recriada a partir da main `744c2d3`, com caça-níquel de manivela (giro mínimo de 5,5 segundos), Roleta Royale 3D, salas, apostas, Coins, extrato e pódio. Música, marca, dependências, correções de segurança e CI da main foram preservados. O teste dos jogos foi adaptado ao Spring Boot 3.5 da main; não inclui a migração antiga para Boot 4/TypeScript 6. Os arquivos SQL V6–V8 são idênticos aos publicados na primeira branch cassino.
+
+Validação: 63 testes Java aprovados no banco separado `friends_test`; lint/build e auditoria npm de produção aprovados; três verificações de jogos/demo e três de música no navegador aprovadas, incluindo celular. O teste móvel dos jogos foi repetido isoladamente após uma recarga por HMR durante a formatação. Gate Trivy do SBOM aprovado com as exceções existentes da main. Não houve publicação nem alteração da stack em execução.

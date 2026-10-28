@@ -37,3 +37,7 @@ Reporte vulnerabilidade de forma privada ao proprietário; não abra issue públ
 ## Endurecimento operacional
 
 Veja [SECURITY_UPGRADE.md](SECURITY_UPGRADE.md): migração de privilégios do banco, MFA obrigatório para administradores em prd, expiração/revogação de sessões, limites de requests e sockets, segmentação, helper com escrita mínima, backups autenticados e procedimentos de incidente. DNS/IP públicos são esperados; autoridade DNS, sessões e chaves continuam privados. As verificações de roteador/Mac/ARM64 e bloqueio de acesso à LAN precisam de aceite do proprietário.
+
+## Coins e jogos
+
+Clube da Sorte usa Coins virtuais sem compra/saque. Sessão, MFA, CSRF e orçamento de requisições protegem as rotas. O servidor controla sorteio, débito, fechamento, devolução e liquidação; locks e referências únicas impedem gastos/pagamentos duplicados. Sair depois do giro mantém a aposta e o direito ao retorno. O limite de 500 Coins/dia vale somente para emissões gratuitas. Regras e testes em [GAMES.md](GAMES.md).

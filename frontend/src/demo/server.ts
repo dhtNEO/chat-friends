@@ -1,5 +1,6 @@
 // Answers /api and /ws inside the page, mimicking docs/API.md closely enough
 // for the interface: same paths, status codes and payloads.
+import { demoGames } from "./games";
 import type { Message } from "../api";
 import { setAvatarResolver } from "../ui";
 import {
@@ -72,6 +73,14 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
   }
   if (!world.me) return fail(401, "Sessão encerrada.");
   const me = world.me;
+  if (path === "/games" || path.startsWith("/games/")) {
+    try {
+      return json(demoGames(path, method, body, me));
+    } catch (e) {
+      return fail(409, (e as Error).message);
+    }
+  }
+
   if (path.startsWith("/music/")) {
     if (route === "GET /music/state") return json(music);
     if (!world.inCall) return fail(409, "Entre na voz primeiro");

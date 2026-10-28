@@ -69,3 +69,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 O repositório já continha [LICENSE](LICENSE), GPL-3.0. Esse arquivo foi preservado; a intenção de licenciamento do código novo precisa ser confirmada pelo proprietário antes de distribuir. Não houve publicação de imagens ou recursos em nuvem. Dependências e suas licenças: [DEPENDENCIES](docs/DEPENDENCIES.md).
 
 Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](docs/SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.
+
+## Clube da Sorte
+
+Abra **Jogos** para o caça-níquel com manivela e a Roleta Royale 3D, individual ou em salas para até oito pessoas. Coins, apostas, devoluções, extrato e pódio são controlados pelo servidor. A música da main permanece disponível; integração da fila com Coins fica para depois. Regras e operação em [GAMES](docs/GAMES.md).

@@ -16,6 +16,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import { api, login, type Member, type User, type Message } from "./api";
 import { MfaGate, type SecurityState } from "./AccountSecurity";
+import { GamesClub } from "./GamesClub";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
@@ -438,6 +439,12 @@ function Workspace({
         <span className="eyebrow">CANAIS DE VOZ</span>
         <div ref={setRoster} />
       </div>
+      <div className="channel-section">
+        <span className="eyebrow">MAIS UMA RODADA?</span>
+        <button className="channel" onClick={() => open("games")}>
+          <Icon name="games" size={18} /> Clube da Sorte <small>NOVO</small>
+        </button>
+      </div>
       <footer className="me">
         <Avatar name={me.user.displayName} src={avatarSrc(me.user)} size={34} />
         <div className="me-name">
@@ -465,6 +472,7 @@ function Workspace({
           onRetry={(p) => void send(p)}
         />
       );
+    if (kind === "games") return <GamesClub me={me.user} />;
     if (kind === "members")
       return (
         <section className="members" aria-label="Membros">
@@ -579,6 +587,13 @@ function Workspace({
             active={!!slots.members}
             badge={online.length}
             onClick={() => open("members")}
+          />
+          <ActivityButton
+            icon="games"
+            label="Jogos"
+            title="Clube da Sorte"
+            active={!!slots.games}
+            onClick={() => open("games")}
           />
           <span className="activity-spacer" />
           <ActivityButton

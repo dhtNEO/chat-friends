@@ -1,5 +1,6 @@
 // Stroke icons drawn inline: font glyphs vary too much between systems.
 const paths = {
+  games: "M7 7h10l4 10-3 2-4-4h-4l-4 4-3-2zM6 11h6M9 8v6M16 10h.01M18 13h.01",
   chat: "M4 5h16v11H9l-5 4z",
   split: "M4 5h16v14H4zM12 5v14",
   hash: "M5 9h15M4 15h15M10 4 8 20M16 4l-2 16",

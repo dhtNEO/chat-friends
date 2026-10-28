@@ -66,3 +66,7 @@ Heartbeat/estado de áudio de uma conexão expirada retorna 409 e exige nova ent
 ## Bot de música
 
 Rotas autenticadas: `GET /api/music/state` retorna `{status,current,queue,error,elapsed}`; `GET /api/music/search?identity=...&q=...` busca até cinco músicas; `POST /api/music/queue` recebe `{identity,videoId}`; `POST /api/music/control` recebe `{identity,action}` (`pause`, `resume`, `skip`, `stop`); `DELETE /api/music/queue/{id}` recebe `{identity}`. Mutação exige CSRF. Busca e controles exigem conexão de voz ativa na mesma sessão e participante presente na SFU. Nenhum token/chave do bot aparece nas respostas. A fila não persiste em reinícios; veja [MUSIC](MUSIC.md).
+
+## Clube da Sorte
+
+Carteira, giros gratuitos e salas de Roleta Royale: contratos, autenticação e limites em [GAMES.md](GAMES.md).
