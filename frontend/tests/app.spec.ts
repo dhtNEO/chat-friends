@@ -232,11 +232,11 @@ test("atalho pessoal gravado nas configurações alterna o microfone", async ({
     "data-shortcut",
     "toggleMic",
   );
-  await expect(page.getByRole("button", { name: "Ligar mic" })).toBeVisible();
+  // Settings may cover the room panel; the quick bar button stays in view.
+  const quickMic = page.getByRole("button", { name: "Alternar microfone" });
+  await expect(quickMic).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Control+Alt+KeyM");
-  await expect(
-    page.getByRole("button", { name: "Desligar mic" }),
-  ).toBeVisible();
+  await expect(quickMic).toHaveAttribute("aria-pressed", "false");
 
   // Leave the shared admin account without shortcuts for other tests.
   await row.getByRole("button", { name: /^Remover/ }).click();
