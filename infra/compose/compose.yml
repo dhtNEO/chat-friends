@@ -71,6 +71,9 @@ services:
   music:
     <<: *defaults
     build: ../../music-bot
+    # media_net reaches the SFU's media interface and YouTube; control_net is
+    # where the backend drives the queue. Never on the database network.
+    networks: [media_net, control_net]
     environment:
       LIVEKIT_URL: ws://livekit:7880
       MUSIC_SECRET_FILE: /run/secrets/music

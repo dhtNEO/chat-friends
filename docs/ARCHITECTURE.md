@@ -89,7 +89,7 @@ Modelo: accounts → messages; accounts → media_connections → session_id; sc
 
 ## Separação operacional
 
-`migrate` é um job de manutenção com credenciais próprias; o backend permanente usa apenas DML e Flyway desativado. Redes: `database_net` (db/backend/migrador, interna), `api_net` (web/edge/backend, interna), `control_net` (backend/SFU, interna), `signal_net` (web/edge/SFU, interna), `ingress_net` e `media_net` (entrada/saída necessária). Backend não tem ponte externa. Isso limita acesso lateral entre serviços; o bloqueio de conexões iniciadas para a LAN depende do host/firewall e precisa ser validado no OrbStack.
+`migrate` é um job de manutenção com credenciais próprias; o backend permanente usa apenas DML e Flyway desativado. Redes: `database_net` (db/backend/migrador, interna), `api_net` (web/edge/backend, interna), `control_net` (backend/SFU/bot de música, interna), `signal_net` (web/edge/SFU, interna), `ingress_net` e `media_net` (entrada/saída necessária; o bot de música usa `media_net` para mídia e para buscar no YouTube). Backend não tem ponte externa. Isso limita acesso lateral entre serviços; o bloqueio de conexões iniciadas para a LAN depende do host/firewall e precisa ser validado no OrbStack.
 
 Veja [atualização de segurança](SECURITY_UPGRADE.md) para MFA, limites, arquivos privados e recuperação. O banco de integração `friends_test` usa `friends_tests`, sem credenciais de runtime/DBA entregues ao Maven.
 
