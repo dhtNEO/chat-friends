@@ -68,14 +68,15 @@ async function shrink(file: File): Promise<Blob> {
   throw new Error("Imagem muito detalhada. Tente outra.");
 }
 
-type Tab = "perfil" | "voz" | "atalhos" | "aparencia" | "sons" | "seguranca";
+// Account and security share the first tab: it opens by default, so the
+// authenticator and open sessions are one click away.
+type Tab = "perfil" | "voz" | "atalhos" | "aparencia" | "sons";
 const TABS: [Tab, string, IconName][] = [
-  ["perfil", "Perfil", "people"],
+  ["perfil", "Conta", "people"],
   ["voz", "Voz e áudio", "mic"],
   ["atalhos", "Atalhos", "keyboard"],
   ["aparencia", "Aparência", "palette"],
   ["sons", "Sons", "volume"],
-  ["seguranca", "Segurança", "shield"],
 ];
 const TAB_KEY = "chat-friends:settings-tab";
 
@@ -224,13 +225,13 @@ export function Profile({
         </p>
       )}
 
-      {tab === "seguranca" && <AccountSecurity />}
       {tab === "voz" && <VoiceSettings userId={me.id} />}
       {tab === "atalhos" && <ShortcutsSettings onError={onError} />}
       {tab === "sons" && <SoundsCard userId={me.id} onError={onError} />}
 
       {tab === "perfil" && (
         <>
+          <AccountSecurity />
           <div className="settings-card">
             <h3>Foto de perfil</h3>
             <div className="avatar-editor">

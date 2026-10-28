@@ -177,10 +177,7 @@ test("tela sintética chega ao outro participante e a parada remove vídeo", asy
   await context.close();
 });
 
-test("silenciar o áudio também muta o mic; atalho pessoal alterna o microfone", async ({
-  page,
-}) => {
-  await signIn(page);
+async function joinVoice(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Entrar na voz" }).click();
   await expect(page.getByText("Voz conectada", { exact: true })).toBeVisible({
     timeout: 15000,
@@ -188,17 +185,33 @@ test("silenciar o áudio também muta o mic; atalho pessoal alterna o microfone"
   await expect(
     page.getByRole("button", { name: "Desligar mic" }),
   ).toBeVisible();
-  // Like Discord: silencing what you hear closes the microphone too, and
-  // hearing again restores it.
+}
+
+test("silenciar o áudio também desliga o mic e ouvir de novo o devolve", async ({
+  page,
+}) => {
+  await signIn(page);
+  await joinVoice(page);
+  // Like Discord: silencing what you hear closes the microphone too.
   await page
     .getByRole("button", { name: "Silenciar áudio", exact: true })
     .click();
+  await expect(
+    page.getByRole("button", { name: "Ouvir áudio", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Ligar mic" })).toBeVisible();
   await page.getByRole("button", { name: "Ouvir áudio", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Desligar mic" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Sair da voz", exact: true }).click();
+});
 
+test("atalho pessoal gravado nas configurações alterna o microfone", async ({
+  page,
+}) => {
+  await signIn(page);
+  await joinVoice(page);
   await page
     .getByRole("button", { name: "Configurações", exact: true })
     .click();
@@ -211,6 +224,8 @@ test("silenciar o áudio também muta o mic; atalho pessoal alterna o microfone"
   await expect(row.locator("kbd")).toHaveCount(3);
   await page.getByRole("button", { name: "Salvar atalhos" }).click();
   await expect(page.getByText("Atalhos salvos.")).toBeVisible();
+  // Shortcuts never fire while typing; make sure focus is on the page.
+  await page.locator(".settings h2").click();
   await page.keyboard.press("Control+Alt+KeyM");
   await expect(page.getByRole("button", { name: "Ligar mic" })).toBeVisible();
   await page.keyboard.press("Control+Alt+KeyM");
