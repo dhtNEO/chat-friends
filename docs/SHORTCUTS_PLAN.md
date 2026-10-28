@@ -1,6 +1,6 @@
 # Plano — atalhos pessoais de teclado
 
-Status: planejamento, sem funcionalidade implementada. Requisito: cada usuário configura seus próprios atalhos. Executar antes do plano de [música compartilhada](MUSIC_PLAYER_PLAN.md), aproveitando a mesma base de ações e preferências.
+Status: backend implementado (migração V6 `user_shortcuts` e `GET`/`PUT /api/me/shortcuts`, ver [API](API.md)); interface e listener no frontend pendentes. Requisito: cada usuário configura seus próprios atalhos. Executar antes do plano de [música compartilhada](MUSIC_PLAYER_PLAN.md), aproveitando a mesma base de ações e preferências.
 
 ## Comportamento e limite do navegador
 
