@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/root/.m2,sharing=locked --mount=type=secret,id=ma
 COPY src src
 RUN --mount=type=cache,target=/root/.m2,sharing=locked --mount=type=secret,id=maven_settings,target=/root/.m2/settings.xml --mount=type=secret,id=build_truststore \
     if [ -f /run/secrets/build_truststore ]; then export MAVEN_OPTS=-Djavax.net.ssl.trustStore=/run/secrets/build_truststore; fi; mvn -B -ntp package -DskipTests
-FROM eclipse-temurin:25.0.4.1_1-jre
+FROM eclipse-temurin:26.0.2_10-jre
 WORKDIR /app
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 COPY --chmod=0444 --from=build /src/target/chat-friends-0.1.0.jar app.jar
