@@ -227,6 +227,11 @@ test("atalho pessoal gravado nas configurações alterna o microfone", async ({
   // Shortcuts never fire while typing; make sure focus is on the page.
   await page.locator(".settings h2").click();
   await page.keyboard.press("Control+Alt+KeyM");
+  // The listener records why it acted or not; a failure shows the reason.
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-shortcut",
+    "toggleMic",
+  );
   await expect(page.getByRole("button", { name: "Ligar mic" })).toBeVisible();
   await page.keyboard.press("Control+Alt+KeyM");
   await expect(
