@@ -31,7 +31,7 @@ jobs:
       LIVEKIT_API_KEY: ci-only
       LIVEKIT_API_SECRET: ci-ephemeral-test-secret-never-for-runtime
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "25", cache: maven }
       - run: ./mvnw -B -ntp verify
@@ -44,7 +44,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           {
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: "24.22.1" }
       - run: node --test scripts/tests/*.test.mjs
@@ -116,7 +116,7 @@ jobs:
   infrastructure:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v3
         with: { terraform_version: "1.13.5" }
       - run: terraform fmt -check && terraform init -backend=false && terraform validate
@@ -127,7 +127,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.multiarch
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/backend.oci backend
