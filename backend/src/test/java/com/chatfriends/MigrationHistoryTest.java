@@ -43,10 +43,10 @@ class MigrationHistoryTest {
   }
 
   void assertComplete() {
-    for (var table : new String[] {"accounts", "avatars", "account_mfa", "mfa_recovery"})
+    for (var table : new String[] {"accounts", "avatars", "account_mfa", "mfa_recovery", "user_shortcuts"})
       assertNotNull(db.queryForObject("select to_regclass(?)", String.class, schema + "." + table));
     assertEquals(
-        "5",
+        "6",
         db.queryForObject(
             "select version from "
                 + schema
