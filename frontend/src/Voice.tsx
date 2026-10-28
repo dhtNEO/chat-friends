@@ -19,6 +19,12 @@ import { Avatar, Popover, avatarSrc, usePeople } from "./ui";
 import { PopoutStage, usePopout } from "./Popout";
 import { loadSounds, playEffect, type Effect } from "./sounds";
 import { Music, MUSIC_IDENTITY } from "./Music";
+import {
+  RoomLayout,
+  orderedItems,
+  usePointerOrder,
+  useRoomLayout,
+} from "./RoomLayout";
 type Connection = {
   identity: string;
   url: string;
@@ -74,6 +80,7 @@ export function Voice({
   onError: (s: string) => void;
 }) {
   const [settings, setSettings] = useAudioSettings(userId);
+  const roomLayout = useRoomLayout(userId);
   const directory = usePeople();
   const popout = usePopout(onError);
   useEffect(() => {
@@ -87,6 +94,7 @@ export function Voice({
   };
   const micProcessor = useRef<MicrophoneGain | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [cardNotice, setCardNotice] = useState("");
   const room = useRef<Room | null>(null),
     connection = useRef<Connection | null>(null),
     lease = useRef<Lease | null>(null),
@@ -450,6 +458,7 @@ export function Voice({
   // Identities are "accountId:connection"; names and photos follow profiles.
   const account = (identity: string) =>
     directory.byId.get(identity.split(":")[0]);
+  const memberOccurrences = new Map<string, number>();
   const people = (
     joined
       ? participants
@@ -467,11 +476,37 @@ export function Voice({
                   )?.deaf ?? false),
           }))
       : state.participants.map((p) => ({ ...p, speaking: false }))
-  ).map((p) => ({
-    ...p,
-    name: account(p.identity)?.displayName ?? p.name,
-    src: avatarSrc(account(p.identity)),
-  }));
+  ).map((p) => {
+    const member = p.identity.split(":")[0];
+    const occurrence = memberOccurrences.get(member) ?? 0;
+    memberOccurrences.set(member, occurrence + 1);
+    return {
+      ...p,
+      layoutKey: occurrence ? `${member}:${occurrence}` : member,
+      name: account(p.identity)?.displayName ?? p.name,
+      src: avatarSrc(account(p.identity)),
+    };
+  });
+  const cardIds = orderedItems(
+    people.map((p) => p.layoutKey),
+    roomLayout.layout.cards,
+  );
+  const cardDrag = usePointerOrder(
+    ".person.tile",
+    ".tiles",
+    cardIds,
+    (from, to) => {
+      roomLayout.reorderCards(
+        people.map((p) => p.layoutKey),
+        from,
+        to,
+      );
+      if (from !== to)
+        setCardNotice(
+          `${people.find((p) => p.layoutKey === from)?.name ?? "Participante"} mudou para a posição ${cardIds.indexOf(to) + 1}.`,
+        );
+    },
+  );
   // Our own state is exact; others' comes from tracks or the polled lease.
   const isLive = (identity: string) =>
     identity === self
@@ -485,6 +520,157 @@ export function Voice({
   const featuredName = featured
     ? (account(featured.identity)?.displayName ?? featured.name)
     : "";
+  const screenContent = (
+    <div className="stage-main">
+      {popout.win ? (
+        <div className="stage-empty">
+          <span className="stage-empty-icon">
+            <Icon name="popout" size={34} />
+          </span>
+          <h3>Transmissão em outra janela</h3>
+          <p>Arraste a janela para outro monitor. O som continua aqui.</p>
+          <button className="primary" onClick={popout.close}>
+            Trazer de volta
+          </button>
+        </div>
+      ) : featured ? (
+        <Screen
+          key={featured.track.sid || "local"}
+          track={featured.track}
+          name={account(featured.identity)?.displayName ?? featured.name}
+          avatar={avatarSrc(account(featured.identity))}
+          local={featured.identity === self}
+          viewers={Math.max(people.length - 1, 0)}
+          volume={settings.stream}
+          deaf={deaf}
+          expanded={maximized}
+          onExpand={onMaximize}
+          onPopout={popout.open}
+          onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
+          onError={onError}
+        />
+      ) : (
+        <div className="stage-empty">
+          <span className="stage-empty-icon">
+            <Icon name="screen" size={34} />
+          </span>
+          <h3>Ninguém está transmitindo</h3>
+          <p>
+            {joined
+              ? "Compartilhe sua tela para todo mundo assistir junto."
+              : people.length
+                ? "Tem gente na sala. Entre e puxe uma cadeira."
+                : "A sala está tranquila. Seja o primeiro a entrar."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+  const peopleContent =
+    people.length > 0 ? (
+      <div className="tiles" role="list" aria-label="Cards dos participantes">
+        <span className="sr-only" role="status" aria-live="polite">
+          {cardNotice}
+        </span>
+        {people.map((p) => (
+          <div
+            key={p.identity}
+            className={
+              "person tile" +
+              (p.speaking && !p.micMuted ? " speaking" : "") +
+              (isLive(p.identity) ? " live" : "") +
+              (featured?.identity === p.identity ? " featured" : "") +
+              (adjusting === p.identity ? " adjusting" : "") +
+              (cardDrag.dragging === p.layoutKey ? " is-dragging" : "") +
+              (cardDrag.over === p.layoutKey &&
+              cardDrag.dragging !== p.layoutKey
+                ? " is-drop-target"
+                : "")
+            }
+            data-reorder-id={p.layoutKey}
+            role="listitem"
+            aria-posinset={cardIds.indexOf(p.layoutKey) + 1}
+            aria-setsize={cardIds.length}
+            style={{ order: cardIds.indexOf(p.layoutKey) }}
+            onClick={() => {
+              if (isLive(p.identity)) setFocus(p.identity);
+              // Touch screens have no hover: a tap reveals the volume.
+              setAdjusting(adjusting === p.identity ? null : p.identity);
+            }}
+          >
+            <button
+              className="person-grip"
+              aria-label={`Reordenar ${p.name}`}
+              title="Arraste ou use as setas para mudar a ordem"
+              {...cardDrag.bind(p.layoutKey)}
+            >
+              ⠿
+            </button>
+            <Avatar
+              name={p.name}
+              src={p.src}
+              size={Math.round(
+                Math.min(84, Math.max(36, roomLayout.layout.cardSize * 0.34)),
+              )}
+              speaking={p.speaking}
+            />
+            {isLive(p.identity) && <span className="live-badge">AO VIVO</span>}
+            <div className="tile-footer">
+              <strong>
+                {p.name}
+                {p.identity === self ? " (você)" : ""}
+              </strong>
+              <span className="tile-icons">
+                {p.micMuted && <Icon name="micOff" size={15} />}
+                {p.deaf && <Icon name="headphonesOff" size={15} />}
+              </span>
+              <span className="sr-only">
+                {p.micMuted ? "Mic desligado" : "Mic ligado"} ·{" "}
+                {p.deaf ? "Áudio silenciado" : "Ouvindo"}
+                {p.speaking && !p.micMuted ? " · falando" : ""}
+              </span>
+            </div>
+            {joined && p.identity !== self && (
+              <label className="tile-volume" title={`Volume de ${p.name}`}>
+                <span className="sr-only">Volume de {p.name}</span>
+                <Icon name="volume" size={14} />
+                <input
+                  type="range"
+                  min="0"
+                  max="200"
+                  value={personVolume(p.identity)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    const value = +e.target.value;
+                    setSettings((old) => ({
+                      ...old,
+                      people: {
+                        ...old.people,
+                        [p.identity.split(":")[0]]: value,
+                      },
+                    }));
+                  }}
+                />
+                <span className="volume-value" aria-hidden="true">
+                  {personVolume(p.identity)}%
+                </span>
+              </label>
+            )}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="room-empty-people">
+        Os cards aparecem aqui quando seus amigos entram na voz.
+      </p>
+    );
+  const musicContent = (
+    <Music
+      identity={joined ? self : undefined}
+      volume={settings.music}
+      onVolume={(music) => setSettings((old) => ({ ...old, music }))}
+    />
+  );
   const stage = (
     <section className="stage" aria-label="Sala de voz" data-version={version}>
       <header className="stage-header">
@@ -498,126 +684,15 @@ export function Voice({
           {status}
         </div>
       </header>
-      <div className="stage-main">
-        {popout.win ? (
-          <div className="stage-empty">
-            <span className="stage-empty-icon">
-              <Icon name="popout" size={34} />
-            </span>
-            <h3>Transmissão em outra janela</h3>
-            <p>Arraste a janela para outro monitor. O som continua aqui.</p>
-            <button className="primary" onClick={popout.close}>
-              Trazer de volta
-            </button>
-          </div>
-        ) : featured ? (
-          <Screen
-            key={featured.track.sid || "local"}
-            track={featured.track}
-            name={account(featured.identity)?.displayName ?? featured.name}
-            avatar={avatarSrc(account(featured.identity))}
-            local={featured.identity === self}
-            viewers={Math.max(people.length - 1, 0)}
-            volume={settings.stream}
-            deaf={deaf}
-            expanded={maximized}
-            onExpand={onMaximize}
-            onPopout={popout.open}
-            onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
-            onError={onError}
-          />
-        ) : (
-          <div className="stage-empty">
-            <span className="stage-empty-icon">
-              <Icon name="screen" size={34} />
-            </span>
-            <h3>Ninguém está transmitindo</h3>
-            <p>
-              {joined
-                ? "Compartilhe sua tela para todo mundo assistir junto."
-                : people.length
-                  ? "Tem gente na sala. Entre e puxe uma cadeira."
-                  : "A sala está tranquila. Seja o primeiro a entrar."}
-            </p>
-          </div>
-        )}
-      </div>
-      {people.length > 0 && (
-        <div className="tiles">
-          {people.map((p) => (
-            <div
-              key={p.identity}
-              className={
-                "person tile" +
-                (p.speaking && !p.micMuted ? " speaking" : "") +
-                (isLive(p.identity) ? " live" : "") +
-                (featured?.identity === p.identity ? " featured" : "") +
-                (adjusting === p.identity ? " adjusting" : "")
-              }
-              onClick={() => {
-                if (isLive(p.identity)) setFocus(p.identity);
-                // Touch screens have no hover: a tap reveals the volume.
-                setAdjusting(adjusting === p.identity ? null : p.identity);
-              }}
-            >
-              <Avatar
-                name={p.name}
-                src={p.src}
-                size={52}
-                speaking={p.speaking}
-              />
-              {isLive(p.identity) && (
-                <span className="live-badge">AO VIVO</span>
-              )}
-              <div className="tile-footer">
-                <strong>
-                  {p.name}
-                  {p.identity === self ? " (você)" : ""}
-                </strong>
-                <span className="tile-icons">
-                  {p.micMuted && <Icon name="micOff" size={15} />}
-                  {p.deaf && <Icon name="headphonesOff" size={15} />}
-                </span>
-                <span className="sr-only">
-                  {p.micMuted ? "Mic desligado" : "Mic ligado"} ·{" "}
-                  {p.deaf ? "Áudio silenciado" : "Ouvindo"}
-                  {p.speaking && !p.micMuted ? " · falando" : ""}
-                </span>
-              </div>
-              {joined && p.identity !== self && (
-                <label className="tile-volume" title={`Volume de ${p.name}`}>
-                  <span className="sr-only">Volume de {p.name}</span>
-                  <Icon name="volume" size={14} />
-                  <input
-                    type="range"
-                    min="0"
-                    max="200"
-                    value={personVolume(p.identity)}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => {
-                      const value = +e.target.value;
-                      setSettings((old) => ({
-                        ...old,
-                        people: {
-                          ...old.people,
-                          [p.identity.split(":")[0]]: value,
-                        },
-                      }));
-                    }}
-                  />
-                  <span className="volume-value" aria-hidden="true">
-                    {personVolume(p.identity)}%
-                  </span>
-                </label>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <Music
-        identity={joined ? self : undefined}
-        volume={settings.music}
-        onVolume={(music) => setSettings((old) => ({ ...old, music }))}
+      <RoomLayout
+        controller={roomLayout}
+        expanded={maximized}
+        onRestoreExpanded={onMaximize}
+        content={{
+          screen: screenContent,
+          people: peopleContent,
+          music: musicContent,
+        }}
       />
       <div className="control-bar">
         {!joined ? (

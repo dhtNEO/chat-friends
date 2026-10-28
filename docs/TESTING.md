@@ -6,6 +6,16 @@ Frontend: TypeScript strict, ESLint, build Vite e Playwright contra stack real p
 
 `./scripts/check.sh` usa containers; banco teste separado. CI valida Compose sem imprimir segredos, Terraform sem apply, dependências e segredos proporcionais. O teste de backup deve restaurar um dump em outro banco e comparar dados; pg_dump bem-sucedido sozinho não prova restauração.
 
+## Organização e tamanho da sala
+
+Os testes da organização pessoal usam o modo demo, sem iniciar backend, banco ou LiveKit. No frontend, inicie `npm run demo` e, em outro terminal na mesma pasta, execute:
+
+```bash
+ROOM_LAYOUT_DEMO_TEST=1 MUSIC_DEMO_TEST=1 APP_TEST_URL=http://localhost:5173 npx playwright test tests/room-layout.spec.ts tests/music.spec.ts
+```
+
+É necessário ter o Chromium do Playwright instalado; `CHROMIUM_PATH` permite usar um executável já disponível. A suíte de layout exercita arraste, redimensionamento, teclado/toque, persistência e adaptação a telas pequenas. A transmissão do demo é um canvas local: manter o mesmo vídeo e `srcObject` durante a reorganização verifica a continuidade do player, mas não substitui um teste de chamada real entre dispositivos. Ao terminar, encerre o servidor demo com Ctrl+C.
+
 ## Roteiro de mídia 2 → 4 → 8 → 16
 
 Cada rodada: registrar data, commit, hardware/OS/arquitetura, versões dos navegadores, rede/upload, topologia e configuração de bitrate. Não contar sockets de chat como participantes de mídia.

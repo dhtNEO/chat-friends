@@ -2,6 +2,17 @@
 
 O projeto possui somente **dev** (local, padrão) e **prd** (internet). A integração de rede privada anterior foi removida do código, scripts, Compose e documentação. A produção usa DuckDNS, HTTPS/WSS :18443 e DNS-01; o proprietário confirmou seu funcionamento no Mac. Isso não equivale a benchmark de 16 participantes.
 
+## Organização pessoal da sala — 28/10/2026
+
+Transmissão, Pessoas e Música podem mudar de ordem e tamanho, com arraste por mouse/toque e alternativas de teclado. Cards têm ordem pessoal e tamanho ajustável; o layout é salvo por conta/navegador, separado entre telas largas e compactas. Foco e restauração mantêm os elementos de mídia montados. Instruções em [USER_GUIDE](USER_GUIDE.md#organizar-a-sala-de-estar).
+
+- Frontend: lint e build passaram; 10 testes Playwright de layout e os três testes do bot passaram no demo em Chromium 154, incluindo 320×568, 390×844, 768×1024 e 1280×720.
+- A reorganização preservou o mesmo vídeo, `srcObject`, elementos de áudio e avanço da reprodução, sem chamadas de saída da voz no demo. Preferências, restauração, dados salvos inválidos e saída de participante durante arraste foram exercitados.
+- O menu de voz que ficava cortado em 320 px passou a ser posicionado fora do recorte do painel, limitado ao viewport; interação interna, redimensionamento, Escape e retorno do foco passaram.
+- O build de produção foi exercitado com CSP estrita e API simulada: mudanças de tamanho, ordem e tamanho dos cards funcionaram sem violações da política.
+
+Essa validação usa transmissão sintética e serviços simulados; não comprova uma chamada real entre dispositivos. Os servidores temporários de frontend foram encerrados e os containers locais permaneceram parados, conforme solicitado. Não houve publicação ou implantação.
+
 ## Bot de música — 28/10/2026
 
 Busca por nome ou link público do YouTube, fila compartilhada, controles de pausa/continuar/pular/parar, remoção de itens e volume individual foram implementados. Um worker privado publica áudio pelo LiveKit; não usa iframe nem pede chave paga. O limite da SFU passou a 17 participantes para acomodar 16 conexões humanas e o bot. Operação e limites em [MUSIC](MUSIC.md).

@@ -1,0 +1,336 @@
+/* The call lives in Voice; this workspace changes only CSS geometry and order. */
+.stage:has(> .room-workspace) {
+  overflow: hidden;
+  gap: 0.65rem;
+}
+.stage > .stage-header,
+.stage > .control-bar,
+.room-layout-toolbar {
+  flex-shrink: 0;
+}
+.stage > .control-bar {
+  max-width: 100%;
+}
+.room-layout-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.room-layout-toolbar button {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.55rem;
+}
+.room-layout-toolbar > span:not(.sr-only) {
+  color: var(--muted);
+  font-size: 0.75rem;
+  flex: 1 1 10rem;
+}
+.room-layout-toolbar .active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.room-workspace {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: row;
+  gap: 0.65rem;
+  align-content: start;
+  align-items: start;
+  padding: 0.15rem 0.25rem 0.8rem 0.15rem;
+  scrollbar-gutter: stable;
+}
+.room-block {
+  container-type: inline-size;
+  position: relative;
+  min-width: 0;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.room-block-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.3rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.room-block-header > strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.room-block .room-grip,
+.room-block .room-focus,
+.room-block-tools > button {
+  padding: 0.1rem 0.4rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  border-radius: 0.35rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+.room-block .room-grip,
+.person-grip {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.room-block .room-grip:active,
+.person-grip:active {
+  cursor: grabbing;
+}
+.room-grip:hover,
+.room-focus:hover {
+  background: var(--surface-3);
+}
+.room-block-tools {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.room-block-tools label,
+.room-card-size {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  min-width: 0;
+  font-size: 0.73rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.room-block-tools label:first-of-type {
+  flex: 1 1 11rem;
+}
+.room-block-tools input,
+.room-card-size input {
+  flex: 1;
+  min-width: 2.5rem;
+  width: 4rem;
+  margin: 0;
+}
+.room-block-tools select {
+  width: 4.6rem;
+  padding: 0.2rem;
+  margin: 0;
+  font-size: 0.75rem;
+}
+.room-block-tools output,
+.room-card-size output {
+  min-width: 3.3rem;
+  text-align: right;
+}
+.room-card-size {
+  flex-shrink: 0;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.room-block-body {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.room-block[data-reorder-id="screen"] > .room-block-body {
+  display: flex;
+  overflow: auto;
+}
+.room-block-body > .stage-main {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 160px;
+}
+.room-block .stage-empty {
+  border: 0;
+  border-radius: 0;
+  padding: 0.65rem;
+  gap: 0.2rem;
+}
+.room-block .stage-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.2rem;
+}
+.room-block .stage-empty h3 {
+  font-size: 1rem;
+}
+.room-block .stage-empty p {
+  font-size: 0.8rem;
+  margin: 0;
+}
+.room-block .screen {
+  border-radius: 0;
+}
+.room-block .music-panel {
+  border: 0;
+  border-radius: 0;
+}
+.room-block .tiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  min-height: 100%;
+  max-height: none;
+  overflow: visible;
+}
+.room-block .tile {
+  flex: 0 0 min(var(--room-card-size), 100%);
+  width: min(var(--room-card-size), 100%);
+  min-width: 0;
+  height: max(108px, calc(var(--room-card-size) * 0.78));
+  min-height: 108px;
+  padding: 0.8rem 0.5rem 2rem;
+}
+.room-block .person-grip {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  z-index: 3;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 1rem;
+}
+.room-block .tile-volume {
+  top: auto;
+  bottom: 2rem;
+  left: 0.3rem;
+  right: 0.3rem;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  z-index: 2;
+}
+.room-block .tile .live-badge {
+  right: auto;
+  left: 0.4rem;
+}
+.room-empty-people {
+  padding: 0.8rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.room-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1.65rem;
+  height: 1.65rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.6rem 0 0;
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+  background: var(--surface);
+  color: var(--muted);
+  z-index: 4;
+}
+.room-resize:hover,
+.room-resize:focus-visible {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.room-workspace .is-drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+}
+.room-workspace .is-dragging {
+  opacity: 0.65;
+}
+.room-workspace .is-resizing {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+@container (max-width: 28rem) {
+  .room-layout-toolbar > span:not(.sr-only) {
+    display: none;
+  }
+  .room-workspace {
+    scrollbar-gutter: auto;
+  }
+  .room-block-tools label:first-of-type {
+    flex-basis: calc(100% - 5rem);
+  }
+  .room-card-size {
+    flex-wrap: wrap;
+  }
+  .room-block .screen-heading,
+  .room-block .screen-toolbar {
+    padding: 0.4rem;
+    gap: 0.3rem;
+  }
+}
+
+.stage > .stage-header {
+  flex-wrap: wrap;
+}
+.room-block .screen-heading,
+.room-block .screen-toolbar {
+  flex-wrap: wrap;
+}
+.room-block .screen-who {
+  min-width: 0;
+  flex: 1;
+}
+.room-block .screen-who strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-block .screen-actions {
+  flex-shrink: 0;
+}
+.room-block .stream-volume {
+  min-width: 0;
+  width: auto;
+  flex: 1;
+}
+.room-block .stream-volume input {
+  min-width: 0;
+}
+.room-block .audio-badge {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@container (max-width: 20rem) {
+  .room-block .screen-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+  .room-block .screen-heading > .avatar {
+    display: none;
+  }
+  .room-block .screen-toolbar {
+    gap: 0.2rem;
+  }
+  .room-block .audio-badge {
+    flex-basis: 100%;
+    white-space: normal;
+  }
+}

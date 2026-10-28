@@ -1,7 +1,37 @@
 let csrf = "";
+const serverUnavailable =
+  "O servidor está indisponível no momento. Tente novamente em instantes.";
+
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function authenticationFetch(path: string, options?: RequestInit) {
+  try {
+    return await fetch(path, options);
+  } catch {
+    throw new Error(
+      "Não foi possível acessar o servidor. Confira sua conexão e tente novamente.",
+    );
+  }
+}
+
 export async function refreshCsrf() {
-  const r = await fetch("/api/csrf");
-  if (!r.ok) throw new Error("Não foi possível iniciar a sessão");
+  const r = await authenticationFetch("/api/csrf");
+  if (!r.ok)
+    throw new ApiError(
+      r.status,
+      r.status >= 500
+        ? serverUnavailable
+        : r.status === 429
+          ? "Muitas tentativas. Aguarde 5 minutos."
+          : "Não foi possível iniciar a sessão. Recarregue a página e permita os cookies deste site.",
+    );
   csrf = (await r.json()).token;
 }
 export async function api<T = void>(
@@ -22,7 +52,8 @@ export async function api<T = void>(
     } catch {
       /* no JSON */
     }
-    throw new Error(
+    throw new ApiError(
+      r.status,
       r.status === 401
         ? "Sessão encerrada. Entre novamente."
         : r.status === 429
@@ -55,7 +86,7 @@ export async function upload<T>(path: string, blob: Blob): Promise<T> {
 }
 export async function login(username: string, password: string) {
   await refreshCsrf();
-  const r = await fetch("/api/login", {
+  const r = await authenticationFetch("/api/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -64,10 +95,17 @@ export async function login(username: string, password: string) {
     body: new URLSearchParams({ username, password }),
   });
   if (!r.ok)
-    throw new Error(
-      r.status === 429
-        ? "Muitas tentativas. Aguarde 5 minutos."
-        : "Usuário ou senha inválidos.",
+    throw new ApiError(
+      r.status,
+      r.status === 401
+        ? "Usuário ou senha inválidos."
+        : r.status === 403
+          ? "Sua sessão de acesso não pôde ser validada. Recarregue a página e permita os cookies deste site."
+          : r.status === 429
+            ? "Muitas tentativas. Aguarde 5 minutos."
+            : r.status >= 500
+              ? serverUnavailable
+              : "Não foi possível entrar no momento. Recarregue a página e tente novamente.",
     );
   await refreshCsrf();
 }

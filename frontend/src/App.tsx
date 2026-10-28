@@ -14,7 +14,14 @@ import {
   type DockviewReadyEvent,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { api, login, type Member, type User, type Message } from "./api";
+import {
+  ApiError,
+  api,
+  login,
+  type Member,
+  type User,
+  type Message,
+} from "./api";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
@@ -41,11 +48,22 @@ export default function App() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const load = useCallback(async () => {
+  const load = useCallback(async (afterLogin = false) => {
     try {
       setMe(await api("/me"));
-    } catch {
+    } catch (e) {
       setMe(null);
+      if (afterLogin) {
+        if (e instanceof ApiError && e.status === 401)
+          throw new Error(
+            "O login foi aceito, mas a sessão não foi mantida. Permita os cookies deste site e confira se está usando o endereço correto.",
+          );
+        if (e instanceof ApiError && e.status >= 500)
+          throw new Error(
+            "O servidor está indisponível no momento. Tente novamente em instantes.",
+          );
+        throw e;
+      }
     } finally {
       setLoading(false);
     }
@@ -63,7 +81,7 @@ export default function App() {
         notice={notice}
         onLogin={async () => {
           setNotice("");
-          await load();
+          await load(true);
         }}
       />
     );
