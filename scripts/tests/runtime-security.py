@@ -10,7 +10,7 @@ assert services['backend']['environment']['POSTGRES_USER'] != services['db']['en
 assert 'MIGRATION_DB_PASSWORD' not in services['backend']['environment']
 assert services['backend']['environment']['MIGRATIONS_ENABLED']=='false'
 dbnet=set(services['db']['networks'])
-for name in ['web','livekit']:
+for name in ['web','livekit','music']:
  assert not dbnet.intersection(services[name]['networks']),name
 for name in ['backend','web','livekit']:
  container=command('./scripts/compose.sh','ps','-q',name).decode().strip()

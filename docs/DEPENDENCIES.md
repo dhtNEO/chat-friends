@@ -9,7 +9,12 @@ Versões diretas fixadas em pom.xml/package.json/Dockerfiles/Compose; resoluçã
 | PostgreSQL | PostgreSQL License |
 | React, Vite, TypeScript, Node (com componentes adicionais) | MIT / Apache-2.0 (TypeScript) |
 | LiveKit server e SDKs | Apache-2.0 |
+| Python / aiohttp | PSF / Apache-2.0 e MIT (componentes) |
+| yt-dlp e yt-dlp-ejs | Unlicense (verificar também componentes opcionais) |
+| FFmpeg do Debian | LGPL/GPL conforme configuração; revisar a distribuição antes de redistribuir |
 | Dockview (painéis arrastáveis: dockview-react, dockview, dockview-core) | MIT |
+| Fontes do letreiro VGH: Russo One e Orbitron 700 (subconjunto latino, `frontend/public/brand/fonts`, auto-hospedadas por causa da CSP) | SIL OFL 1.1 (textos ao lado dos arquivos) |
+| Kit de marca VGH (favicon, ícones PWA/Apple em `frontend/public/brand`) | Arte do projeto; a logo raster foi gerada por IA, revisar uso antes de distribuir |
 | Caddy | Apache-2.0 |
 | Terraform 1.13 | Business Source License 1.1; verificar termos de uso |
 | Provider Google | MPL-2.0 |
