@@ -129,7 +129,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/backend.oci backend
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/frontend.oci -f frontend/Dockerfile .
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/edge.oci infra/caddy
