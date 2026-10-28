@@ -120,30 +120,33 @@ function Login({
   }
   return (
     <main className="login-page">
-      <div className="login-art">
-        <div className="brand">
-          <Lockup width={300} />
-        </div>
-        <span className="eyebrow">SEU CANTO DA INTERNET</span>
+      <section className="login-hero">
+        <Lockup width={440} />
         <h1>
-          Boa conversa.
+          Sua galera.
           <br />
-          Boa companhia.
+          Sua <span>house</span>.
+          <br />
+          Seu jogo.
         </h1>
-        <p>
-          Um espaço só de vocês.
-          <br />
-          Para jogar, compartilhar e ficar mais um pouco.
-        </p>
-        <div className="orbit">
-          <i />
-          <i />
-          <i />
-          <span>✳</span>
-        </div>
-        <div className="login-foot">Sem distrações. Com seus amigos.</div>
-      </div>
-      <section className="login-form">
+        <p>Voz, tela ao vivo, música e chat num espaço só de vocês.</p>
+        <ul className="login-features">
+          {(
+            [
+              ["speaker", "Voz"],
+              ["screen", "Tela ao vivo"],
+              ["music", "Bot de música"],
+              ["chat", "Chat"],
+            ] as [IconName, string][]
+          ).map(([icon, label]) => (
+            <li key={label}>
+              <Icon name={icon} size={18} />
+              {label}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="login-card">
         <span className="eyebrow">BOM TER VOCÊ POR AQUI</span>
         <h2>Entre e fique à vontade.</h2>
         <p className="muted">

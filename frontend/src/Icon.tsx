@@ -30,6 +30,8 @@ const paths = {
   send: "M4 12l16-8-6 16-2.5-6.5z",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6 6 18",
+  music:
+    "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
   popout: "M14 4h6v6M20 4l-8 8M18 14v6H4V6h6",
   volume: "M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6",
   volumeOff: "M4 9h4l5-4v14l-5-4H4zM16 9l5 6M21 9l-5 6",
