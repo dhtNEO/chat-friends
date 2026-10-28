@@ -86,6 +86,13 @@ if (mode === "prd") {
     throw new Error("URLs devem corresponder aos domínios");
 }
 fs.mkdirSync("infra/compose/generated", { recursive: true, mode: 0o700 });
+fs.chmodSync("infra/compose/generated", 0o700);
+// A scoped control key; the worker never receives the LiveKit signing secret.
+fs.writeFileSync("infra/compose/generated/music-secret", crypto
+  .createHmac("sha256", values.LIVEKIT_API_SECRET)
+  .update("chat-friends:music-control:v1").digest("hex"), { mode: 0o644 });
+// The private 0700 parent protects the host path; the nonroot container reads only this bind.
+fs.chmodSync("infra/compose/generated/music-secret", 0o644);
 fs.writeFileSync(
   "infra/compose/generated/livekit.yaml",
   `port: 7880
@@ -98,7 +105,7 @@ rtc:
   # Docker forwards media to eth0, never to the container loopback socket.
   enable_loopback_candidate: false
 room:
-  max_participants: 16
+  max_participants: 17
   empty_timeout: 60
 keys:
   ${JSON.stringify(values.LIVEKIT_API_KEY)}: ${JSON.stringify(values.LIVEKIT_API_SECRET)}

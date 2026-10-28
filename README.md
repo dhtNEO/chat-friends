@@ -19,7 +19,7 @@ Para mexer na interface sem Docker, backend ou LiveKit: `cd frontend && npm ci &
 
 ## Início rápido no Mac ou Linux
 
-Pré-requisitos: Docker Engine com Compose **2.24.4+** (no Mac, OrbStack), Git e Bash. Não instale Java, Node ou Kubernetes no macOS. Reserve espaço para imagens e builds; os limites dos serviços somam cerca de 2,5 GiB, fora SO/cache/builds.
+Pré-requisitos: Docker Engine com Compose **2.24.4+** (no Mac, OrbStack), Git e Bash. Não instale Java, Node ou Kubernetes no macOS. Reserve espaço para imagens e builds; os limites dos serviços, incluindo o bot de música, somam cerca de 3 GiB, fora SO/cache/builds.
 
 ```bash
 git clone <URL-HTTPS-DO-SEU-REPOSITORIO> chat-friends
@@ -38,6 +38,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 
 - Java 25 / Spring Boot 3.5.16, Maven Wrapper 3.9.11, PostgreSQL 17 / Flyway / sessões JDBC.
 - React 19 / TypeScript / Vite, SDK oficial LiveKit, Caddy e LiveKit self-hosted.
+- Bot de música na chamada: busca por nome ou link do YouTube, fila compartilhada, pausa/pular e volume individual. Serviço privado incluído no Compose; detalhes e limites em [MUSIC](docs/MUSIC.md).
 - Contas individuais, administrador, alteração/redefinição de senha, desativação e invalidação de sessões. Cada pessoa troca nick, usuário, foto de perfil, cores do tema, tamanho da interface e sons da chamada.
 - Mensagens de até 4.000 unidades UTF-16, confirmação após commit, idempotência por UUID, histórico e recuperação após reconexão.
 - Presença da página separada da chamada, microfone, seleção de entrada, ganho de microfone, supressão de ruído nativa, volumes locais por participante/transmissão, indicadores de mic/recepção e tela até Full HD 60 fps com controles próprios, layout em painéis arrastáveis.

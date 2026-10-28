@@ -271,6 +271,17 @@ public class Media {
       l = lease();
     }
     for (var p : participants) {
+      // Only the private worker receives this identity's token. Public admission still rejects it.
+      if (Music.IDENTITY.equals(p.getIdentity())) {
+        boolean safe = !p.getPermission().getCanSubscribe()
+            && !p.getPermission().getCanPublishData()
+            && p.getPermission().getCanPublishSourcesList().equals(List.of(TrackSource.MICROPHONE))
+            && p.getTracksCount() <= 1
+            && p.getTracksList().stream().allMatch(t -> t.getSource() == TrackSource.MICROPHONE
+                && t.getType() == TrackType.AUDIO);
+        if (!safe) live.remove(p.getIdentity());
+        continue;
+      }
       if (!validConnection(p.getIdentity())) {
         live.remove(p.getIdentity());
         continue;

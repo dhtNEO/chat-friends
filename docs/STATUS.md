@@ -1,6 +1,25 @@
-# Estado da implementação — 26/10/2026 (America/Sao_Paulo)
+# Estado da implementação — 28/10/2026 (America/Sao_Paulo)
 
 O projeto possui somente **dev** (local, padrão) e **prd** (internet). A integração de rede privada anterior foi removida do código, scripts, Compose e documentação. A produção usa DuckDNS, HTTPS/WSS :18443 e DNS-01; o proprietário confirmou seu funcionamento no Mac. Isso não equivale a benchmark de 16 participantes.
+
+## Bot de música — 28/10/2026
+
+Busca por nome ou link público do YouTube, fila compartilhada, controles de pausa/continuar/pular/parar, remoção de itens e volume individual foram implementados. Um worker privado publica áudio pelo LiveKit; não usa iframe nem pede chave paga. O limite da SFU passou a 17 participantes para acomodar 16 conexões humanas e o bot. Operação e limites em [MUSIC](MUSIC.md).
+
+Validação executada em stack descartável separada, sem alterar banco ou containers do aplicativo existente:
+
+- Backend: 22 testes de integração passaram, incluindo vínculo dos controles à sessão de voz, reconciliação do bot e rejeição de seu token na admissão pública.
+- Worker: 10 testes passaram, cobrindo API privada, URLs/duração/fila, cancelamento/avanço, leitura fragmentada, enfileiramento durante desconexão, cache de metadados, saída da sala vazia mesmo pausado e opções do SDK instalado.
+- Frontend: lint/build e três testes Playwright no modo demo passaram (busca/link, fila/controles, persistência do volume e tela móvel). O demo não toca áudio do YouTube.
+- Áudio real: Chromium 154 entrou na voz, buscou por nome e pelo link do vídeo público `aqz-KE-bpKQ` e recebeu áudio WebRTC do participante `music-bot`, com RMS medido acima de 0,001 em duas execuções (aproximadamente 0,005 e 0,003). Volume individual a 25%, silenciar/restaurar recepção, pausar/continuar e parar/remover o participante foram exercitados; a segunda execução usou a imagem final do worker.
+- Regressão: nove testes existentes de chat, voz, áudio/transmissão e admissão da sinalização passaram juntos com Node 24 e Chromium 154.
+- Scripts: 23 testes Node passaram, incluindo permissões, estabilidade e rotação da chave dedicada do bot. Imagem do worker e stack isolada foram construídas/iniciadas; não houve publicação de imagem, push ou implantação em produção.
+
+Na primeira validação, Buildx estava indisponível: a stack isolada usou os artefatos aprovados por Maven/Vite sobre os runtimes locais existentes. Em uma verificação posterior de 28/10, Buildx 0.21 respondeu normalmente e o build de backend, frontend e worker pelos Dockerfiles padrão passou. `CHAT_MODE=dev ./scripts/up.sh` atualizou a instância local, os cinco serviços ficaram saudáveis e LiveKit foi reiniciado para carregar a configuração atual. O volume do banco e as contas existentes foram preservados; isso não é implantação em produção.
+
+A instância dev atualizada também foi validada no Edge nativo do Windows, com perfis temporários e janelas headless/visível: voz, publicação de microfone e conexão ICE/DTLS/SCTP por TCP passaram. No teste headless, busca/fila/controles responderam HTTP 200 e o áudio real do YouTube recebido teve RMS acima de 0,001; volume individual, recepção silenciada e parada foram exercitados. O proprietário confirmou entrada na voz pelo InPrivate. A causa da falha relatada no perfil normal não foi identificada; nenhum perfil pessoal ou política de navegador foi alterado.
+
+Esse teste local não comprova operação WAN, áudio em todos os sistemas/navegadores ou capacidade para 16 ouvintes. YouTube pode bloquear o IP, restringir vídeos ou exigir autenticação; falhas ficam visíveis e a fila tenta a próxima música. Cookies pessoais e contorno de restrições não fazem parte da implementação. A fila é temporária e limpa ao reiniciar o worker ou quando a sala permanece vazia.
 
 ## Evidências
 

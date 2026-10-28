@@ -45,6 +45,17 @@ public class LiveKitGateway {
     return t.toJwt();
   }
 
+  public String musicToken() {
+    var t = new AccessToken(key, secret);
+    t.setIdentity(Music.IDENTITY);
+    t.setName("Bot de música");
+    t.setTtl(86400000);
+    t.addGrants(new RoomJoin(true), new RoomName(room), new CanPublish(true),
+        new CanSubscribe(false), new CanPublishData(false),
+        new CanPublishSources(List.of("microphone")), new CanUpdateOwnMetadata(false));
+    return t.toJwt();
+  }
+
   public List<ParticipantInfo> participants() {
     try {
       var r = client.listParticipants(room).execute();

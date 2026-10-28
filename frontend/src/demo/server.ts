@@ -21,6 +21,21 @@ const json = (body: unknown, status = 200) =>
   });
 const empty = () => new Response(null, { status: 204 });
 const fail = (status: number, error: string) => json({ error }, status);
+type DemoSong = {
+  id: string;
+  videoId: string;
+  title: string;
+  duration: number;
+  url: string;
+  requestedBy: string;
+};
+const music = {
+  status: "idle",
+  current: null as DemoSong | null,
+  queue: [] as DemoSong[],
+  error: null,
+  elapsed: 0,
+};
 
 function page(query: URLSearchParams) {
   const before = Number(query.get("before")),
@@ -57,6 +72,65 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
   }
   if (!world.me) return fail(401, "Sessão encerrada.");
   const me = world.me;
+  if (path.startsWith("/music/")) {
+    if (route === "GET /music/state") return json(music);
+    if (!world.inCall) return fail(409, "Entre na voz primeiro");
+    if (route === "GET /music/search") {
+      const query = url.searchParams.get("q") || "Música";
+      const videoId = /(?:v=|youtu\.be\/)([\w-]{11})/.exec(query)?.[1];
+      return json(
+        (videoId
+          ? [videoId]
+          : ["aqz-KE-bpKQ", "M7lc1UVf-VE", "jNQXAC9IVRw"]
+        ).map((id, index) => ({
+          videoId: id,
+          title: videoId
+            ? "Big Buck Bunny · demo"
+            : `${query} · resultado ${index + 1}`,
+          duration: 180 + index * 30,
+          url: `https://www.youtube.com/watch?v=${id}`,
+          requestedBy: "",
+        })),
+      );
+    }
+    if (route === "POST /music/queue") {
+      const videoId = (body as { videoId: string }).videoId;
+      const item = {
+        id: crypto.randomUUID(),
+        videoId,
+        title: `Música de demonstração · ${videoId}`,
+        duration: 180,
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        requestedBy: me.displayName,
+      };
+      if (!music.current) {
+        music.current = item;
+        music.status = "playing";
+      } else music.queue.push(item);
+      return json(music);
+    }
+    if (route === "POST /music/control") {
+      const action = (body as { action: string }).action;
+      if (action === "pause") music.status = "paused";
+      if (action === "resume") music.status = "playing";
+      if (action === "skip") {
+        music.current = music.queue.shift() || null;
+        music.status = music.current ? "playing" : "idle";
+      }
+      if (action === "stop") {
+        music.current = null;
+        music.queue = [];
+        music.status = "idle";
+      }
+      return json(music);
+    }
+    if (method === "DELETE" && path.startsWith("/music/queue/")) {
+      music.queue = music.queue.filter(
+        (item) => item.id !== path.split("/").pop(),
+      );
+      return json(music);
+    }
+  }
   switch (route) {
     case "GET /me":
       return json({ user: me, spaceName: "Entre amigos" });

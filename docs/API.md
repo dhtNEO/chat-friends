@@ -45,3 +45,7 @@ WebSocket `/ws`: sessão autenticada, `Origin` exatamente APP_ORIGIN. Cliente en
 As identidades de mídia são geradas pelo servidor e vinculadas à conta e sessão. Duas abas usam identidades diferentes; ocupam duas das 16 conexões. O cliente não escolhe sala, privilégios administrativos nem permissão de câmera.
 
 `micMuted` vem da publicação de microfone na SFU; `deaf` é estado declarado pelo cliente autenticado e pode levar até 5 s para aparecer nos outros clientes. Não é prova de que o dispositivo físico está sem som. Ganho de microfone e volumes de recepção ficam no cliente, não alteram os ajustes de outros usuários. `screen` informa tetos de até 1080p/30 fps/8 Mbps; resolução efetiva depende da captura e da conexão.
+
+## Bot de música
+
+Rotas autenticadas: `GET /api/music/state` retorna `{status,current,queue,error,elapsed}`; `GET /api/music/search?identity=...&q=...` busca até cinco músicas; `POST /api/music/queue` recebe `{identity,videoId}`; `POST /api/music/control` recebe `{identity,action}` (`pause`, `resume`, `skip`, `stop`); `DELETE /api/music/queue/{id}` recebe `{identity}`. Mutação exige CSRF. Busca e controles exigem conexão de voz ativa na mesma sessão e participante presente na SFU. Nenhum token/chave do bot aparece nas respostas. A fila não persiste em reinícios; veja [MUSIC](MUSIC.md).

@@ -24,11 +24,10 @@ function fixture(fn) {
     path.join(root, ".env.example"),
     path.join(cwd, ".env.example"),
   );
-  const result = spawnSync(
-    process.execPath,
-    ["scripts/render-config.mjs"],
-    { cwd, encoding: "utf8" },
-  );
+  const result = spawnSync(process.execPath, ["scripts/render-config.mjs"], {
+    cwd,
+    encoding: "utf8",
+  });
   assert.equal(result.status, 0);
   const docker = path.join(cwd, "docker");
   fs.writeFileSync(
@@ -66,6 +65,42 @@ test("dev padrão gera credenciais privadas e anuncia loopback", () =>
         .trim(),
       "dev",
     );
+  }));
+test("bot recebe chave própria estável e diretório privado; rotação acompanha LiveKit", () =>
+  fixture((cwd) => {
+    const generated = path.join(cwd, "infra/compose/generated");
+    const keyPath = path.join(generated, "music-secret");
+    const envPath = path.join(cwd, ".env");
+    const originalEnv = fs.readFileSync(envPath, "utf8");
+    const key = fs.readFileSync(keyPath, "utf8");
+    assert.match(key, /^[a-f0-9]{64}$/);
+    assert.notEqual(key, /^LIVEKIT_API_SECRET=(.*)$/m.exec(originalEnv)[1]);
+    assert.equal(fs.statSync(generated).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(keyPath).mode & 0o777, 0o644);
+    assert.match(
+      fs.readFileSync(path.join(generated, "livekit.yaml"), "utf8"),
+      /max_participants: 17/,
+    );
+    const render = () =>
+      assert.equal(
+        spawnSync(process.execPath, ["scripts/render-config.mjs"], {
+          cwd,
+          stdio: "ignore",
+        }).status,
+        0,
+      );
+    render();
+    assert.equal(fs.readFileSync(keyPath, "utf8"), key);
+    assert.equal(fs.readFileSync(envPath, "utf8"), originalEnv);
+    fs.writeFileSync(
+      envPath,
+      originalEnv.replace(
+        /^LIVEKIT_API_SECRET=.*$/m,
+        "LIVEKIT_API_SECRET=" + "rotated-test-secret-".repeat(3),
+      ),
+    );
+    render();
+    assert.notEqual(fs.readFileSync(keyPath, "utf8"), key);
   }));
 test("gerador recusa entradas além de dev/prd antes de alterar configuração", () =>
   fixture((cwd) => {

@@ -867,6 +867,131 @@ input[type="range"] {
   flex-direction: column;
   gap: 0.8571rem;
   padding: 1rem 1.1429rem 1.1429rem;
+  overflow-y: auto;
+}
+
+/* Shared queue, local listening volume. The panel follows the room's own width. */
+.music-panel {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--surface-4);
+  border-radius: 0.85rem;
+  background: var(--surface-2);
+}
+.music-header,
+.music-search,
+.music-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.music-header {
+  margin-bottom: 0.6rem;
+}
+.music-bot-badge {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.35rem;
+  background: var(--accent-strong);
+  border-radius: 0.3rem;
+  color: white;
+}
+.music-status {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.music-search input {
+  flex: 1 1 12rem;
+  width: 0;
+  min-width: 0;
+  margin: 0;
+}
+.music-panel button {
+  flex-shrink: 0;
+}
+.music-hint,
+.music-current small,
+.music-panel li small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.music-hint {
+  margin: 0.5rem 0 0;
+}
+.music-current {
+  margin: 0.65rem 0;
+  display: grid;
+  gap: 0.3rem;
+  overflow-wrap: anywhere;
+}
+.music-results,
+.music-queue {
+  padding: 0;
+  margin: 0.65rem 0;
+  list-style: none;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+.music-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--surface-4);
+}
+.music-panel li > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.music-panel li a {
+  color: var(--text);
+}
+.music-controls {
+  margin-top: 0.65rem;
+}
+.music-volume {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.music-volume input {
+  width: 6rem;
+  margin: 0;
+}
+.music-volume output {
+  min-width: 2.8rem;
+  text-align: right;
+}
+.music-error {
+  color: var(--danger, #ff808b);
+  font-size: 0.85rem;
+}
+@container (max-width: 30rem) {
+  .music-volume {
+    margin-left: 0;
+    width: 100%;
+  }
+  .music-volume input {
+    flex: 1;
+    min-width: 2rem;
+  }
+  .music-panel li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .music-panel button {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.65rem;
+  }
 }
 .stage-header {
   display: flex;
@@ -1026,6 +1151,7 @@ input[type="range"] {
   border-radius: 0;
 }
 .tiles {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10.7143rem, 1fr));
   gap: 0.7143rem;
