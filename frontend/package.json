@@ -14,7 +14,7 @@
   "dependencies": {
     "dockview": "8.4.1",
     "dockview-core": "8.4.1",
-    "dockview-react": "8.4.1",
+    "dockview-react": "8.6.1",
     "livekit-client": "2.23.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
