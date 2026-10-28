@@ -48,6 +48,8 @@ app:
   screen-bitrate: ${SCREEN_BITRATE:8000000}
   screen-height: ${SCREEN_HEIGHT:1080}
   screen-fps: ${SCREEN_FPS:60}
+  music-url: ${MUSIC_INTERNAL_URL:http://music:8090}
+  music-secret-file: ${MUSIC_SECRET_FILE:/run/secrets/music}
 logging:
   level:
     root: WARN

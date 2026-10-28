@@ -133,7 +133,7 @@ limit:
   signal_message_size_limit: 65536
   max_api_request_body_size: 131072
 room:
-  max_participants: 16
+  max_participants: 17
   empty_timeout: 60
 keys:
   ${JSON.stringify(values.LIVEKIT_API_KEY)}: ${JSON.stringify(values.LIVEKIT_API_SECRET)}
@@ -173,6 +173,17 @@ writePrivate("infra/compose/generated/network/livekit.yaml", mediaYaml);
 if (process.env.CHAT_HELPER !== "true") {
   writePrivate("infra/compose/generated/livekit.yaml", mediaYaml);
   writePrivate("infra/compose/generated/mode", mode + "\n");
+  // A scoped control key; the worker never receives the LiveKit signing secret.
+  fs.chmodSync("infra/compose/generated", 0o700);
+  writePrivate(
+    "infra/compose/generated/music-secret",
+    crypto
+      .createHmac("sha256", values.LIVEKIT_API_SECRET)
+      .update("chat-friends:music-control:v1")
+      .digest("hex"),
+  );
+  // The private 0700 parent protects the host path; the nonroot container reads only this bind.
+  fs.chmodSync("infra/compose/generated/music-secret", 0o644);
   fs.chmodSync(".env", 0o600);
 }
 console.log("Configuração validada e gerada; segredos não exibidos.");

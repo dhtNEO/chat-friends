@@ -62,3 +62,7 @@ As identidades de mídia são geradas pelo servidor e vinculadas à conta e sess
 Mantém CSRF para mutações. HTTP 428 em mutação administrativa exige confirmar identidade em Segurança e repetir a ação explicitamente. Login tem inatividade de 2 h e TTL absoluto de 8 h; replay TOTP/recuperação é recusado.
 
 Heartbeat/estado de áudio de uma conexão expirada retorna 409 e exige nova entrada na voz. HTTP 401 continua representando autenticação/sessão inválida; perder uma conexão de mídia não deve encerrar o login do chat.
+
+## Bot de música
+
+Rotas autenticadas: `GET /api/music/state` retorna `{status,current,queue,error,elapsed}`; `GET /api/music/search?identity=...&q=...` busca até cinco músicas; `POST /api/music/queue` recebe `{identity,videoId}`; `POST /api/music/control` recebe `{identity,action}` (`pause`, `resume`, `skip`, `stop`); `DELETE /api/music/queue/{id}` recebe `{identity}`. Mutação exige CSRF. Busca e controles exigem conexão de voz ativa na mesma sessão e participante presente na SFU. Nenhum token/chave do bot aparece nas respostas. A fila não persiste em reinícios; veja [MUSIC](MUSIC.md).

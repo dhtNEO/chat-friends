@@ -36,6 +36,8 @@ class IntegrationTest {
   @Autowired RequestBudget requestBudget;
   final Map<String, org.springframework.test.web.servlet.request.RequestPostProcessor>
       profileLogins = new HashMap<>();
+  @MockitoBean MusicGateway musicBot;
+  @Autowired Music music;
 
   @BeforeEach
   void setup() {
@@ -60,6 +62,65 @@ class IntegrationTest {
     mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
     mvc.perform(post("/api/media/join")).andExpect(status().isForbidden());
     mvc.perform(get("/ws")).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/music/state")).andExpect(status().isUnauthorized());
+    mvc.perform(post("/api/music/control")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void musicControlsRequireOwnedUnexpiredConnectionActuallyInVoice() throws Exception {
+    String identity = accounts.get("ana").id() + ":music-test";
+    var request = connection("ana", identity);
+    assertEquals(409, assertThrows(ResponseStatusException.class,
+        () -> music.search(() -> "ana", request, identity, "jazz")).getStatusCode().value());
+    when(live.participants()).thenReturn(List.of(participant(identity, false)));
+    assertEquals(403, assertThrows(ResponseStatusException.class,
+        () -> music.control(() -> "bia", request, new Music.Control(identity, "stop"))).getStatusCode().value());
+    var other = new MockHttpServletRequest();
+    other.setSession(new MockHttpSession());
+    assertEquals(403, assertThrows(ResponseStatusException.class,
+        () -> music.control(() -> "ana", other, new Music.Control(identity, "stop"))).getStatusCode().value());
+    assertEquals(400, assertThrows(ResponseStatusException.class,
+        () -> music.enqueue(() -> "ana", request, new Music.Enqueue(identity, "https://127.0.0.1"))).getStatusCode().value());
+    assertEquals(400, assertThrows(ResponseStatusException.class,
+        () -> music.control(() -> "ana", request, new Music.Control(identity, "exec"))).getStatusCode().value());
+    verifyNoInteractions(musicBot);
+    var expected = new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"status\":\"playing\"}");
+    when(musicBot.enqueue(eq("aqz-KE-bpKQ"), eq("Ana"), any())).thenReturn(expected);
+    assertEquals(expected, music.enqueue(() -> "ana", request, new Music.Enqueue(identity, "aqz-KE-bpKQ")));
+    accounts.db.update("update spring_session set expiry_time=0 where session_id=?", request.getSession().getId());
+    assertEquals(401, assertThrows(ResponseStatusException.class,
+        () -> music.control(() -> "ana", request, new Music.Control(identity, "stop"))).getStatusCode().value());
+    verify(musicBot, never()).control(any());
+  }
+
+  @Test
+  void reconciliationKeepsOnlyNarrowPublishOnlyMusicParticipant() {
+    var safe = ParticipantInfo.newBuilder().setIdentity(Music.IDENTITY)
+        .setPermission(ParticipantPermission.newBuilder().setCanPublish(true)
+            .addCanPublishSources(TrackSource.MICROPHONE)).build();
+    when(live.participants()).thenReturn(List.of(safe));
+    media.reconcile();
+    verify(live, never()).remove(Music.IDENTITY);
+    var elevated = safe.toBuilder().setPermission(safe.getPermission().toBuilder()
+        .addCanPublishSources(TrackSource.SCREEN_SHARE)).build();
+    when(live.participants()).thenReturn(List.of(elevated));
+    media.reconcile();
+    verify(live).remove(Music.IDENTITY);
+  }
+
+  @Test
+  void botTokenCannotPassPublicSessionAdmissionAndHasNoSubscribeGrant() {
+    var gateway = new LiveKitGateway("http://localhost:7880", "test-key", "test-only-secret-with-32-characters",
+        "amigos", "ws://localhost:8080");
+    String token = gateway.musicToken();
+    var claims = com.auth0.jwt.JWT.decode(token);
+    assertEquals(Music.IDENTITY, claims.getSubject());
+    var grant = claims.getClaim("video").asMap();
+    assertEquals(false, grant.get("canSubscribe"));
+    assertEquals(false, grant.get("canPublishData"));
+    assertEquals(List.of("microphone"), grant.get("canPublishSources"));
+    assertThrows(ResponseStatusException.class,
+        () -> new MediaAdmission(gateway, media, accounts).downscope(token));
   }
 
   @Test

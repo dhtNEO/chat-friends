@@ -18,6 +18,7 @@ import { Icon } from "./Icon";
 import { Avatar, Popover, avatarSrc, usePeople } from "./ui";
 import { PopoutStage, usePopout } from "./Popout";
 import { loadSounds, playEffect, type Effect } from "./sounds";
+import { Music, MUSIC_IDENTITY } from "./Music";
 type Connection = {
   identity: string;
   url: string;
@@ -220,8 +221,12 @@ export function Voice({
         RoomEvent.TrackUnmuted,
       ])
         r.on(event, bump);
-      r.on(RoomEvent.ParticipantConnected, () => effect("join", true));
-      r.on(RoomEvent.ParticipantDisconnected, () => effect("leave", true));
+      r.on(RoomEvent.ParticipantConnected, (p) => {
+        if (p.identity !== MUSIC_IDENTITY) effect("join", true);
+      });
+      r.on(RoomEvent.ParticipantDisconnected, (p) => {
+        if (p.identity !== MUSIC_IDENTITY) effect("leave", true);
+      });
       r.on(RoomEvent.Reconnecting, () => setStatus("Reconectando à voz…"));
       r.on(RoomEvent.Reconnected, () => {
         setStatus("Voz conectada");
@@ -447,18 +452,20 @@ export function Voice({
     directory.byId.get(identity.split(":")[0]);
   const people = (
     joined
-      ? participants.map((p) => ({
-          identity: p.identity,
-          name: p.name || "Amigo",
-          speaking: p.isSpeaking,
-          micMuted: !p.isMicrophoneEnabled,
-          deaf:
-            p === room.current?.localParticipant
-              ? deaf
-              : (state.participants.find(
-                  (person) => person.identity === p.identity,
-                )?.deaf ?? false),
-        }))
+      ? participants
+          .filter((p) => p.identity !== MUSIC_IDENTITY)
+          .map((p) => ({
+            identity: p.identity,
+            name: p.name || "Amigo",
+            speaking: p.isSpeaking,
+            micMuted: !p.isMicrophoneEnabled,
+            deaf:
+              p === room.current?.localParticipant
+                ? deaf
+                : (state.participants.find(
+                    (person) => person.identity === p.identity,
+                  )?.deaf ?? false),
+          }))
       : state.participants.map((p) => ({ ...p, speaking: false }))
   ).map((p) => ({
     ...p,
@@ -607,6 +614,11 @@ export function Voice({
           ))}
         </div>
       )}
+      <Music
+        identity={joined ? self : undefined}
+        volume={settings.music}
+        onVolume={(music) => setSettings((old) => ({ ...old, music }))}
+      />
       <div className="control-bar">
         {!joined ? (
           <button
@@ -875,7 +887,9 @@ export function Voice({
               : ((settings.output / 100) *
                   (source === Track.Source.ScreenShareAudio
                     ? settings.stream
-                    : personVolume(identity))) /
+                    : identity === MUSIC_IDENTITY
+                      ? settings.music
+                      : personVolume(identity))) /
                 100
           }
         />
