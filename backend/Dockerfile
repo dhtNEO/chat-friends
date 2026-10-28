@@ -1,4 +1,4 @@
-FROM maven:3.9.11-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /src
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2,sharing=locked --mount=type=secret,id=maven_settings,target=/root/.m2/settings.xml --mount=type=secret,id=build_truststore \
