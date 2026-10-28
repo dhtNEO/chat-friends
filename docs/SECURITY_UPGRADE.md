@@ -105,3 +105,29 @@ As publicações prd do aplicativo/SFU são explicitamente IPv4. Isso não alter
 Na primeira atualização, snapshots completos antigos e arquivos temporários desconhecidos do DuckDNS são preservados em `generated/operator-backups`, fora do mount do helper. Os snapshots ativos passam a conter somente parâmetros de rede. A configuração usa o mesmo lock do atualizador para evitar concorrência nessa migração. Logs ficam separados em `generated/duckdns-logs`. Proteja também os arquivos arquivados e aplique retenção somente após verificar o backup.
 
 O helper propõe `generated/network/network.env` e um YAML candidato em `generated/network/livekit.yaml`. O chamador valida uma lista fechada de variáveis e não permite expansão de segredos. O YAML ativo (`generated/livekit.yaml`) e o marcador de modo ficam fora do mount gravável do worker e são gerados pelo código do operador sob lock. Assim, o estado de rede não pode sobrescrever credenciais de banco/MFA nem escolher o modo de execução.
+
+### Atualizações automáticas de dependências
+
+O arquivo `.github/dependabot.yml` agenda atualizações de versão mensalmente,
+no primeiro dia do mês, às 09:00 no fuso `America/Sao_Paulo`.
+Todas as atualizações de versão (major, minor e patch) são agrupadas por
+ecossistema: Maven, npm, Go, imagens Docker e GitHub Actions. Isso inclui os
+pacotes Dockview no mesmo grupo npm. Cada entrada permite um único PR de
+atualização de versão aberto; com cinco entradas, são até cinco PRs simultâneos.
+
+O agrupamento reduz PRs, mas não garante compatibilidade. Como versões major
+podem exigir migrações, revisar o conjunto e executar testes e scans antes do
+merge. Uma atualização incompatível pode bloquear o grupo inteiro; nesse caso,
+separar ou adiar explicitamente essa dependência antes de aprovar as demais.
+Não há merge automático.
+
+Correções de segurança possuem um grupo separado por ecossistema, quando as
+atualizações automáticas de segurança estão habilitadas nas configurações do
+GitHub. Elas não aguardam a agenda mensal e possuem um limite separado gerido
+pelo GitHub, portanto podem gerar PRs além dos cinco de atualização de versão.
+Continuar revisando alertas semanalmente e após avisos relevantes.
+
+Esta configuração passa a valer quando chegar à branch padrão. Excluir os PRs
+anteriores não desativa o Dependabot; a nova configuração controla as próximas
+execuções. O bot pode não oferecer novamente versões cujos PRs foram fechados
+manualmente; conferir as dependências e os logs das próximas execuções.
