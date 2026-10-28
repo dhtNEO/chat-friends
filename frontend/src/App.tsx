@@ -20,7 +20,7 @@ import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
 import { Profile } from "./Profile";
-import { Logo } from "./Logo";
+import { Lockup, Logo } from "./Logo";
 import { applyTheme } from "./theme";
 import {
   Empty,
@@ -122,7 +122,7 @@ function Login({
     <main className="login-page">
       <div className="login-art">
         <div className="brand">
-          <Logo /> entre amigos
+          <Lockup width={300} />
         </div>
         <span className="eyebrow">SEU CANTO DA INTERNET</span>
         <h1>
@@ -419,11 +419,8 @@ function Workspace({
   const sidebar = (
     <aside className="sidebar" aria-label="Navegação">
       <div className="brand">
-        <Logo />
-        <span>
-          {me.spaceName}
-          <small>Um espaço só nosso</small>
-        </span>
+        <Lockup width={190} />
+        <small>{me.spaceName}</small>
       </div>
       <div className="channel-section">
         <span className="eyebrow">CANAIS DE TEXTO</span>

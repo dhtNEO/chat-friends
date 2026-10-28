@@ -1,3 +1,15 @@
+/* VGH lettering, self-hosted (SIL OFL 1.1, see public/brand/fonts). */
+@font-face {
+  font-family: "Russo One";
+  src: url("/brand/fonts/russo-one-latin.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Orbitron";
+  font-weight: 700;
+  src: url("/brand/fonts/orbitron-700-latin.woff2") format("woff2");
+  font-display: swap;
+}
 :root {
   font-family:
     Inter,
@@ -376,8 +388,17 @@ h3 {
   --muted: #9b9cb1;
   --faint: #6f7086;
   /* Personal colors (theme.ts); the rest derives from them. */
-  --primary: #8b5cf6;
-  --secondary: #ec4899;
+  --primary: #7d3cff;
+  --secondary: #b980fa;
+  /* VGH logo; theme.ts recomputes these from each person's colors. */
+  --logo-roof-a: #be9dff;
+  --logo-roof-b: #7d3cff;
+  --logo-roof-c: #b980fa;
+  --logo-pad-b: #f1e9ff;
+  --logo-pad-c: #b892ff;
+  --logo-letter: #ece2ff;
+  --logo-accent: #c799fb;
+  --logo-ink: #4b2499;
   --on-primary: #ffffff;
   --accent-strong: var(--primary);
   --accent: color-mix(in srgb, var(--primary) 62%, white);
@@ -1949,4 +1970,29 @@ body:has(.compact) .demo-badge {
 .mfa-secret {
   overflow-wrap: anywhere;
   user-select: all;
+}
+.lockup {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.lockup-letters {
+  font-family: "Russo One", "Arial Black", sans-serif;
+}
+.lockup-tagline {
+  font-family: "Orbitron", "Arial", sans-serif;
+  font-weight: 700;
+}
+.sidebar .brand {
+  display: grid;
+  gap: 0.3rem;
+}
+.sidebar .brand small {
+  margin-left: 0.15rem;
+}
+.login-art .brand .lockup {
+  filter: drop-shadow(
+    0 0 1.5rem color-mix(in srgb, var(--primary) 35%, transparent)
+  );
 }
