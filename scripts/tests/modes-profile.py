@@ -11,7 +11,7 @@ def compose(mode, **options):
 result = compose('dev')
 assert result.returncode == 0
 services = json.loads(result.stdout)['services']
-assert set(services) == {'db', 'backend', 'livekit', 'web'}
+assert set(services) == {'db', 'backend', 'livekit', 'music', 'web'}
 ports = [p for service in services.values() for p in service.get('ports', [])]
 assert {(p['target'],p['protocol']) for p in ports} == {(8080,'tcp'),(7881,'tcp'),(7882,'udp')}
 assert all(p['host_ip'] == '127.0.0.1' for p in ports)
