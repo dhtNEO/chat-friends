@@ -11,8 +11,10 @@ function fixture(fn) {
   fs.mkdirSync(path.join(cwd, "infra/compose/generated"), { recursive: true });
   for (const name of [
     "render-config.mjs",
+    "security-config.mjs",
     "network-config.mjs",
     "modes.sh",
+    "compose.sh",
     "configure.sh",
     "check.sh",
   ])
@@ -24,11 +26,10 @@ function fixture(fn) {
     path.join(root, ".env.example"),
     path.join(cwd, ".env.example"),
   );
-  const result = spawnSync(
-    process.execPath,
-    ["scripts/render-config.mjs"],
-    { cwd, encoding: "utf8" },
-  );
+  const result = spawnSync(process.execPath, ["scripts/render-config.mjs"], {
+    cwd,
+    encoding: "utf8",
+  });
   assert.equal(result.status, 0);
   const docker = path.join(cwd, "docker");
   fs.writeFileSync(
@@ -53,9 +54,15 @@ function fixture(fn) {
 test("dev padrão gera credenciais privadas e anuncia loopback", () =>
   fixture((cwd) => {
     assert.equal(fs.statSync(path.join(cwd, ".env")).mode & 0o777, 0o600);
+    assert.deepEqual(
+      fs.readFileSync(path.join(cwd, "infra/compose/generated/livekit.yaml")),
+      fs.readFileSync(
+        path.join(cwd, "infra/compose/generated/network/livekit.yaml"),
+      ),
+    );
     assert.match(
       fs.readFileSync(
-        path.join(cwd, "infra/compose/generated/livekit.yaml"),
+        path.join(cwd, "infra/compose/generated/network/livekit.yaml"),
         "utf8",
       ),
       /node_ip: "127.0.0.1"/,
@@ -149,4 +156,97 @@ test("TURN em dev é recusado antes de gerar configuração", () =>
       }).status,
       0,
     );
+  }));
+
+test("compose não inicia modo divergente e permite inspecionar/parar a stack", () =>
+  fixture((cwd, env) => {
+    fs.writeFileSync(path.join(cwd, "infra/compose/generated/mode"), "prd\n");
+    fs.writeFileSync(
+      path.join(cwd, "docker"),
+      "#!/usr/bin/env bash\nprintf called > docker-called\n",
+      { mode: 0o700 },
+    );
+    for (const command of ["up", "start", "restart", "run", "exec"]) {
+      assert.notEqual(
+        spawnSync("bash", ["scripts/compose.sh", command], {
+          cwd,
+          env,
+          stdio: "ignore",
+        }).status,
+        0,
+      );
+      assert.equal(fs.existsSync(path.join(cwd, "docker-called")), false);
+    }
+    for (const command of ["config", "logs", "down"]) {
+      assert.equal(
+        spawnSync("bash", ["scripts/compose.sh", command], {
+          cwd,
+          env,
+          stdio: "ignore",
+        }).status,
+        0,
+      );
+      fs.rmSync(path.join(cwd, "docker-called"));
+    }
+  }));
+
+test("override de rede não pode importar credenciais nem expandir variáveis do operador", () =>
+  fixture((cwd, env) => {
+    fs.writeFileSync(
+      path.join(cwd, "docker"),
+      "#!/usr/bin/env bash\nprintf called > docker-called\n",
+      { mode: 0o700 },
+    );
+    const network = path.join(
+      cwd,
+      "infra/compose/generated/network/network.env",
+    );
+    for (const value of [
+      "APP_DB_USER=friends\n",
+      "MFA_ENCRYPTION_KEY=forbidden\n",
+      "ACME_EMAIL=${POSTGRES_PASSWORD}@example.org\n",
+    ]) {
+      fs.writeFileSync(network, value);
+      assert.notEqual(
+        spawnSync("bash", ["scripts/compose.sh", "config"], {
+          cwd,
+          env,
+          stdio: "ignore",
+        }).status,
+        0,
+      );
+      assert.equal(fs.existsSync(path.join(cwd, "docker-called")), false);
+    }
+    fs.writeFileSync(network, "APP_DOMAIN=test.duckdns.org\n");
+    assert.equal(
+      spawnSync("bash", ["scripts/compose.sh", "config"], {
+        cwd,
+        env,
+        stdio: "ignore",
+      }).status,
+      0,
+    );
+    assert.equal(
+      fs
+        .readdirSync(path.join(cwd, "infra/compose/generated"))
+        .some((n) => n.startsWith(".network.")),
+      false,
+    );
+  }));
+test("renderização privada rejeita override de rede de credenciais", () =>
+  fixture((cwd) => {
+    const file = path.join(cwd, "infra/compose/generated/runtime.env"),
+      before = fs.readFileSync(file, "utf8");
+    fs.writeFileSync(
+      path.join(cwd, "infra/compose/generated/network/network.env"),
+      "APP_DB_PASSWORD=forbidden\n",
+    );
+    assert.notEqual(
+      spawnSync(process.execPath, ["scripts/render-config.mjs", "dev"], {
+        cwd,
+        stdio: "ignore",
+      }).status,
+      0,
+    );
+    assert.equal(fs.readFileSync(file, "utf8"), before);
   }));

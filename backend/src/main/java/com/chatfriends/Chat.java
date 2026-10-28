@@ -26,6 +26,8 @@ public class Chat {
     this.events = events;
   }
 
+  private record Sent(Message message, boolean created) {}
+
   public record Message(
       long id, UUID clientId, UUID authorId, String author, String body, Instant createdAt) {}
 
@@ -59,7 +61,7 @@ public class Chat {
     var a = accounts.active(user);
     if (clientId == null || body == null || body.isBlank() || body.length() > 4000)
       throw new ResponseStatusException(BAD_REQUEST, "Mensagem: 1 a 4000 caracteres");
-    Message m =
+    Sent sent =
         tx.execute(
             s -> {
               db.execute("select pg_advisory_xact_lock(1)");
@@ -72,7 +74,7 @@ public class Chat {
               if (!old.isEmpty()) {
                 if (!old.getFirst().body().equals(body))
                   throw new ResponseStatusException(CONFLICT, "Identificador reutilizado");
-                return old.getFirst();
+                return new Sent(old.getFirst(), false);
               }
               if (!rate.allow("chat:" + a.id(), 20, 10))
                 throw new ResponseStatusException(TOO_MANY_REQUESTS);
@@ -83,9 +85,9 @@ public class Chat {
                       a.id(),
                       clientId,
                       body);
-              return db.query(SELECT + "where m.id=?", this::map, id).getFirst();
+              return new Sent(db.query(SELECT + "where m.id=?", this::map, id).getFirst(), true);
             });
-    events.broadcast(Map.of("type", "message", "message", m));
-    return m;
+    if (sent.created()) events.broadcast(Map.of("type", "message", "message", sent.message()));
+    return sent.message();
   }
 }

@@ -30,7 +30,7 @@ public class Accounts implements UserDetailsService {
       Long avatarVersion) {}
 
   Account map(java.sql.ResultSet r, int n) throws java.sql.SQLException {
-    long avatar = r.getLong("avatar_version");
+    Long avatar = r.getObject("avatar_version", Long.class);
     return new Account(
         r.getObject("id", UUID.class),
         r.getString("username"),
@@ -39,7 +39,7 @@ public class Accounts implements UserDetailsService {
         r.getBoolean("enabled"),
         r.getString("primary_color"),
         r.getString("secondary_color"),
-        r.wasNull() ? null : avatar);
+        avatar);
   }
 
   static final String SELECT =

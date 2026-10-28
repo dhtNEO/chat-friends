@@ -1,21 +1,38 @@
 # Compose >= 2.24.4 (tag !override). Sem exposição da porta administrativa 7880.
 services:
+  backend:
+    environment:
+      ADMIN_MFA_REQUIRED: "true"
+      COOKIE_SECURE: "true"
   livekit:
     ports: !override
-      - "7881:7881/tcp"
-      - "7882:7882/udp"
+      - "0.0.0.0:7881:7881/tcp"
+      - "0.0.0.0:7882:7882/udp"
   web:
+    networks: !override [api_net, signal_net]
     ports: !override []
     environment:
       MEDIA_CONNECT_SRC: "https://${MEDIA_DOMAIN:?}:${PUBLIC_HTTPS_PORT:-443} wss://${MEDIA_DOMAIN:?}:${PUBLIC_HTTPS_PORT:-443}"
   edge:
-    image: caddy:2.11.4-alpine
+    image: chat-friends-edge
+    build: ../caddy
+    entrypoint: ["caddy"]
+    command: ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    user: "${CHAT_UID:-1000}:${CHAT_GID:-1000}"
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    pids_limit: 128
+    cpus: ${EDGE_CPUS:-1.0}
+    sysctls: {net.ipv4.ip_unprivileged_port_start: "0"}
+    networks: [ingress_net, api_net, signal_net]
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
-    ports: ["80:80/tcp", "443:443/tcp", "443:443/udp"]
+    ports: ["0.0.0.0:80:80/tcp", "0.0.0.0:443:443/tcp", "0.0.0.0:443:443/udp"]
     environment:
       NO_PROXY: localhost,127.0.0.1,backend,db,livekit,web
       no_proxy: localhost,127.0.0.1,backend,db,livekit,web
+      APP_PROXY_KEY: ${APP_PROXY_KEY:?}
       APP_DOMAIN: ${APP_DOMAIN:?}
       MEDIA_DOMAIN: ${MEDIA_DOMAIN:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
@@ -24,11 +41,28 @@ services:
       - ./Caddyfile.prd:/etc/caddy/Caddyfile:ro
       - certificates:/data
       - caddy_config:/config
-    depends_on: [web, livekit]
+    depends_on:
+      web: {condition: service_healthy}
+      livekit: {condition: service_started}
+      edge-permissions: {condition: service_completed_successfully}
     logging:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}
     mem_limit: 128m
+  edge-permissions:
+    image: alpine:3.24.3
+    restart: "no"
+    network_mode: none
+    read_only: true
+    user: "0:0"
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      CHAT_UID: ${CHAT_UID:-1000}
+      CHAT_GID: ${CHAT_GID:-1000}
+    entrypoint: ["/bin/sh", "-c", 'chown -R "$$CHAT_UID:$$CHAT_GID" /data /config && chmod 700 /data /config']
+    volumes: ["certificates:/data", "caddy_config:/config"]
 volumes:
   certificates:
   caddy_config:

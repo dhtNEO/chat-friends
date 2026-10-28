@@ -59,7 +59,33 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
   const me = world.me;
   switch (route) {
     case "GET /me":
-      return json({ user: me, spaceName: "Entre amigos" });
+      return json({
+        user: me,
+        spaceName: "Entre amigos",
+        security: {
+          mfaEnabled: false,
+          mfaPending: false,
+          enrollmentRequired: false,
+        },
+      });
+    case "GET /security/sessions":
+      return json([
+        {
+          id: "demo",
+          current: true,
+          lastAccessAt: Date.now(),
+          expiresAt: Date.now() + 7200000,
+        },
+      ]);
+    case "POST /security/reauth":
+    case "POST /security/mfa/setup":
+      return fail(
+        400,
+        "Segurança de conta disponível somente na aplicação conectada.",
+      );
+    case "DELETE /security/sessions/demo":
+      world.me = null;
+      return empty();
     case "POST /logout":
       world.me = null;
       return empty();

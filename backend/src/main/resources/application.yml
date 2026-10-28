@@ -8,9 +8,9 @@ spring:
   session:
     jdbc:
       initialize-schema: never
-    timeout: 12h
+    timeout: 2h
   flyway:
-    enabled: true
+    enabled: ${MIGRATIONS_ENABLED:true}
 server:
   port: 8080
   shutdown: graceful
@@ -24,9 +24,20 @@ server:
         secure: ${COOKIE_SECURE:false}
         same-site: strict
   tomcat:
+    connection-timeout: 10s
+    keep-alive-timeout: 20s
+    max-connections: 200
+    accept-count: 64
+    threads:
+      max: 40
+      min-spare: 4
     max-http-form-post-size: 16KB
     max-swallow-size: 16KB
 app:
+  proxy-key: ${APP_PROXY_KEY:}
+  mfa-key: ${MFA_ENCRYPTION_KEY:}
+  admin-mfa-required: ${ADMIN_MFA_REQUIRED:false}
+  session-absolute-seconds: 28800
   origin: ${APP_ORIGIN:http://localhost:8080}
   name: ${SPACE_NAME:Entre amigos}
   room: ${LIVEKIT_ROOM:amigos}

@@ -33,3 +33,7 @@ Os testes de corrida verificam duas reservas normais, expiração, revogação a
 Faça backup; coloque em manutenção; pare web/backend/livekit. Gere novas chaves LiveKit e segredo de banco fora do Git. Trocar senha PostgreSQL exige `ALTER ROLE` pelo canal administrativo seguro **e** atualização de `.env`: mudar env sozinho não altera senha de um volume existente. Reinicie SFU (encerra chamadas), gere config, recrie serviços; invalide sessões se houver comprometimento. Não copie segredos para scripts, histórico ou Terraform. Em caso de vazamento, trate backups/relatórios de testes como possivelmente afetados.
 
 Reporte vulnerabilidade de forma privada ao proprietário; não abra issue pública com token, senha, dump ou dados pessoais. Sem processo de divulgação público configurado ainda.
+
+## Endurecimento operacional
+
+Veja [SECURITY_UPGRADE.md](SECURITY_UPGRADE.md): migração de privilégios do banco, MFA obrigatório para administradores em prd, expiração/revogação de sessões, limites de requests e sockets, segmentação, helper com escrita mínima, backups autenticados e procedimentos de incidente. DNS/IP públicos são esperados; autoridade DNS, sessões e chaves continuam privados. As verificações de roteador/Mac/ARM64 e bloqueio de acesso à LAN precisam de aceite do proprietário.

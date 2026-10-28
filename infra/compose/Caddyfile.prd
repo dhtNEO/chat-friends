@@ -4,10 +4,14 @@
  admin off
 }
 {$APP_DOMAIN} {
+ request_header X-Chat-Client-IP {http.request.remote.host}
+ request_header X-Chat-Proxy-Key {$APP_PROXY_KEY:disabled}
  header Strict-Transport-Security "max-age=31536000"
  reverse_proxy web:8080
 }
 {$MEDIA_DOMAIN} {
+ request_header X-Chat-Client-IP {http.request.remote.host}
+ request_header X-Chat-Proxy-Key {$APP_PROXY_KEY:disabled}
  @signal path /rtc /rtc/*
  handle @signal {
   forward_auth backend:8080 {

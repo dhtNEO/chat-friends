@@ -15,10 +15,16 @@ duck_remove_operation() {
 }
 duck_node() {
   local network=${DUCKDNS_NETWORK:-bridge}
+  [[ -f infra/compose/generated/helper.env ]] || { echo "Execute configure.sh em manutenção antes de usar o helper atualizado." >&2; return 1; }
   "$duck_docker" run --rm -i --name "$duck_operation" --label "chatfriends.duckdns.lock=$duck_lock_id" --network "$network" \
     -e NO_PROXY=localhost,127.0.0.1,backend,db,livekit,web,edge -e no_proxy=localhost,127.0.0.1,backend,db,livekit,web,edge \
-    --user "$(id -u):$(id -g)" -v "$PWD:/work" -v "$PWD/$duck_dir/token:/work/$duck_dir/token:ro" -w /work \
-    node:24.14.0-alpine node scripts/duckdns-update.mjs "$@"
+    --read-only --cap-drop ALL --security-opt no-new-privileges:true --pids-limit 128 --memory 256m --cpus 0.5 \
+    --tmpfs "/tmp:size=32m,mode=1777" --tmpfs "/work:rw,size=8m,uid=$(id -u),gid=$(id -g)" \
+    --user "$(id -u):$(id -g)" -v "$PWD/scripts:/work/scripts:ro" -v "$PWD/.env.example:/work/.env.example:ro" \
+    -v "$PWD/infra/compose/generated/helper.env:/work/.env:ro" \
+    -v "$PWD/infra/compose/generated/network:/work/infra/compose/generated/network" \
+    -v "$PWD/$duck_dir:/work/$duck_dir" -v "$PWD/$duck_dir/token:/work/$duck_dir/token:ro" \
+    -e CHAT_HELPER=true -w /work node:24.22.1-alpine node scripts/duckdns-update.mjs "$@"
 }
 duck_release() {
   duck_remove_operation "$duck_lock_id"
@@ -39,7 +45,7 @@ duck_lock() {
   duck_lock_id=$("$duck_docker" create --name chat-friends-duckdns-lock \
     --label "chatfriends.duckdns.pid=$$" --label "chatfriends.duckdns.start=$(duck_signature $$)" \
     --label "chatfriends.duckdns.root=$(printf '%s' "$PWD" | cksum | awk '{print $1}')" \
-    node:24.14.0-alpine true) || return 1
+    node:24.22.1-alpine true) || return 1
   trap duck_release EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM

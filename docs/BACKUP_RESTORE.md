@@ -23,3 +23,11 @@ Compare contagens e, em ambiente isolado, confirme login/histórico com a versã
 Avise usuários e verifique backup legível. `CONFIRM_RESTORE=REPLACE_DATABASE ./scripts/restore.sh backups/ARQUIVO.dump` para web/backend/livekit, restaura transacionalmente com `--clean --if-exists`, apaga sessões/conexões/leases e reinicia. A variável é uma confirmação explícita de substituição; não é dry-run. Se restaurar falhar, serviços permanecem parados para diagnóstico. No modo prd use CHAT_MODE=prd; edge pode servir erro enquanto web está parado, sem novas escritas.
 
 Teste novamente saúde, login, leitura de mensagem conhecida, nova mensagem, chamada. Sessões antigas serão invalidadas. Não restaura chamadas ativas. Dados posteriores ao backup serão perdidos se não forem reconciliados antes da substituição. Procedimento de migração/rollback em MIGRATION.
+
+## Bundle autenticado de dados e configuração
+
+`CHAT_MODE=prd ./scripts/backup-encrypted.sh` reúne dump, `.env`, credenciais separadas/chave MFA, estado de rede/DuckDNS e certificados existentes, quando o edge está ativo. Usa AES-256-GCM e scrypt (N=32768, r=8, p=1, salt aleatório), frase digitada de pelo menos 16 caracteres e arquivo temporário privado; nunca passa a frase em argv. O texto claro temporário é removido ao fim. Criptografia não protege contra um Mac já comprometido enquanto o backup é criado.
+
+`./scripts/open-backup.sh backups/arquivo.cfbackup` autentica e descriptografa para um diretório privado novo. Não extrai nem substitui configuração automaticamente. Inspecione o tar, extraia somente um bundle próprio confiável em pasta privada e ensaie primeiro em instalação isolada. Restaure a configuração e a **mesma chave MFA** antes de restaurar `database.dump` pelo procedimento acima. Na versão nova, `restore.sh` também reprovisiona privilégios/migrações e invalida sessões/conexões. Proteja/remova a cópia descriptografada quando terminar. Sem a frase não há recuperação criptográfica.
+
+Veja [atualização de segurança](SECURITY_UPGRADE.md) para backup anterior à primeira migração, recuperação do operador e aceite do Mac. Testes automatizados cobrem round trip, senha incorreta e adulteração sem confirmar um arquivo de saída; a cópia externa e o ensaio completo no seu hardware continuam manuais.

@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17.7-alpine
+        image: postgres:17.11-alpine
         env:
           POSTGRES_USER: friends
           POSTGRES_PASSWORD: ci-ephemeral-test-only
@@ -36,6 +36,11 @@ jobs:
         with: { distribution: temurin, java-version: "25", cache: maven }
       - run: ./mvnw -B -ntp verify
         working-directory: backend
+      - name: Scan resolved Java SBOM
+        run: |
+          test -f backend/target/bom.json
+          docker run --rm -v "$PWD:/work:ro" -v "$RUNNER_TEMP:/reports" aquasec/trivy:0.68.1 sbom --format json --output /reports/java-vulns.json /work/backend/target/bom.json
+          python3 scripts/vulnerability-gate.py "$RUNNER_TEMP/java-vulns.json"
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -43,44 +48,69 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           {
-            node-version: "24.14.0",
+            node-version: "24.22.1",
             cache: npm,
             cache-dependency-path: frontend/package-lock.json,
           }
       - run: npm ci && npm run lint && npm run build && npm audit --omit=dev --audit-level=high
         working-directory: frontend
   stack:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "24.14.0" }
+        with: { node-version: "24.22.1" }
       - run: node --test scripts/tests/*.test.mjs
+      - run: python3 scripts/tests/security-policy-test.py
       - run: python3 scripts/tests/duckdns-lock.py
+      - run: python3 scripts/tests/helper-mounts.py
       - run: ./scripts/up.sh
+      - run: python3 scripts/tests/caddy-security.py
+      - run: python3 scripts/tests/runtime-security.py && ./scripts/check-db-privileges.sh
       - run: docker build -t chat-friends-edge-duckdns infra/caddy
       - run: python3 scripts/tests/modes-profile.py
       - run: python3 scripts/tests/prd-profile.py
       - run: python3 scripts/tests/dns01-https.py
       - run: ./scripts/compose.sh config -q && CHAT_MODE=prd ./scripts/compose.sh config -q
+      - name: Release build cache before browser dependencies
+        run: docker builder prune --force
       - name: Browser tests with disposable administrator
         shell: bash
         run: |
           set -euo pipefail
           umask 077
+          echo "administrator bootstrap" > "$RUNNER_TEMP/browser-phase"
           secret=$(mktemp "$PWD/infra/compose/generated/ci-admin.XXXXXX")
           trap 'rm -f "$secret"' EXIT
           openssl rand -hex 24 > "$secret"
           export TEST_ADMIN_PASSWORD="$(cat "$secret")"
           echo "::add-mask::$TEST_ADMIN_PASSWORD"
-          ./scripts/compose.sh run --rm --no-deps --user 0:0 -v "$secret:/run/password:ro" -e ADMIN_PASSWORD_FILE=/run/password backend --server.port=0 --bootstrap-admin=admin
+          ./scripts/compose.sh run --rm --no-deps --user "$(id -u):$(id -g)" -v "$secret:/run/password:ro" -e ADMIN_PASSWORD_FILE=/run/password backend --server.port=0 --bootstrap-admin=admin
           export TEST_LIVEKIT_SECRET="$(node -e 'const fs=require("fs");process.stdout.write(fs.readFileSync(".env","utf8").split("\n").find(l=>l.startsWith("LIVEKIT_API_SECRET=")).slice(19))')"
           echo "::add-mask::$TEST_LIVEKIT_SECRET"
           cd frontend
+          echo "npm ci" > "$RUNNER_TEMP/browser-phase"
           npm ci
-          npx playwright install --with-deps chromium
-          npm test
+          echo "Chrome preparation" > "$RUNNER_TEMP/browser-phase"
+          export CHROMIUM_PATH="$(command -v google-chrome || command -v google-chrome-stable)"
+          test -x "$CHROMIUM_PATH"
+          "$CHROMIUM_PATH" --version
+          echo "browser tests" > "$RUNNER_TEMP/browser-phase"
+          PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/browser-report.json" npm test -- --reporter=list,json
+      - name: Browser diagnostics (redacted)
+        if: always()
+        run: node scripts/ci-browser-summary.mjs "$RUNNER_TEMP/browser-report.json" "$RUNNER_TEMP/browser-phase" "$RUNNER_TEMP/browser-install.log"
       - run: ./scripts/test-backup.sh
+      - name: Scan actual runtime images
+        run: |
+          for image in chat-friends-backend chat-friends-web chat-friends-edge-duckdns chat-friends-livekit chat-friends-db; do
+            file=$(echo "$image" | tr '/:' '__')
+            opts=()
+            if [[ "$image" == chat-friends-backend ]]; then opts+=(--pkg-types os); fi
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$RUNNER_TEMP:/reports" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" aquasec/trivy:0.68.1 image --scanners vuln "${opts[@]}" --format json --output "/reports/$file.json" "$image"
+            python3 scripts/vulnerability-gate.py "$RUNNER_TEMP/$file.json"
+          done
       - if: always()
         run: ./scripts/compose.sh down
   infrastructure:
@@ -91,8 +121,8 @@ jobs:
         with: { terraform_version: "1.13.5" }
       - run: terraform fmt -check && terraform init -backend=false && terraform validate
         working-directory: infra/gcp
-      - name: Dependency and secret scan (no publication)
-        run: docker run --rm -v "$PWD:/work:ro" aquasec/trivy:0.68.1 fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /work/.git /work
+      - name: Secret scan (no publication)
+        run: docker run --rm -v "$PWD:/work:ro" aquasec/trivy:0.68.1 fs --scanners secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /work/.git /work
   multiarch:
     if: github.event_name == 'workflow_dispatch' && inputs.multiarch
     runs-on: ubuntu-latest
@@ -101,5 +131,7 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/backend.oci backend
-      - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/frontend.oci frontend
+      - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/frontend.oci -f frontend/Dockerfile .
       - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/edge.oci infra/caddy
+      - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/livekit.oci infra/livekit
+      - run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/db.oci infra/postgres

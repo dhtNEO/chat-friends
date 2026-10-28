@@ -11,3 +11,5 @@ LiveKit 1.9.12 + SDK Java 0.16.0 e JS 2.23.0; permissões por fonte, webhooks ve
 Caddy serve arquivos e termina TLS, mas UDP da mídia é publicado diretamente. TURN/TLS opcional usa 5349 para evitar conflito com 443 do Caddy. Redes que só permitem 443 exigem IP/host separado ou proxy L4 com SNI, não implementado nesta stack.
 
 Sem publicações ou recursos pagos. Oracle ARM e GCP usam a mesma stack; arquitetura e qualidade dependem de medições. A licença GPL-3.0 preexistente foi preservada, sem inferir decisão do proprietário sobre código novo.
+
+Atualização de segurança de 26/10/2026: LiveKit 1.13.11 com patch x/net/Go, migrador temporário, runtime DB restrito e redes separadas. Procedimento e exceções em [SECURITY_UPGRADE.md](../SECURITY_UPGRADE.md).

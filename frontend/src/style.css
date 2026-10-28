@@ -1810,3 +1810,17 @@ body:has(.compact) .demo-badge {
   top: auto;
   bottom: 4rem;
 }
+
+.security-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+.security-page > section {
+  width: min(100%, 36rem);
+}
+.mfa-secret {
+  overflow-wrap: anywhere;
+  user-select: all;
+}

@@ -6,6 +6,10 @@ services:
     volumes:
       - certificates_staging:/data
       - caddy_config_staging:/config
+  edge-permissions:
+    volumes:
+      - certificates_staging:/data
+      - caddy_config_staging:/config
 volumes:
   certificates_staging:
   caddy_config_staging:

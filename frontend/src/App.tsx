@@ -15,6 +15,7 @@ import {
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
 import { api, login, type Member, type User, type Message } from "./api";
+import { MfaGate, type SecurityState } from "./AccountSecurity";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
@@ -37,7 +38,11 @@ import {
   type PanelKind,
 } from "./Dock";
 export default function App() {
-  const [me, setMe] = useState<{ user: User; spaceName: string } | null>(null),
+  const [me, setMe] = useState<{
+      user: User;
+      spaceName: string;
+      security: SecurityState;
+    } | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -51,7 +56,13 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
+    const expired = () => {
+      setMe(null);
+      setError("");
+    };
+    window.addEventListener("session-ended", expired);
     void load();
+    return () => window.removeEventListener("session-ended", expired);
   }, [load]);
   useEffect(() => {
     applyTheme(me?.user.primaryColor, me?.user.secondaryColor);
@@ -67,6 +78,8 @@ export default function App() {
         }}
       />
     );
+  if (me.security.mfaPending || me.security.enrollmentRequired)
+    return <MfaGate state={me.security} onDone={load} />;
   return (
     <Workspace
       me={me}

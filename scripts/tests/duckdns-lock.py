@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory() as workspace:
         # Representa helper que sobreviveu à morte abrupta do processo no host.
         operation_id = subprocess.check_output(['docker', 'create', '--name', 'chat-friends-duckdns-operation',
                                                '--label', 'chatfriends.duckdns.lock=' + old_id,
-                                               'node:24.14.0-alpine', 'true'], text=True).strip()
+                                               'node:24.22.1-alpine', 'true'], text=True).strip()
         first.send_signal(signal.SIGKILL)
         first.wait(timeout=10)
         recovered = subprocess.run(['bash', '-c', prefix + 'echo RECOVERED'], cwd=workspace,

@@ -30,8 +30,17 @@ public class Events extends TextWebSocketHandler {
       return;
     }
     accounts.active(raw.getPrincipal().getName());
+    String user = raw.getPrincipal().getName();
+    synchronized (sockets) {
+      if (sockets.size() >= 128
+          || sockets.values().stream().filter(s -> s.getPrincipal().getName().equals(user)).count()
+              >= 4) {
+        raw.close(CloseStatus.POLICY_VIOLATION);
+        return;
+      }
+      sockets.put(raw.getId(), new ConcurrentWebSocketSessionDecorator(raw, 5000, 65536));
+    }
     raw.setTextMessageSizeLimit(128);
-    sockets.put(raw.getId(), new ConcurrentWebSocketSessionDecorator(raw, 5000, 65536));
     last.put(raw.getId(), System.currentTimeMillis());
     presence();
   }
@@ -42,7 +51,13 @@ public class Events extends TextWebSocketHandler {
       s.close(CloseStatus.BAD_DATA);
       return;
     }
-    last.put(s.getId(), System.currentTimeMillis());
+    long now = System.currentTimeMillis();
+    Long previous = last.get(s.getId());
+    if (previous != null && now - previous < 1000) {
+      close(s);
+      return;
+    }
+    last.put(s.getId(), now);
     sockets
         .get(s.getId())
         .sendMessage(new TextMessage(json.writeValueAsString(Map.of("type", "pong"))));

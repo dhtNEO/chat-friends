@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, upload, type User } from "./api";
+import { AccountSecurity } from "./AccountSecurity";
 import { Icon } from "./Icon";
 import { Avatar, avatarSrc } from "./ui";
 import {
@@ -142,6 +143,7 @@ export function Profile({
   return (
     <section className="settings profile">
       <h2>Minha conta</h2>
+      <AccountSecurity />
       {notice && (
         <p role="status" className="notice">
           {notice}
