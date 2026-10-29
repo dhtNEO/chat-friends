@@ -1,5 +1,6 @@
 // Answers /api and /ws inside the page, mimicking docs/API.md closely enough
 // for the interface: same paths, status codes and payloads.
+import { demoParty } from "./party";
 import { demoGames } from "./games";
 import type { Message } from "../api";
 import { setAvatarResolver } from "../ui";
@@ -73,6 +74,15 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
   }
   if (!world.me) return fail(401, "Sessão encerrada.");
   const me = world.me;
+  if (path === "/party" || path.startsWith("/party/")) {
+    try {
+      return json(
+        demoParty(path, method, body, url.searchParams, me, world.inCall),
+      );
+    } catch (e) {
+      return fail(409, (e as Error).message);
+    }
+  }
   if (path === "/games" || path.startsWith("/games/")) {
     try {
       return json(demoGames(path, method, body, me));

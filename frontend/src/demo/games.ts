@@ -41,6 +41,12 @@ function clearBets() {
       p.refunded = false;
     });
 }
+export function demoGrant(amount: number, reason: string) {
+  const reward = Math.max(0, Math.min(amount, 500 - granted));
+  granted += reward;
+  add(reward, reason);
+  return reward;
+}
 export function demoGames(
   path: string,
   method: string,

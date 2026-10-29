@@ -9,6 +9,7 @@ import {
 import { api, type User } from "./api";
 import { pocketColor } from "./rouletteRules";
 const RouletteWheel = lazy(() => import("./RouletteWheel"));
+import { PartyClub } from "./PartyClub";
 import { SlotMachine } from "./SlotMachine";
 import "./games.css";
 import "./casino.css";
@@ -59,7 +60,15 @@ export const choiceLabel = (choice: string) =>
     ? `Número ${choice.slice(2)}`
     : (OUTSIDE.find((c) => c[0] === choice)?.[1] ?? choice);
 const format = (value: number) => value.toLocaleString("pt-BR");
-export function GamesClub({ me }: { me: User }) {
+export function GamesClub({
+  me,
+  voiceIdentity,
+  onOpenVoice,
+}: {
+  me: User;
+  voiceIdentity?: string;
+  onOpenVoice?: () => void;
+}) {
   const [state, setState] = useState<ClubState | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -72,6 +81,7 @@ export function GamesClub({ me }: { me: User }) {
     [choice, setChoice] = useState("red"),
     [amount, setAmount] = useState("10"),
     [clock, setClock] = useState(Date.now());
+  const [partyActive, setPartyActive] = useState(false);
   const mounted = useRef(true),
     polling = useRef(false),
     pending = useRef(false),
@@ -116,7 +126,8 @@ export function GamesClub({ me }: { me: User }) {
   }, [load]);
   const room = state?.room,
     own = room?.players.find((p) => p.id === me.id),
-    active = !!room && ["waiting", "running"].includes(room.status);
+    active =
+      partyActive || (!!room && ["waiting", "running"].includes(room.status));
   useEffect(() => {
     if (!room) return;
     const beat = () => {
@@ -765,6 +776,13 @@ export function GamesClub({ me }: { me: User }) {
                   </small>
                 </article>
               </div>
+              <PartyClub
+                me={me}
+                voiceIdentity={voiceIdentity}
+                onOpenVoice={onOpenVoice}
+                onActiveChange={setPartyActive}
+                blocked={!!room && ["waiting", "running"].includes(room.status)}
+              />
               <section className="club-lobbies">
                 <div className="club-section-heading">
                   <div>

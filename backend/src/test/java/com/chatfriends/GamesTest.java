@@ -9,8 +9,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,7 +27,11 @@ class GamesTest {
 
   @BeforeEach
   void setup() {
-    games.db.execute("TRUNCATE accounts CASCADE");
+    games.locked(
+        () -> {
+          games.db.execute("TRUNCATE accounts CASCADE");
+          return null;
+        });
     ana = accounts.create("ana", "Ana", "test-only-password-ana", false).id();
     bia = accounts.create("bia", "Bia", "test-only-password-bia", false).id();
   }

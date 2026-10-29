@@ -70,3 +70,7 @@ Atualize pelo fluxo habitual `./scripts/up.sh` (dev) ou `CHAT_MODE=prd ./scripts
 `GamesTest` cobre as 37 casas, multiplicadores, all-in, saldo insuficiente, pagamento sem teto diário, empate de requisições concorrentes, devolução, abandono durante giro, próxima rodada e CSRF/autenticação. Playwright cobre a duração do caça-níquel, manivela, apostas, giro, resultado, nova rodada e celular.
 
 Na Mosca foi retirado. A reprodução de música da main permanece disponível. A integração da fila musical com Coins continua planejada; ainda não há consumo de Coins por música.
+
+## Blackjack e ritmo multiplayer
+
+Blackjack Social e Beat Club usam salas de 2–8 pessoas e premiação em Coins. A roleta recebeu ajuste de câmera para mostrar o aro inteiro mais acima. Regras, uso do bot e API dos novos jogos em [PARTY_GAMES.md](PARTY_GAMES.md).

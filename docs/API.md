@@ -70,3 +70,7 @@ Rotas autenticadas: `GET /api/music/state` retorna `{status,current,queue,error,
 ## Clube da Sorte
 
 Carteira, giros gratuitos e salas de Roleta Royale: contratos, autenticação e limites em [GAMES.md](GAMES.md).
+
+## Blackjack Social e Beat Club
+
+Rotas autenticadas `/api/party`, mãos de blackjack, prontidão e acertos de ritmo: contratos e regras em [PARTY_GAMES.md](PARTY_GAMES.md). A música exige conexão de voz pertencente à mesma conta/sessão.

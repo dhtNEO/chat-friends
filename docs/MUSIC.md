@@ -23,3 +23,7 @@ O modo demo simula fila e controles, **sem reproduzir áudio do YouTube**. Execu
 Testes do worker: `docker build -t chat-friends-music-test music-bot` e `docker run --rm -v "$PWD/music-bot:/app:ro" chat-friends-music-test python -m unittest discover -s /app -v`. Eles verificam isolamento da API, validação de links, limites, avanço após falha, cancelamento, leitura fragmentada de metadados e a corrida entre enfileirar e desconectar. Os testes de backend verificam vínculo à sessão de voz e permissões/admissão da identidade do bot. Não equivalem a testar uma música real contra os serviços externos.
 
 Referências de implementação: [LiveKit raw audio](https://docs.livekit.io/transport/media/raw-tracks/), [yt-dlp](https://github.com/yt-dlp/yt-dlp), [JavaScript/EJS](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
+
+## Beat Club
+
+O bot também prepara e publica um trecho de até 45 segundos para as salas de ritmo. Durante a sessão, músicas e controles normais ficam reservados ao jogo; o volume continua individual. Preparação analisa o próprio PCM que será transmitido, sem guardar arquivo. Fluxo, limites e diagnóstico em [PARTY_GAMES.md](PARTY_GAMES.md). Rebuild do worker é necessário para disponibilizar as novas rotas privadas.

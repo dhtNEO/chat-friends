@@ -116,6 +116,15 @@ public class Roulette {
   void available(UUID u) {
     require(
         db.queryForObject(
+                "select count(*) from party_players p join party_rooms r on r.id=p.room_id where"
+                    + " p.account_id=? and not p.departed and r.status in"
+                    + " ('waiting','preparing','running')",
+                Integer.class,
+                u)
+            == 0,
+        "Você já está em uma sala de jogos.");
+    require(
+        db.queryForObject(
                 "select count(*) from game_players p join game_rooms r on r.id=p.room_id where"
                     + " p.account_id=? and not p.departed and r.round_id is not null and r.status"
                     + " in ('waiting','running')",

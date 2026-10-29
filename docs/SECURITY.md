@@ -41,3 +41,5 @@ Veja [SECURITY_UPGRADE.md](SECURITY_UPGRADE.md): migração de privilégios do b
 ## Coins e jogos
 
 Clube da Sorte usa Coins virtuais sem compra/saque. Sessão, MFA, CSRF e orçamento de requisições protegem as rotas. O servidor controla sorteio, débito, fechamento, devolução e liquidação; locks e referências únicas impedem gastos/pagamentos duplicados. Sair depois do giro mantém a aposta e o direito ao retorno. O limite de 500 Coins/dia vale somente para emissões gratuitas. Regras e testes em [GAMES.md](GAMES.md).
+
+Blackjack e Beat Club: baralho e carta oculta permanecem privados; ações de cartas e notas são idempotentes. O ritmo valida voz da própria sessão, reserva o bot por UUID e só premia após confirmação de reprodução. O worker limita o trecho a 45 segundos em memória e mantém extractor/protocolos/segredo privados existentes. Falha de áudio cancela a premiação. [Regras e testes](PARTY_GAMES.md).

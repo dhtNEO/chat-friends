@@ -225,8 +225,36 @@ export default function RouletteWheel({
         height = el.clientHeight || 360;
       renderer.setSize(width, height);
       camera.aspect = width / height;
-      camera.fov = width / height < 1.6 ? 44 : 30;
-      camera.updateProjectionMatrix();
+      camera.fov = 40;
+      const direction = new THREE.Vector3(0, 8.4, 9.2).normalize();
+      let distance = 11;
+      // Fit the entire housing and spindle, then aim slightly below its centre
+      // to lift the wheel without cropping it in narrow dock panels.
+      for (let attempt = 0; attempt < 24; attempt++) {
+        camera.position.copy(direction).multiplyScalar(distance);
+        camera.lookAt(0, -0.9, 0);
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld();
+        const corners = [new THREE.Vector3(0, 1.4, 0).project(camera)];
+        for (let i = 0; i < 64; i++)
+          for (const y of [-0.55, 0.35]) {
+            const angle = (i * Math.PI * 2) / 64;
+            corners.push(
+              new THREE.Vector3(
+                Math.sin(angle) * 4.2,
+                y,
+                Math.cos(angle) * 4.2,
+              ).project(camera),
+            );
+          }
+        if (
+          corners.every(
+            (p) => Math.abs(p.x) < 0.91 && p.y < 0.88 && p.y > -0.79,
+          )
+        )
+          break;
+        distance *= 1.055;
+      }
     };
     const observer = new ResizeObserver(resize);
     observer.observe(el);

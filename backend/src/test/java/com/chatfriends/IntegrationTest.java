@@ -28,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 class IntegrationTest {
   @Autowired Accounts accounts;
   @Autowired Chat chat;
+  @Autowired Games games;
   @Autowired Media media;
   @Autowired MockMvc mvc;
   @MockitoBean LiveKitGateway live;
@@ -48,8 +49,12 @@ class IntegrationTest {
               org.springframework.test.util.ReflectionTestUtils.getField(requestBudget, "buckets"))
           .clear();
     }
-    accounts.db.execute(
-        "TRUNCATE messages,media_connections,accounts,rate_limits,spring_session CASCADE");
+    // Coordinate destructive fixtures with game jobs that join accounts.
+    games.locked(() -> {
+      accounts.db.execute(
+          "TRUNCATE messages,media_connections,accounts,rate_limits,spring_session CASCADE");
+      return null;
+    });
     accounts.db.execute("UPDATE screen_lease SET identity=NULL,lease_id=NULL,expires_at=NULL");
     accounts.create("ana", "Ana", "test-only-password-ana", false);
     accounts.create("bia", "Bia", "test-only-password-bia", false);

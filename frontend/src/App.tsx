@@ -208,6 +208,7 @@ function Workspace({
   onRefresh: () => Promise<void>;
   onLogout: (notice?: string) => void;
 }) {
+  const [voiceIdentity, setVoiceIdentity] = useState<string>();
   const [members, setMembers] = useState<Member[]>([]);
   const loadMembers = useCallback(
     () =>
@@ -472,7 +473,14 @@ function Workspace({
           onRetry={(p) => void send(p)}
         />
       );
-    if (kind === "games") return <GamesClub me={me.user} />;
+    if (kind === "games")
+      return (
+        <GamesClub
+          me={me.user}
+          voiceIdentity={voiceIdentity}
+          onOpenVoice={() => open("voice")}
+        />
+      );
     if (kind === "members")
       return (
         <section className="members" aria-label="Membros">
@@ -675,6 +683,7 @@ function Workspace({
         <Voice
           key={me.user.id}
           userId={me.user.id}
+          onIdentityChange={setVoiceIdentity}
           admin={me.user.admin}
           hosts={{ stage: slots.voice ?? null, roster, quick }}
           maximized={stageMaximized}

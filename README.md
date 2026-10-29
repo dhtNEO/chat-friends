@@ -72,4 +72,4 @@ Para atualizar a instalação com privilégios separados, MFA e recuperação, s
 
 ## Clube da Sorte
 
-Abra **Jogos** para o caça-níquel com manivela e a Roleta Royale 3D, individual ou em salas para até oito pessoas. Coins, apostas, devoluções, extrato e pódio são controlados pelo servidor. A música da main permanece disponível; integração da fila com Coins fica para depois. Regras e operação em [GAMES](docs/GAMES.md).
+Abra **Jogos** para o caça-níquel com manivela e a Roleta Royale 3D, individual ou em salas para até oito pessoas. Coins, apostas, devoluções, extrato e pódio são controlados pelo servidor. A música da main permanece disponível; integração da fila com Coins fica para depois. Regras e operação em [GAMES](docs/GAMES.md). Blackjack Social e Beat Club acrescentam salas de 2–8 pessoas com premiação em Coins; no ritmo, escolha uma faixa do bot, entre na voz e toque D/F/J/K (ou as pistas no celular). Veja [PARTY_GAMES](docs/PARTY_GAMES.md).
