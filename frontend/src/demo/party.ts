@@ -37,6 +37,7 @@ export function demoParty(
         roundId?: string;
         kind?: "blackjack" | "rhythm";
         videoId?: string;
+        difficulty?: "easy" | "normal" | "hard";
         note?: number;
         lane?: number;
       }
@@ -159,6 +160,7 @@ export function demoParty(
       hostId: user.id,
       kind: body?.kind ?? "blackjack",
       status: "waiting",
+      difficulty: body?.difficulty ?? "normal",
       startsAt: 0,
       endsAt: 0,
       players: [
@@ -226,10 +228,27 @@ export function demoParty(
       room.players[1].total = 17;
       room.players[1].standing = true;
     } else
-      room.notes = Array.from({ length: 24 }, (_, i) => ({
-        at: 2000 + i * 500,
-        lane: i % 4,
-      }));
+      room.notes = Array.from(
+        {
+          length:
+            room.difficulty === "easy"
+              ? 12
+              : room.difficulty === "hard"
+                ? 48
+                : 24,
+        },
+        (_, i) => ({
+          at:
+            2000 +
+            i *
+              (room!.difficulty === "easy"
+                ? 1000
+                : room!.difficulty === "hard"
+                  ? 250
+                  : 500),
+          lane: i % 4,
+        }),
+      );
   }
   if (
     action === "hit" &&
@@ -262,6 +281,12 @@ export function demoParty(
     if (points) room.players[0].hits++;
     room.players[0].combo = points ? room.players[0].combo + 1 : 0;
     return { points };
+  }
+  if (action === "stop") {
+    if (room.kind !== "rhythm" || room.hostId !== user.id)
+      throw new Error("Só o anfitrião pode encerrar.");
+    room.status = "cancelled";
+    room.endsAt = Date.now();
   }
   if (action === "leave") {
     if (

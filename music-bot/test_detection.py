@@ -89,3 +89,18 @@ class SpectralDetection(unittest.TestCase):
         self.assertTrue(all(b["at"] - a["at"] >= 210 for a, b in zip(notes, notes[1:])))
         self.assertTrue(all(min(abs(note["at"] - t * 1000) for t in times) <= 25 for note in notes))
         self.assertEqual(notes, detect_notes(synthesize(times, seconds=300)))
+
+    def test_fast_subdivisions_remain_real_onsets_in_dense_chart(self):
+        times = np.arange(2.1, 17.9, .125)
+        notes = detect_notes(synthesize(times, frequencies=(80, 600, 2500, 8000)), 110)
+        self.assert_chart_matches(notes, times)
+        self.assertTrue(all(b['at'] - a['at'] >= 110 for a, b in zip(notes, notes[1:])))
+        self.assertGreater(len(notes), len(detect_notes(synthesize(times))))
+
+    def test_sustained_vibrato_is_not_percussion(self):
+        bed = lambda t: .2 * np.sin(2 * np.pi * 440 * t + .8 * np.sin(2 * np.pi * 5 * t))
+        self.assertEqual([], detect_notes(synthesize([], bed=bed), 110))
+
+    def test_invalid_density_is_rejected(self):
+        with self.assertRaises(ValueError):
+            detect_notes(b'', 0)

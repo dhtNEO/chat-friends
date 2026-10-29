@@ -573,4 +573,24 @@ class PartyGamesTest {
 
     return result;
   }
+
+  @Test
+  void onlyHostCanStopRhythmWithoutRewardsAndRetriesAreSafe() throws Exception {
+    UUID id = rhythm();
+    assertThrows(ResponseStatusException.class, () -> action("bia", id, "stop"));
+    UUID request = UUID.randomUUID();
+    party.action("ana", id, request, "stop", null);
+    party.action("ana", id, request, "stop", null);
+    assertEquals("cancelled", party.row(id).get("status"));
+    assertEquals(0, games.db.queryForObject("select sum(reward) from party_players where room_id=?", Integer.class, id));
+    assertThrows(ResponseStatusException.class, () -> party.note("ana", id, 0, 0));
+    verify(bot, atLeastOnce()).releaseRhythm(id.toString());
+  }
+
+  @Test
+  void difficultyIsValidatedAndReturnedToEveryPlayer() {
+    assertThrows(ResponseStatusException.class, () -> party.create("ana", UUID.randomUUID(), "rhythm", "aqz-KE-bpKQ", "invalid"));
+    UUID id = party.create("ana", UUID.randomUUID(), "rhythm", "aqz-KE-bpKQ", "hard");
+    assertEquals("hard", party.state(party.row(id)).get("difficulty"));
+  }
 }
