@@ -12,16 +12,16 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "dockview": "8.6.1",
-    "dockview-core": "8.6.1",
-    "dockview-react": "8.6.1",
+    "dockview": "8.8.0",
+    "dockview-core": "8.8.0",
+    "dockview-react": "8.8.0",
     "livekit-client": "2.23.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "three": "0.186.1"
   },
   "devDependencies": {
-    "@livekit/protocol": "1.53.0",
+    "@livekit/protocol": "1.53.1",
     "@playwright/test": "1.64.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -30,8 +30,8 @@
     "eslint": "10.13.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "prettier": "3.9.10",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.72.0",
+    "typescript": "7.0.2",
+    "typescript-eslint": "8.72.1",
     "vite": "8.3.5"
   }
 }

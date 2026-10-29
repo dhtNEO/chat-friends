@@ -2,8 +2,8 @@ package com.chatfriends;
 
 import static org.springframework.http.HttpStatus.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import java.security.SecureRandom;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -593,7 +593,7 @@ public class PartyGames {
             s.put(
                 "notes",
                 json.convertValue(notes, new TypeReference<List<Map<String, Integer>>>() {}));
-            s.put("title", prepared.path("title").asText("Música"));
+            s.put("title", prepared.path("title").asString("Música"));
             save(id, s);
             db.update(
                 "update party_rooms set status='running',starts_at=?,ends_at=? where id=?",
@@ -787,15 +787,15 @@ public class PartyGames {
             "select id from party_rooms where kind='rhythm' and status='running'", UUID.class)) {
       try {
         var status = bot.state().path("rhythm");
-        boolean matches = id.toString().equals(status.path("id").asText());
+        boolean matches = id.toString().equals(status.path("id").asString());
         games.locked(
             () -> {
               var r = row(id);
               if (!r.get("status").equals("running")) return null;
-              if (!matches || status.path("phase").asText().equals("failed")) {
+              if (!matches || status.path("phase").asString().equals("failed")) {
                 db.update("update party_rooms set status='cancelled' where id=?", id);
               } else if (now() > (Long) r.get("ends_at")
-                  && status.path("phase").asText().equals("finished")) settleRhythm(id, r);
+                  && status.path("phase").asString().equals("finished")) settleRhythm(id, r);
               else if (now() > (Long) r.get("ends_at") + 10000)
                 db.update("update party_rooms set status='cancelled' where id=?", id);
               return null;

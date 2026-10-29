@@ -9,20 +9,25 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
-@SpringBootTest(properties = {"app.reconcile-initial-delay=600000"})
+@SpringBootTest(properties = { "app.reconcile-initial-delay=600000" })
 @AutoConfigureMockMvc
 class GamesTest {
-  @Autowired Games games;
-  @Autowired Roulette roulette;
-  @Autowired Accounts accounts;
-  @Autowired MockMvc mvc;
-  @MockitoBean LiveKitGateway live;
+  @Autowired
+  Games games;
+  @Autowired
+  Roulette roulette;
+  @Autowired
+  Accounts accounts;
+  @Autowired
+  MockMvc mvc;
+  @MockitoBean
+  LiveKitGateway live;
   UUID ana, bia;
 
   @BeforeEach
@@ -67,9 +72,9 @@ class GamesTest {
   void authenticationAndCsrfRequired() throws Exception {
     mvc.perform(get("/api/games")).andExpect(status().isUnauthorized());
     mvc.perform(
-            post("/api/games/spin")
-                .contentType("application/json")
-                .content("{\"clientId\":\"" + UUID.randomUUID() + "\"}"))
+        post("/api/games/spin")
+            .contentType("application/json")
+            .content("{\"clientId\":\"" + UUID.randomUUID() + "\"}"))
         .andExpect(status().isForbidden());
     assertEquals(0, roulette.balance(ana));
   }
@@ -79,9 +84,11 @@ class GamesTest {
     UUID id = UUID.randomUUID();
     try (var pool = Executors.newFixedThreadPool(6)) {
       var tasks = new ArrayList<Callable<Map<String, Object>>>();
-      for (int i = 0; i < 6; i++) tasks.add(() -> games.spin("ana", id));
+      for (int i = 0; i < 6; i++)
+        tasks.add(() -> games.spin("ana", id));
       var results = pool.invokeAll(tasks);
-      for (var result : results) assertEquals(results.getFirst().get(), result.get());
+      for (var result : results)
+        assertEquals(results.getFirst().get(), result.get());
     }
     assertEquals(1, games.db.queryForObject("select count(*) from game_spins", Integer.class));
     assertEquals(1, games.db.queryForObject("select count(*) from coin_ledger", Integer.class));
@@ -90,24 +97,25 @@ class GamesTest {
   @Test
   void freeQuotaAndCapStillApply() {
     funds(ana, 499);
-    for (int i = 0; i < 10; i++) games.spin("ana", UUID.randomUUID());
+    for (int i = 0; i < 10; i++)
+      games.spin("ana", UUID.randomUUID());
     assertEquals(500, roulette.balance(ana));
     assertThrows(ResponseStatusException.class, () -> games.spin("ana", UUID.randomUUID()));
   }
 
   @Test
   void allThirtySevenPocketsAndPayoutMultipliersAreCorrect() {
-    for (String c :
-        List.of(
-            "red", "black", "even", "odd", "low", "high", "dozen1", "dozen2", "dozen3", "n:0",
-            "n:36")) {
+    for (String c : List.of(
+        "red", "black", "even", "odd", "low", "high", "dozen1", "dozen2", "dozen3", "n:0",
+        "n:36")) {
       int count = 0;
-      for (int n = 0; n <= 36; n++) if (Roulette.wins(c, n)) count++;
+      for (int n = 0; n <= 36; n++)
+        if (Roulette.wins(c, n))
+          count++;
       assertEquals(c.startsWith("n:") ? 1 : c.startsWith("dozen") ? 12 : 18, count);
       assertEquals(c.startsWith("n:") ? 36 : c.startsWith("dozen") ? 3 : 2, Roulette.multiplier(c));
     }
-    for (String c :
-        List.of("red", "black", "even", "odd", "low", "high", "dozen1", "dozen2", "dozen3"))
+    for (String c : List.of("red", "black", "even", "odd", "low", "high", "dozen1", "dozen2", "dozen3"))
       assertFalse(Roulette.wins(c, 0));
     assertThrows(ResponseStatusException.class, () -> Roulette.multiplier("n:37"));
   }
@@ -174,7 +182,8 @@ class GamesTest {
               }
               return null;
             });
-      for (var result : pool.invokeAll(tasks)) result.get();
+      for (var result : pool.invokeAll(tasks))
+        result.get();
     }
     assertEquals(1, accepted.get());
     assertEquals(0, roulette.balance(ana));
@@ -290,8 +299,7 @@ class GamesTest {
     bet("ana", room, "red", 20);
     games.action("ana", room, "leave");
     @SuppressWarnings("unchecked")
-    var board =
-        (java.util.List<java.util.Map<String, Object>>) games.overview("ana").get("leaderboard");
+    var board = (java.util.List<java.util.Map<String, Object>>) games.overview("ana").get("leaderboard");
     assertEquals(100L, ((Number) board.getFirst().get("coins")).longValue());
     room = create();
     bet("ana", room, "red", 10);
@@ -309,15 +317,15 @@ class GamesTest {
   }
 
   jakarta.servlet.http.Cookie login() throws Exception {
-    var json = new com.fasterxml.jackson.databind.ObjectMapper();
+    var json = new tools.jackson.databind.ObjectMapper();
     var csrf = mvc.perform(get("/api/csrf")).andReturn().getResponse();
     return mvc.perform(
-            post("/api/login")
-                .cookie(csrf.getCookie("SESSION"))
-                .header(
-                    "X-CSRF-TOKEN", json.readTree(csrf.getContentAsString()).get("token").asText())
-                .param("username", "ana")
-                .param("password", "test-only-password-ana"))
+        post("/api/login")
+            .cookie(csrf.getCookie("SESSION"))
+            .header(
+                "X-CSRF-TOKEN", json.readTree(csrf.getContentAsString()).get("token").asString())
+            .param("username", "ana")
+            .param("password", "test-only-password-ana"))
         .andExpect(status().isNoContent())
         .andReturn()
         .getResponse()
@@ -328,45 +336,43 @@ class GamesTest {
   void authenticatedApiDebitsAndRejectsMissingCsrf() throws Exception {
     funds(ana, 100);
     var cookie = login();
-    var json = new com.fasterxml.jackson.databind.ObjectMapper();
+    var json = new tools.jackson.databind.ObjectMapper();
     var csrf = mvc.perform(get("/api/csrf").cookie(cookie)).andReturn().getResponse();
-    String token = json.readTree(csrf.getContentAsString()).get("token").asText();
-    var created =
-        mvc.perform(
-                post("/api/games/rooms")
-                    .cookie(cookie)
-                    .header("X-CSRF-TOKEN", token)
-                    .contentType("application/json")
-                    .content("{\"clientId\":\"" + UUID.randomUUID() + "\",\"solo\":true}"))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse();
-    UUID room = UUID.fromString(json.readTree(created.getContentAsString()).get("id").asText());
-    String payload =
-        "{\"clientId\":\""
-            + UUID.randomUUID()
-            + "\",\"roundId\":\""
-            + round(room)
-            + "\",\"choice\":\"red\",\"amount\":100}";
+    String token = json.readTree(csrf.getContentAsString()).get("token").asString();
+    var created = mvc.perform(
+        post("/api/games/rooms")
+            .cookie(cookie)
+            .header("X-CSRF-TOKEN", token)
+            .contentType("application/json")
+            .content("{\"clientId\":\"" + UUID.randomUUID() + "\",\"solo\":true}"))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse();
+    UUID room = UUID.fromString(json.readTree(created.getContentAsString()).get("id").asString());
+    String payload = "{\"clientId\":\""
+        + UUID.randomUUID()
+        + "\",\"roundId\":\""
+        + round(room)
+        + "\",\"choice\":\"red\",\"amount\":100}";
     mvc.perform(
-            post("/api/games/rooms/" + room + "/bet")
-                .cookie(cookie)
-                .header("X-CSRF-TOKEN", token)
-                .contentType("application/json")
-                .content(payload.replace("100}", "1.5}")))
+        post("/api/games/rooms/" + room + "/bet")
+            .cookie(cookie)
+            .header("X-CSRF-TOKEN", token)
+            .contentType("application/json")
+            .content(payload.replace("100}", "1.5}")))
         .andExpect(status().isBadRequest());
     mvc.perform(
-            post("/api/games/rooms/" + room + "/bet")
-                .cookie(cookie)
-                .contentType("application/json")
-                .content(payload))
+        post("/api/games/rooms/" + room + "/bet")
+            .cookie(cookie)
+            .contentType("application/json")
+            .content(payload))
         .andExpect(status().isForbidden());
     mvc.perform(
-            post("/api/games/rooms/" + room + "/bet")
-                .cookie(cookie)
-                .header("X-CSRF-TOKEN", token)
-                .contentType("application/json")
-                .content(payload))
+        post("/api/games/rooms/" + room + "/bet")
+            .cookie(cookie)
+            .header("X-CSRF-TOKEN", token)
+            .contentType("application/json")
+            .content(payload))
         .andExpect(status().isOk());
     mvc.perform(get("/api/games").cookie(cookie)).andExpect(status().isOk());
     assertEquals(0, roulette.balance(ana));

@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -234,7 +234,7 @@ class OutlookTest {
                     .cookie(csrf.getCookie("SESSION"))
                     .header(
                         "X-CSRF-TOKEN",
-                        json.readTree(csrf.getContentAsString()).get("token").asText())
+                        json.readTree(csrf.getContentAsString()).get("token").asString())
                     .param("username", name)
                     .param("password", "test-only-password-" + name))
             .andExpect(status().isNoContent())
@@ -248,7 +248,7 @@ class OutlookTest {
                     .getResponse()
                     .getContentAsString())
             .get("token")
-            .asText();
+            .asString();
     return new Login(cookie, token);
   }
 
@@ -274,7 +274,7 @@ class OutlookTest {
             .andExpect(status().isOk())
             .andReturn()
             .getResponse();
-    var id = json.readTree(result.getContentAsString()).get("id").asText();
+    var id = json.readTree(result.getContentAsString()).get("id").asString();
     var b = login("bia");
     mvc.perform(
             get("/api/outlook")

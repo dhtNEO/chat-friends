@@ -10,21 +10,27 @@ import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
-@SpringBootTest(properties = {"app.reconcile-initial-delay=600000"})
+@SpringBootTest(properties = { "app.reconcile-initial-delay=600000" })
 @AutoConfigureMockMvc
 class PartyGamesTest {
-  @Autowired PartyGames party;
-  @Autowired Games games;
-  @Autowired Accounts accounts;
-  @Autowired MockMvc mvc;
-  @MockitoBean LiveKitGateway live;
-  @MockitoBean MusicGateway bot;
+  @Autowired
+  PartyGames party;
+  @Autowired
+  Games games;
+  @Autowired
+  Accounts accounts;
+  @Autowired
+  MockMvc mvc;
+  @MockitoBean
+  LiveKitGateway live;
+  @MockitoBean
+  MusicGateway bot;
   UUID ana, bia;
 
   @BeforeEach
@@ -105,7 +111,8 @@ class PartyGamesTest {
     party.action("ana", id, UUID.randomUUID(), "ready", voice(ana, "ana"));
     party.action("bia", id, UUID.randomUUID(), "ready", voice(bia, "bia"));
     var notes = new ArrayList<Map<String, Integer>>();
-    for (int i = 0; i < 600; i++) notes.add(Map.of("at", 2000 + i * 490, "lane", i % 4));
+    for (int i = 0; i < 600; i++)
+      notes.add(Map.of("at", 2000 + i * 490, "lane", i % 4));
     when(bot.prepareRhythm(eq(id.toString()), anyString(), anyString(), anyString()))
         .thenReturn(
             party.json.valueToTree(
@@ -155,9 +162,19 @@ class PartyGamesTest {
   @Test
   void opponentsCardsAndTotalsStayPrivateUntilTheResult() {
     UUID id = blackjack();
-    var anaView = (List<Map<String, Object>>) party.view(id, ana).get("players");
-    var own = anaView.stream().filter(p -> ana.equals(p.get("id"))).findFirst().orElseThrow();
-    var other = anaView.stream().filter(p -> bia.equals(p.get("id"))).findFirst().orElseThrow();
+
+    var anaView = players(id, ana);
+
+    var own = anaView.stream()
+        .filter(p -> ana.equals(p.get("id")))
+        .findFirst()
+        .orElseThrow();
+
+    var other = anaView.stream()
+        .filter(p -> bia.equals(p.get("id")))
+        .findFirst()
+        .orElseThrow();
+
     assertEquals(2, ((List<?>) own.get("hand")).size());
     assertEquals(List.of(), other.get("hand"));
     assertNull(other.get("total"));
@@ -166,7 +183,9 @@ class PartyGamesTest {
     assertEquals(0, other.get("reward"));
     assertEquals(true, other.get("handHidden"));
     assertEquals(2, other.get("cardCount"));
-    var biaView = (List<Map<String, Object>>) party.view(id, bia).get("players");
+
+    var biaView = players(id, bia);
+
     assertEquals(
         List.of(),
         biaView.stream()
@@ -174,8 +193,10 @@ class PartyGamesTest {
             .findFirst()
             .orElseThrow()
             .get("hand"));
+
     expire(id);
-    for (var player : (List<Map<String, Object>>) party.view(id, ana).get("players")) {
+
+    for (var player : players(id, ana)) {
       assertFalse(((List<?>) player.get("hand")).isEmpty());
       assertNotNull(player.get("total"));
       assertNotNull(player.get("outcome"));
@@ -337,7 +358,8 @@ class PartyGamesTest {
               action("ana", id, "ready");
               return null;
             });
-      for (var result : pool.invokeAll(tasks)) result.get();
+      for (var result : pool.invokeAll(tasks))
+        result.get();
     }
     assertEquals(90, games.roulette.balance(ana));
   }
@@ -455,7 +477,8 @@ class PartyGamesTest {
               party.action("ana", id, key, "hit", null);
               return null;
             });
-      for (var r : pool.invokeAll(tasks)) r.get();
+      for (var r : pool.invokeAll(tasks))
+        r.get();
     }
     assertEquals(
         3,
@@ -475,35 +498,33 @@ class PartyGamesTest {
     String other = voice(bia, "bia");
     var json = party.json;
     var csrf = mvc.perform(get("/api/csrf")).andReturn().getResponse();
-    var cookie =
-        mvc.perform(
-                post("/api/login")
-                    .cookie(csrf.getCookie("SESSION"))
-                    .header(
-                        "X-CSRF-TOKEN",
-                        json.readTree(csrf.getContentAsString()).get("token").asText())
-                    .param("username", "ana")
-                    .param("password", "test-only-password-ana"))
-            .andExpect(status().isNoContent())
+    var cookie = mvc.perform(
+        post("/api/login")
+            .cookie(csrf.getCookie("SESSION"))
+            .header(
+                "X-CSRF-TOKEN",
+                json.readTree(csrf.getContentAsString()).get("token").asString())
+            .param("username", "ana")
+            .param("password", "test-only-password-ana"))
+        .andExpect(status().isNoContent())
+        .andReturn()
+        .getResponse()
+        .getCookie("SESSION");
+    var token = json.readTree(
+        mvc.perform(get("/api/csrf").cookie(cookie))
             .andReturn()
             .getResponse()
-            .getCookie("SESSION");
-    var token =
-        json.readTree(
-                mvc.perform(get("/api/csrf").cookie(cookie))
-                    .andReturn()
-                    .getResponse()
-                    .getContentAsString())
-            .get("token")
-            .asText();
+            .getContentAsString())
+        .get("token")
+        .asString();
     mvc.perform(
-            post("/api/party/" + room + "/ready")
-                .cookie(cookie)
-                .header("X-CSRF-TOKEN", token)
-                .contentType("application/json")
-                .content(
-                    json.writeValueAsString(
-                        Map.of("clientId", UUID.randomUUID(), "identity", other))))
+        post("/api/party/" + room + "/ready")
+            .cookie(cookie)
+            .header("X-CSRF-TOKEN", token)
+            .contentType("application/json")
+            .content(
+                json.writeValueAsString(
+                    Map.of("clientId", UUID.randomUUID(), "identity", other))))
         .andExpect(status().isForbidden());
     assertFalse(
         games.db.queryForObject(
@@ -517,9 +538,39 @@ class PartyGamesTest {
   void apiRequiresAuthenticationAndCsrf() throws Exception {
     mvc.perform(get("/api/party")).andExpect(status().isUnauthorized());
     mvc.perform(
-            post("/api/party")
-                .contentType("application/json")
-                .content("{\"clientId\":\"" + UUID.randomUUID() + "\",\"kind\":\"blackjack\"}"))
+        post("/api/party")
+            .contentType("application/json")
+            .content("{\"clientId\":\"" + UUID.randomUUID() + "\",\"kind\":\"blackjack\"}"))
         .andExpect(status().isForbidden());
+  }
+
+  private List<Map<String, Object>> players(UUID gameId, UUID viewerId) {
+    Object value = party.view(gameId, viewerId).get("players");
+
+    if (!(value instanceof List<?> list)) {
+      throw new AssertionError("Expected players to be a List");
+    }
+
+    List<Map<String, Object>> result = new ArrayList<>();
+
+    for (Object item : list) {
+      if (!(item instanceof Map<?, ?> map)) {
+        throw new AssertionError("Expected player to be a Map");
+      }
+
+      Map<String, Object> player = new HashMap<>();
+
+      for (var entry : map.entrySet()) {
+        if (!(entry.getKey() instanceof String key)) {
+          throw new AssertionError("Expected player key to be a String");
+        }
+
+        player.put(key, entry.getValue());
+      }
+
+      result.add(player);
+    }
+
+    return result;
   }
 }
