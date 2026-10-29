@@ -17,6 +17,7 @@ import "dockview-react/dist/styles/dockview.css";
 import { api, login, type Member, type User, type Message } from "./api";
 import { MfaGate, type SecurityState } from "./AccountSecurity";
 import { GamesClub } from "./GamesClub";
+import { Outlook } from "./Outlook";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
@@ -446,6 +447,12 @@ function Workspace({
           <Icon name="games" size={18} /> Clube da Sorte <small>NOVO</small>
         </button>
       </div>
+      <div className="channel-section">
+        <span className="eyebrow">MARQUE COM A GALERA</span>
+        <button className="channel" onClick={() => open("outlook")}>
+          <Icon name="calendar" size={18} /> Outlook
+        </button>
+      </div>
       <footer className="me">
         <Avatar name={me.user.displayName} src={avatarSrc(me.user)} size={34} />
         <div className="me-name">
@@ -473,6 +480,7 @@ function Workspace({
           onRetry={(p) => void send(p)}
         />
       );
+    if (kind === "outlook") return <Outlook me={me.user} />;
     if (kind === "games")
       return (
         <GamesClub
@@ -602,6 +610,13 @@ function Workspace({
             title="Clube da Sorte"
             active={!!slots.games}
             onClick={() => open("games")}
+          />
+          <ActivityButton
+            icon="calendar"
+            label="Outlook"
+            title="Outlook · calendário da galera"
+            active={!!slots.outlook}
+            onClick={() => open("outlook")}
           />
           <span className="activity-spacer" />
           <ActivityButton

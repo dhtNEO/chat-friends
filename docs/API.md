@@ -74,3 +74,7 @@ Carteira, giros gratuitos e salas de Roleta Royale: contratos, autenticação e 
 ## Blackjack Social e Beat Club
 
 Rotas autenticadas `/api/party`, mãos de blackjack, prontidão e acertos de ritmo: contratos e regras em [PARTY_GAMES.md](PARTY_GAMES.md). A música exige conexão de voz pertencente à mesma conta/sessão.
+
+## Outlook
+
+Calendário compartilhado autenticado: listagem por intervalo, criação de jogatinas, edição/cancelamento pelo criador ou administrador e respostas individuais de presença. Rotas e contratos em [OUTLOOK.md](OUTLOOK.md#api-autenticada). Requer migração V11.

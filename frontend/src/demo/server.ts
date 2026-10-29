@@ -1,5 +1,6 @@
 // Answers /api and /ws inside the page, mimicking docs/API.md closely enough
 // for the interface: same paths, status codes and payloads.
+import { demoOutlook } from "./outlook";
 import { demoParty } from "./party";
 import { demoGames } from "./games";
 import type { Message } from "../api";
@@ -74,6 +75,13 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
   }
   if (!world.me) return fail(401, "Sessão encerrada.");
   const me = world.me;
+  if (path === "/outlook" || path.startsWith("/outlook/")) {
+    try {
+      return json(demoOutlook(path, method, body, url.searchParams, me));
+    } catch (e) {
+      return fail(409, (e as Error).message);
+    }
+  }
   if (path === "/party" || path.startsWith("/party/")) {
     try {
       return json(

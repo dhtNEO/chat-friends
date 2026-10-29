@@ -73,3 +73,7 @@ Para atualizar a instalação com privilégios separados, MFA e recuperação, s
 ## Clube da Sorte
 
 Abra **Jogos** para o caça-níquel com manivela e a Roleta Royale 3D, individual ou em salas para até oito pessoas. Coins, apostas, devoluções, extrato e pódio são controlados pelo servidor. A música da main permanece disponível; integração da fila com Coins fica para depois. Regras e operação em [GAMES](docs/GAMES.md). Blackjack Social e Beat Club acrescentam salas de 2–8 pessoas com premiação em Coins; no blackjack, Vega acompanha a mesa em 3D e as mãos dos adversários só são reveladas no resultado. No ritmo, escolha até cinco minutos de uma faixa do bot, entre na voz e toque D/F/J/K (ou as pistas no celular), com pista 3D e Riff na guitarra neon. Veja [PARTY_GAMES](docs/PARTY_GAMES.md).
+
+## Outlook
+
+Aba de calendário compartilhado para marcar jogatinas: todos criam eventos e respondem Vou/Talvez/Não vou. Calendário mensal, horários no seu fuso, lista de presença e edição/cancelamento pelo organizador ou administrador. Uso e API em [OUTLOOK](docs/OUTLOOK.md).

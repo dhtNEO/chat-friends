@@ -1,5 +1,6 @@
 // Stroke icons drawn inline: font glyphs vary too much between systems.
 const paths = {
+  calendar: "M5 5h14v16H5zM5 10h14M8 3v4M16 3v4M8 13h2M14 13h2M8 17h2M14 17h2",
   games: "M7 7h10l4 10-3 2-4-4h-4l-4 4-3-2zM6 11h6M9 8v6M16 10h.01M18 13h.01",
   chat: "M4 5h16v11H9l-5 4z",
   split: "M4 5h16v14H4zM12 5v14",

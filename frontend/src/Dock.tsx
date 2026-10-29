@@ -12,9 +12,17 @@ import {
 // content into a stable element per panel id, so moving a tab, hiding it or
 // switching layouts never remounts it, and closing a panel never ends a call.
 export type PanelKind =
-  "nav" | "voice" | "chat" | "members" | "account" | "admin" | "games";
+  | "nav"
+  | "voice"
+  | "chat"
+  | "members"
+  | "account"
+  | "admin"
+  | "games"
+  | "outlook";
 export const TITLES: Record<PanelKind, string> = {
   games: "Clube da Sorte",
+  outlook: "Outlook",
   nav: "Canais",
   voice: "Sala de estar",
   chat: "# geral",
