@@ -1,8 +1,5 @@
 """Private music publisher. The browser only talks to the authenticated Java API."""
 import asyncio
-import array
-import math
-import sys
 import contextlib
 import hmac
 import json
@@ -15,12 +12,12 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from aiohttp import web
+from rhythm import detect_notes, MAX_NOTES as RHYTHM_MAX_NOTES
 
 IDENTITY = "music-bot"
 MAX_SECONDS = 20 * 60
 MAX_QUEUE = 30
 RHYTHM_SECONDS = 5 * 60
-RHYTHM_MAX_NOTES = 1200
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 YTDLP = ["yt-dlp", "--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist",
          "--no-warnings", "--socket-timeout", "15", "--retries", "1",
@@ -467,28 +464,6 @@ class Player:
             self.elapsed = 0
             await self.disconnect()
             return self.snapshot()
-
-
-def detect_notes(pcm):
-    """Transient-energy onset detection on the exact PCM later published by the bot."""
-    if sys.byteorder == "little":
-        samples = memoryview(pcm).cast("h")
-    else:
-        samples = array.array("h"); samples.frombytes(pcm)
-        samples.byteswap()
-    energies = []
-    for pos in range(0, len(samples)-1919, 1920):
-        energies.append(math.sqrt(sum(v*v for v in samples[pos:pos+1920])/1920)/32768)
-    flux = [max(0, value-sum(energies[max(0,i-8):i])/max(1,min(i,8))) for i,value in enumerate(energies)]
-    notes = []
-    for i in range(100, len(flux)-100):
-        local = flux[max(0,i-25):i+26]
-        threshold = max(.002, sum(local)/len(local)*1.6)
-        if flux[i] > threshold and flux[i] >= flux[i-1] and flux[i] > flux[i+1]:
-            at = i*20
-            if not notes or at-notes[-1]["at"] >= 260:
-                notes.append({"at": at, "lane": [0, 2, 1, 3, 0, 1, 2, 3][len(notes)%8]})
-    return notes[:RHYTHM_MAX_NOTES]
 
 
 def create_app(secret, player=None):

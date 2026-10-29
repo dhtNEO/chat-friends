@@ -8,6 +8,7 @@ import {
 } from "react";
 import { api, type User } from "./api";
 import "./party.css";
+import { chooseRhythmNote } from "./rhythmTiming";
 const PartyStage3D = lazy(() => import("./PartyStage3D"));
 const OUTCOMES: Record<string, string> = {
   blackjack: "Blackjack! Vitória",
@@ -262,17 +263,14 @@ export function PartyClub({
       ...locallyJudged.current,
     ]);
     const time = Date.now() + offset.current;
-    const candidates = room.notes
-      .map((n, i) => ({
-        ...n,
-        i,
-        delta: Math.abs(room.startsAt + n.at + 150 + adjust - time),
-      }))
-      .filter(
-        (n) => !judged.has(n.i) && !inFlight.current.has(n.i) && n.delta <= 320,
-      )
-      .sort((a, b) => a.delta - b.delta);
-    const note = candidates[0];
+    const note = chooseRhythmNote(
+      room.notes,
+      room.startsAt,
+      time,
+      adjust,
+      lane,
+      new Set([...judged, ...inFlight.current]),
+    );
     if (!note) {
       setFeedback("Fora do tempo");
       return;
