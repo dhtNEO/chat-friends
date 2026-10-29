@@ -826,4 +826,140 @@ class IntegrationTest {
             "select count(*) from spring_session where principal_name='ana'", Integer.class));
     assertThrows(ResponseStatusException.class, () -> accounts.get("ana"));
   }
+
+  static String shortcuts(String platform, long revision, String bindings) {
+    return "{\"platform\":\"" + platform + "\",\"revision\":" + revision
+        + ",\"enabled\":true,\"allowWhileTyping\":true,\"bindings\":[" + bindings + "]}";
+  }
+
+  static String binding(String action, String code, boolean ctrl, boolean alt, boolean meta) {
+    return "{\"action\":\"" + action + "\",\"code\":\"" + code + "\",\"ctrl\":" + ctrl
+        + ",\"alt\":" + alt + ",\"shift\":false,\"meta\":" + meta + "}";
+  }
+
+  @Test
+  void shortcutsAreSavedPerAccountAndPlatformWithRevisionCheck() throws Exception {
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("ana")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.platform").value("mac"))
+        .andExpect(jsonPath("$.revision").value(0))
+        .andExpect(jsonPath("$.enabled").value(true))
+        .andExpect(jsonPath("$.allowWhileTyping").value(false))
+        .andExpect(jsonPath("$.bindings.length()").value(0));
+    String mic = binding("toggleMic", "KeyM", true, true, false);
+    String deaf = binding("toggleDeaf", "F13", false, false, false);
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("ana"))
+                .contentType("application/json")
+                .content(shortcuts("mac", 0, mic + "," + deaf)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.revision").value(1))
+        .andExpect(jsonPath("$.allowWhileTyping").value(true));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("ana")))
+        .andExpect(jsonPath("$.revision").value(1))
+        .andExpect(jsonPath("$.bindings[0].action").value("toggleMic"))
+        .andExpect(jsonPath("$.bindings[0].code").value("KeyM"))
+        .andExpect(jsonPath("$.bindings[0].ctrl").value(true))
+        .andExpect(jsonPath("$.bindings[0].alt").value(true))
+        .andExpect(jsonPath("$.bindings[0].meta").value(false))
+        .andExpect(jsonPath("$.bindings[1].code").value("F13"));
+    // Other profile and other account stay untouched.
+    mvc.perform(get("/api/me/shortcuts?platform=other").with(as("ana")))
+        .andExpect(jsonPath("$.revision").value(0));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("bia")))
+        .andExpect(jsonPath("$.revision").value(0))
+        .andExpect(jsonPath("$.bindings.length()").value(0));
+    // Stale revisions (including a second "first save") never overwrite.
+    for (long stale : new long[] {0, 2})
+      mvc.perform(
+              put("/api/me/shortcuts")
+                  .with(as("ana"))
+                  .contentType("application/json")
+                  .content(shortcuts("mac", stale, "")))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.error").value("Atalhos alterados em outra sessão; recarregue"));
+    // A body accountId is ignored: bia's save lands on bia only.
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("bia"))
+                .contentType("application/json")
+                .content(
+                    shortcuts("mac", 0, mic)
+                        .replaceFirst(
+                            "\\{", "{\"accountId\":\"" + accounts.get("ana").id() + "\",")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.revision").value(1));
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("ana"))
+                .contentType("application/json")
+                .content(shortcuts("mac", 1, "")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.revision").value(2))
+        .andExpect(jsonPath("$.bindings.length()").value(0));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("bia")))
+        .andExpect(jsonPath("$.bindings.length()").value(1));
+    assertEquals(
+        2,
+        accounts.db.queryForObject(
+            "select revision from user_shortcuts where account_id=? and platform='mac'",
+            Long.class,
+            accounts.get("ana").id()));
+  }
+
+  @Test
+  void shortcutValidationRejectsUnsafeOrAmbiguousBindings() throws Exception {
+    String mic = binding("toggleMic", "KeyM", true, false, false);
+    var many = new StringJoiner(",");
+    for (int i = 0; i < 13; i++) many.add(binding("toggleMic", "Digit" + (i % 10), true, false, false));
+    for (String body :
+        new String[] {
+          shortcuts("linux", 0, mic),
+          shortcuts("mac", -1, mic),
+          shortcuts("mac", 0, binding("exec", "KeyM", true, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "KeyM", false, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "F12", false, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "ControlLeft", true, false, false)),
+          shortcuts("mac", 0, binding("toggleMic", "MetaRight", false, false, true)),
+          shortcuts("mac", 0, binding("toggleMic", "Key M", true, false, false)),
+          shortcuts("mac", 0, mic + "," + binding("toggleDeaf", "KeyM", true, false, false)),
+          shortcuts("mac", 0, mic + "," + binding("toggleMic", "KeyN", true, false, false)),
+          shortcuts("mac", 0, many.toString()),
+          "{\"platform\":\"mac\",\"revision\":0}"
+        })
+      mvc.perform(
+              put("/api/me/shortcuts")
+                  .with(as("ana"))
+                  .contentType("application/json")
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/me/shortcuts?platform=win").with(as("ana")))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/me/shortcuts").with(as("ana"))).andExpect(status().isBadRequest());
+    assertEquals(0, accounts.db.queryForObject("select count(*) from user_shortcuts", Integer.class));
+  }
+
+  @Test
+  void shortcutsRequireCompleteAuthenticatedSessionAndCsrf() throws Exception {
+    String body = shortcuts("mac", 0, binding("toggleMic", "KeyM", true, false, false));
+    mvc.perform(get("/api/me/shortcuts?platform=mac")).andExpect(status().isUnauthorized());
+    mvc.perform(put("/api/me/shortcuts").contentType("application/json").content(body))
+        .andExpect(status().isForbidden());
+    var cookie = loginCookie("ana", "test-only-password-ana");
+    mvc.perform(
+            put("/api/me/shortcuts").cookie(cookie).contentType("application/json").content(body))
+        .andExpect(status().isForbidden());
+    String secret = mfa.generate();
+    mfa.enroll("bia", secret, Mfa.totp(secret, java.time.Instant.now().getEpochSecond() / 30));
+    mvc.perform(get("/api/me/shortcuts?platform=mac").with(as("bia")))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            put("/api/me/shortcuts")
+                .with(as("bia"))
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isForbidden());
+    assertEquals(0, accounts.db.queryForObject("select count(*) from user_shortcuts", Integer.class));
+  }
 }

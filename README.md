@@ -38,7 +38,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 
 ## O que está incluído
 
-- Java 25 / Spring Boot 3.5.16, Maven Wrapper 3.9.11, PostgreSQL 17 / Flyway / sessões JDBC.
+- Java 25 / Spring Boot 4.1.2, Maven Wrapper 3.9.11, PostgreSQL 17 / Flyway / sessões JDBC.
 - React 19 / TypeScript / Vite, SDK oficial LiveKit, Caddy e LiveKit self-hosted.
 - Bot de música na chamada: busca por nome ou link do YouTube, fila compartilhada, pausa/pular e volume individual. Serviço privado incluído no Compose; detalhes e limites em [MUSIC](docs/MUSIC.md).
 - Contas individuais, administrador, alteração/redefinição de senha, desativação e invalidação de sessões. Cada pessoa troca nick, usuário, foto de perfil, cores do tema, tamanho da interface e sons da chamada.

@@ -14,6 +14,8 @@ import {
 export type PanelKind =
   | "nav"
   | "voice"
+  | "stream"
+  | "music"
   | "chat"
   | "members"
   | "account"
@@ -25,9 +27,11 @@ export const TITLES: Record<PanelKind, string> = {
   outlook: "Outlook",
   nav: "Canais",
   voice: "Sala de estar",
+  stream: "Transmissão",
+  music: "Bot de música",
   chat: "# geral",
   members: "Membros",
-  account: "Minha conta",
+  account: "Configurações",
   admin: "Gerenciar contas",
 };
 export const kindOf = (id: string) => id.split("-")[0] as PanelKind;
@@ -169,14 +173,29 @@ export function openPanel(api: DockviewApi, kind: PanelKind) {
         ? { referencePanel: chat, direction: "left" }
         : { direction: "left" },
     );
-  else if (kind === "chat") add(api, kind, { direction: "right" });
+  else if (kind === "stream" || kind === "music") {
+    const room = api.getPanel("voice");
+    add(
+      api,
+      kind,
+      room
+        ? { referencePanel: room, direction: "right" }
+        : { direction: "right" },
+    );
+  } else if (kind === "chat") add(api, kind, { direction: "right" });
   else add(api, kind, chat ? { referencePanel: chat } : undefined);
   fitSides(api);
 }
 
 // Opens another view of #geral beside the last one, like splitting an editor.
+// There is a single channel, so two side-by-side views are the useful maximum.
+const MAX_CHATS = 2;
 export function openChat(api: DockviewApi) {
   const chats = api.panels.filter((p) => kindOf(p.id) === "chat");
+  if (chats.length >= MAX_CHATS) {
+    chats[chats.length - 1].api.setActive();
+    return;
+  }
   let n = 1;
   while (api.getPanel(n === 1 ? "chat" : `chat-${n}`)) n++;
   const id = n === 1 ? "chat" : `chat-${n}`;

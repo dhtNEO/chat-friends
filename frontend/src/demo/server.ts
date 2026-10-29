@@ -17,6 +17,7 @@ import {
   world,
 } from "./world";
 
+const shortcuts = new Map<string, unknown>();
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -268,6 +269,27 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
       me.avatarVersion = null;
       profileListeners.forEach((listener) => listener());
       return empty();
+    case "GET /me/shortcuts":
+      return json(
+        shortcuts.get(url.searchParams.get("platform") ?? "other") ?? {
+          platform: url.searchParams.get("platform"),
+          revision: 0,
+          enabled: true,
+          allowWhileTyping: false,
+          bindings: [],
+        },
+      );
+    case "PUT /me/shortcuts": {
+      const next = body as { platform: string; revision: number };
+      const saved = shortcuts.get(next.platform) as
+        | { revision: number }
+        | undefined;
+      if ((saved?.revision ?? 0) !== next.revision)
+        return fail(409, "Atalhos alterados em outra sessão; recarregue");
+      const stored = { ...next, revision: next.revision + 1 };
+      shortcuts.set(next.platform, stored);
+      return json(stored);
+    }
     case "GET /admin/accounts":
       return json([me, ...world.accounts]);
     case "POST /admin/accounts": {

@@ -25,6 +25,11 @@ export function AudioTrack({
   // webAudioMix owns playback. Muting only the HTML element does NOT mute its graph.
   useEffect(() => {
     track.setVolume(volume);
+    // Some browsers ignore volume on media elements (iOS); muting always works.
+    // With Web Audio mixing LiveKit keeps the element at volume 0 and muted
+    // (sound goes through its gain node), so only unmute a playing element.
+    const el = ref.current;
+    if (el) el.muted = volume === 0 || el.volume === 0;
   }, [track, volume]);
   return (
     <audio
@@ -44,10 +49,8 @@ export function Screen({
   avatar,
   viewers,
   volume,
-  deaf,
   expanded,
   onExpand,
-  onPopout,
   onVolume,
   onError,
 }: {
@@ -57,11 +60,9 @@ export function Screen({
   avatar?: string;
   viewers: number;
   volume: number;
-  deaf: boolean;
   // Expanding maximizes the dock panel, leaving browser fullscreen separate.
   expanded: boolean;
   onExpand: () => void;
-  onPopout: () => void;
   onVolume: (volume: number) => void;
   onError: (message: string) => void;
 }) {
@@ -92,15 +93,19 @@ export function Screen({
     };
   }, [track]);
   useEffect(() => {
+    const element = container.current!;
     const update = () =>
-      setFull(document.fullscreenElement === container.current);
-    document.addEventListener("fullscreenchange", update);
-    return () => document.removeEventListener("fullscreenchange", update);
+      setFull(element.ownerDocument.fullscreenElement === element);
+    element.addEventListener("fullscreenchange", update);
+    return () => element.removeEventListener("fullscreenchange", update);
   }, []);
   const toggleFull = () => {
-    const action = full
-      ? document.exitFullscreen()
-      : container.current?.requestFullscreen();
+    const element = container.current;
+    const doc = element?.ownerDocument;
+    const action =
+      doc?.fullscreenElement === element
+        ? doc?.exitFullscreen()
+        : element?.requestFullscreen();
     void action?.catch(() =>
       onError("Não foi possível abrir a tela cheia neste navegador."),
     );
@@ -134,14 +139,6 @@ export function Screen({
             onClick={onExpand}
           >
             <Icon name={expanded ? "collapse" : "expand"} />
-          </button>
-          <button
-            className="icon-button"
-            aria-label="Abrir em outra janela"
-            title="Abrir em outra janela (outro monitor)"
-            onClick={onPopout}
-          >
-            <Icon name="popout" />
           </button>
           <button
             className="icon-button"
@@ -182,7 +179,6 @@ export function Screen({
               {volume}%
             </span>
           </label>
-          {deaf && <span className="audio-badge">Recepção silenciada</span>}
         </div>
       )}
     </div>

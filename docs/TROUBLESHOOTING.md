@@ -2,8 +2,11 @@
 
 | Sintoma | Verificação e próximo passo |
 |---|---|
+| Login 401 | Conta/senha recusada ou conta desativada. Confirme se a conta existe no servidor acessado: criar usuário no ambiente local não o cria automaticamente no Mac de produção. |
 | Login 403 | GET /api/csrf antes/depois de login; cookie e header; mesma origem; não desativar CSRF |
 | Login 429 | aguardar janela 5 min; limite por usuário e IP do proxy compartilhado |
+| Login 500/502/503 | Falha do servidor/proxy, não prova senha incorreta. No host de produção, execute `CHAT_MODE=prd ./scripts/compose.sh ps` e confira a saúde de backend/db/web/edge. Não compartilhe `.env`, senhas ou cookies. |
+| Login retorna 204, mas `/api/me` retorna 401 | A autenticação foi aceita, mas a sessão não foi mantida. Verifique cookies do site e endereço usado; produção exige HTTPS e `COOKIE_SECURE=true`. Não troque para HTTP nem desative Secure/CSRF como correção de produção. |
 | WebSocket recusa | cookie válido, APP_ORIGIN igual a origem real (esquema/porta), proxy com Upgrade |
 | Chat reaparece após retry | UUID deve ser reutilizado; o servidor deduplica; confira erro 409 se corpo mudou |
 | API retorna “Domain forbidden” em cloud | proxy herdado pode interceptar serviço interno; NO_PROXY/no_proxy de web/livekit deve incluir backend/db/livekit/web |
@@ -19,6 +22,8 @@
 | Certificado inválido | DNS/horário/ACME, portas 80/443, cadeia completa e persistência de /data; não usar -k como correção |
 
 Use `scripts/diagnose.sh`; nunca colar `.env`, `docker inspect` completo, `compose config` expandido ou dumps de sessão. `compose config -q` valida sem imprimir segredos. HTTP 200 da página prova frontend, não WebRTC. Teste chamada de outra rede e confirme frames/áudio recebidos.
+
+A tela de login distingue credenciais recusadas, sessão/cookies, limite de tentativas, indisponibilidade do servidor e falha de rede. Versões anteriores mostravam “Usuário ou senha inválidos” também para 403 e 5xx, ou permaneciam silenciosamente no formulário quando a sessão se perdia após um 204. O código HTTP das requisições `/api/csrf`, `/api/login` e `/api/me`, visto na aba Network do navegador, permite diferenciar esses casos sem compartilhar tokens ou corpos de requisição.
 
 ## Falha de sinalização com CSP em produção
 

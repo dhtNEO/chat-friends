@@ -14,7 +14,14 @@ import {
   type DockviewReadyEvent,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { api, login, type Member, type User, type Message } from "./api";
+import {
+  ApiError,
+  api,
+  login,
+  type Member,
+  type User,
+  type Message,
+} from "./api";
 import { MfaGate, type SecurityState } from "./AccountSecurity";
 import { GamesClub } from "./GamesClub";
 import { Outlook } from "./Outlook";
@@ -22,6 +29,7 @@ import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
 import { Profile } from "./Profile";
+import { loadShortcuts, setShortcuts, useKeyboardShortcuts } from "./Shortcuts";
 import { Lockup, Logo } from "./Logo";
 import { applyTheme } from "./theme";
 import {
@@ -48,11 +56,22 @@ export default function App() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const load = useCallback(async () => {
+  const load = useCallback(async (afterLogin = false) => {
     try {
       setMe(await api("/me"));
-    } catch {
+    } catch (e) {
       setMe(null);
+      if (afterLogin) {
+        if (e instanceof ApiError && e.status === 401)
+          throw new Error(
+            "O login foi aceito, mas a sessão não foi mantida. Permita os cookies deste site e confira se está usando o endereço correto.",
+          );
+        if (e instanceof ApiError && e.status >= 500)
+          throw new Error(
+            "O servidor está indisponível no momento. Tente novamente em instantes.",
+          );
+        throw e;
+      }
     } finally {
       setLoading(false);
     }
@@ -76,7 +95,7 @@ export default function App() {
         notice={notice}
         onLogin={async () => {
           setNotice("");
-          await load();
+          await load(true);
         }}
       />
     );
@@ -209,6 +228,12 @@ function Workspace({
   onRefresh: () => Promise<void>;
   onLogout: (notice?: string) => void;
 }) {
+  useKeyboardShortcuts();
+  // A person's shortcuts load with their session and never outlive it.
+  useEffect(() => {
+    void loadShortcuts().catch(() => {});
+    return () => setShortcuts(null);
+  }, [me.user.id]);
   const [voiceIdentity, setVoiceIdentity] = useState<string>();
   const [members, setMembers] = useState<Member[]>([]);
   const loadMembers = useCallback(
@@ -235,7 +260,8 @@ function Workspace({
     [pending, setPending] = useState<{ clientId: string; body: string }[]>([]);
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({}),
     [dock, setDock] = useState<DockviewApi | null>(null),
-    [stageMaximized, setStageMaximized] = useState(false);
+    [stageMaximized, setStageMaximized] = useState(false),
+    [streamMaximized, setStreamMaximized] = useState(false);
   const initialized = useRef(false);
   const latest = useRef(0),
     queue = useRef(pending);
@@ -283,9 +309,10 @@ function Workspace({
   useEffect(() => {
     if (!dock) return;
     const saving = dock.onDidLayoutChange(() => saveLayout(dock));
-    const maximized = dock.onDidMaximizedGroupChange(() =>
-      setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized()),
-    );
+    const maximized = dock.onDidMaximizedGroupChange(() => {
+      setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized());
+      setStreamMaximized(!!dock.getPanel("stream")?.api.isMaximized());
+    });
     // Phone and desktop keep separate layouts; switch when crossing over.
     const media = matchMedia(compactQuery),
       switchLayout = () => {
@@ -584,6 +611,20 @@ function Workspace({
             onClick={() => open("voice")}
           />
           <ActivityButton
+            icon="screen"
+            label="Painel da transmissão"
+            title="Separar transmissão"
+            active={!!slots.stream}
+            onClick={() => open("stream")}
+          />
+          <ActivityButton
+            icon="music"
+            label="Painel do bot de música"
+            title="Separar música"
+            active={!!slots.music}
+            onClick={() => open("music")}
+          />
+          <ActivityButton
             icon="chat"
             label="Conversa"
             title="Conversa #geral"
@@ -700,12 +741,30 @@ function Workspace({
           userId={me.user.id}
           onIdentityChange={setVoiceIdentity}
           admin={me.user.admin}
-          hosts={{ stage: slots.voice ?? null, roster, quick }}
+          hosts={{
+            stage: slots.voice ?? null,
+            stream: slots.stream ?? null,
+            music: slots.music ?? null,
+            roster,
+            quick,
+          }}
           maximized={stageMaximized}
+          streamMaximized={streamMaximized}
+          onSeparate={(kind) => open(kind)}
+          onReturn={(kind) => {
+            close(kind);
+            open("voice");
+          }}
           onOpen={() => open("voice")}
           onStreaming={(active) => {
             streaming.current = active;
-            if (active) open("voice");
+            if (active) open(dock?.getPanel("stream") ? "stream" : "voice");
+          }}
+          onMaximizeStream={() => {
+            const panel = dock?.getPanel(slots.stream ? "stream" : "voice");
+            if (!panel) return;
+            if (panel.api.isMaximized()) panel.api.exitMaximized();
+            else panel.api.maximize();
           }}
           onMaximize={() => {
             const panel = dock?.getPanel("voice");
@@ -745,6 +804,42 @@ function ActivityButton({
       <Icon name={icon} />
       {!!badge && <small>{badge}</small>}
     </button>
+  );
+}
+// Turns http(s) and www. addresses into links; everything else stays text,
+// so messages can never inject markup.
+const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+[^\s<>"'.,;:!?)\]}]/gi;
+function Linkified({ text }: { text: string }) {
+  const parts: (string | { href: string; label: string })[] = [];
+  let last = 0;
+  for (const match of text.matchAll(URL_PATTERN)) {
+    const label = match[0],
+      start = match.index ?? 0;
+    parts.push(text.slice(last, start));
+    parts.push({
+      href: /^https?:/i.test(label) ? label : "https://" + label,
+      label,
+    });
+    last = start + label.length;
+  }
+  parts.push(text.slice(last));
+  return (
+    <>
+      {parts.map((part, i) =>
+        typeof part === "string" ? (
+          part
+        ) : (
+          <a
+            key={i}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+          >
+            {part.label}
+          </a>
+        ),
+      )}
+    </>
   );
 }
 const EMOJIS = [
@@ -953,7 +1048,9 @@ function ChatView({
                         {time}
                       </header>
                     )}
-                    <p>{m.body}</p>
+                    <p>
+                      <Linkified text={m.body} />
+                    </p>
                   </div>
                 </article>
               </div>

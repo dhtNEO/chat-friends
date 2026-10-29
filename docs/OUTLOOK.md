@@ -37,6 +37,6 @@ Todas as rotas exigem sessão ativa e respeitam MFA/políticas existentes. POST 
 
 ## Atualização e verificação
 
-Use `./scripts/up.sh` em dev ou `CHAT_MODE=prd ./scripts/up.sh` em produção para reconstruir backend/frontend e aplicar V11 pelo migrador. Não habilite Flyway nem credenciais de manutenção no backend runtime. O calendário não depende do bot musical.
+Use `./scripts/up.sh` em dev ou `CHAT_MODE=prd ./scripts/up.sh` em produção para reconstruir backend/frontend e aplicar as migrações pelo migrador. Na integração com atalhos, a agenda é criada pela V11 da linha de jogos ou pela V12 na linha de atalhos; os históricos existentes são preservados conforme [SECURITY_UPGRADE](SECURITY_UPGRADE.md). Não habilite Flyway nem credenciais de manutenção no backend runtime. O calendário não depende do bot musical.
 
 Testes de backend usam somente `friends_test`: compartilhamento, permissões de criador/admin, sessão/CSRF, concorrência e repetição de criação, conflito de versões, respostas individuais, cancelamento, contas desativadas, limites e eventos noturnos. Navegador valida criação, horários em America/Sao_Paulo, edição, cancelamento, presença, navegação mensal e celular. O modo demo simula a agenda apenas na página; o armazenamento persistente pertence à aplicação conectada.

@@ -9,6 +9,8 @@ test("CSP prd permite validação HTTPS da mídia e bloqueia outro destino", asy
   request,
 }) => {
   const name = "friends-csp-" + randomUUID();
+  const project = process.env.TEST_COMPOSE_PROJECT || "chat-friends";
+  const image = process.env.TEST_WEB_IMAGE || "chat-friends-web";
   const media = "https://media.example.test:18443";
   const docker = (...args: string[]) =>
     execFileSync("docker", args, { encoding: "utf8", stdio: "pipe" }).trim();
@@ -19,11 +21,11 @@ test("CSP prd permite validação HTTPS da mídia e bloqueia outro destino", asy
       "--name",
       name,
       "--network",
-      "chat-friends_ingress_net",
+      `${project}_ingress_net`,
       "--network",
-      "chat-friends_api_net",
+      `${project}_api_net`,
       "--network",
-      "chat-friends_signal_net",
+      `${project}_signal_net`,
       "--user",
       "10001:10001",
       "--read-only",
@@ -39,7 +41,7 @@ test("CSP prd permite validação HTTPS da mídia e bloqueia outro destino", asy
       "127.0.0.1::8080",
       "-e",
       `MEDIA_CONNECT_SRC=${media} wss://media.example.test:18443`,
-      "chat-friends-web",
+      image,
     );
     const address = docker("port", name, "8080/tcp");
     const origin = "http://" + address;

@@ -10,6 +10,8 @@ Mesma origem do frontend. JSON UTF-8, exceto login (form), upload de avatar (bin
 | POST /api/logout | 204; invalida sessão |
 | GET /api/me | `{user:{id,username,displayName,admin,enabled,primaryColor,secondaryColor,avatarVersion},spaceName,security:{mfaEnabled,mfaPending,enrollmentRequired}}` |
 | POST /api/password | `{currentPassword,password}`; invalida todas as sessões e solicita expulsão |
+| GET /api/me/shortcuts?platform=mac\|other | atalhos da própria conta para o perfil: `{platform,revision,enabled,allowWhileTyping,bindings:[{action,code,ctrl,alt,shift,meta}]}`; sem registro salvo, `{revision:0,enabled:true,allowWhileTyping:false,bindings:[]}` |
+| PUT /api/me/shortcuts | `{platform,revision,enabled,allowWhileTyping,bindings}`; conta sempre da sessão. `revision` = última lida (0 na primeira gravação); divergente → 409 "Atalhos alterados em outra sessão; recarregue". Devolve o objeto salvo com `revision+1`. Até 12 atalhos; `action` em `toggleMic`, `toggleDeaf`, `pushToTalk`, `leaveVoice`, `toggleStreamSound`; `code` é `KeyboardEvent.code` (`[A-Za-z0-9]{1,24}`), exige Ctrl, Alt ou Meta (exceto F13–F24), recusa modificador isolado, ação ou combinação repetida (400). Limite 30 gravações/min por conta |
 | GET /api/members | contas ativas: `[{id,username,displayName,avatarVersion}]` |
 | PATCH /api/profile | `{displayName?,username?,primaryColor?,secondaryColor?}`; cores `#rrggbb` ou `""` para padrão; devolve `{user,signedOut}`. Trocar `username` (único, mesmo formato da criação) encerra todas as sessões da conta |
 | POST /api/profile/avatar | corpo binário `image/png`, `image/jpeg` ou `image/webp` (conferidos pelos bytes iniciais), até 16 KB; o navegador recorta e reduz antes |
@@ -77,4 +79,4 @@ Rotas autenticadas `/api/party`, mãos de blackjack, prontidão e acertos de rit
 
 ## Outlook
 
-Calendário compartilhado autenticado: listagem por intervalo, criação de jogatinas, edição/cancelamento pelo criador ou administrador e respostas individuais de presença. Rotas e contratos em [OUTLOOK.md](OUTLOOK.md#api-autenticada). Requer migração V11.
+Calendário compartilhado autenticado: listagem por intervalo, criação de jogatinas, edição/cancelamento pelo criador ou administrador e respostas individuais de presença. Rotas e contratos em [OUTLOOK.md](OUTLOOK.md#api-autenticada). Requer o esquema de agenda da V11 (linha de jogos) ou V12 (integração com atalhos).
