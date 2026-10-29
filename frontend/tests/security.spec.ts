@@ -33,7 +33,10 @@ test("autenticador, recuperação e revogação da própria sessão pela interfa
   expect(
     (
       await request.post("/api/login", {
-        form: { username: "admin", password: adminPassword },
+        form: {
+          username: process.env.TEST_ADMIN_USERNAME || "admin",
+          password: adminPassword,
+        },
         headers: { "X-CSRF-TOKEN": csrf },
       })
     ).status(),
@@ -55,6 +58,12 @@ test("autenticador, recuperação e revogação da própria sessão pela interfa
   await page
     .getByRole("button", { name: "Configurações", exact: true })
     .click();
+  await expect(
+    page.getByRole("tab", { name: "Conta", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("heading", { name: "Segurança", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Ativar autenticador" }).click();
   const gate = page.locator(".security-page");
   await gate.getByLabel("Senha atual", { exact: true }).fill(password);
@@ -93,6 +102,7 @@ test("autenticador, recuperação e revogação da própria sessão pela interfa
   await page
     .getByRole("button", { name: "Configurações", exact: true })
     .click();
+  await page.getByRole("tab", { name: "Conta", exact: true }).click();
   await expect(page.getByText("Esta sessão", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Encerrar sessão" }).click();
   await expect(

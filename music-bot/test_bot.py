@@ -1,12 +1,15 @@
 import asyncio
 import time
 import unittest
+import tempfile
+import os
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from unittest.mock import AsyncMock, patch
 
 from aiohttp.test_utils import TestClient, TestServer
-from bot import Player, create_app, metadata, query_target, song
+from bot import control_key, Player, create_app, metadata, query_target, song
 
 
 class Validation(unittest.TestCase):
@@ -101,6 +104,28 @@ class Lifecycle(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.player.enqueue("aqz-KE-bpKQ", "Ana", "token")
         self.player.queue = []
+
+    async def test_rotated_control_key_is_reloaded_and_missing_key_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            key = Path(temp) / "control.key"
+            before, after = "a" * 64, "b" * 64
+            key.write_text(before)
+            client = TestClient(TestServer(create_app(lambda: control_key(key), self.player)))
+            await client.start_server()
+            try:
+                response = await client.get('/state', headers={'Authorization': 'Bearer ' + before})
+                self.assertEqual(200, response.status)
+                replacement = key.with_suffix('.new'); replacement.write_text(after); os.replace(replacement, key)
+                response = await client.get('/state', headers={'Authorization': 'Bearer ' + after})
+                self.assertEqual(200, response.status)
+                response = await client.get('/state', headers={'Authorization': 'Bearer ' + before})
+                self.assertEqual(401, response.status)
+                key.unlink()
+                response = await client.get('/state', headers={'Authorization': 'Bearer ' + after})
+                self.assertEqual(503, response.status)
+                self.assertNotIn(temp, await response.text())
+            finally:
+                await client.close()
 
     async def test_private_api_requires_scoped_key_and_never_returns_token(self):
         client = TestClient(TestServer(create_app("a" * 64, self.player)))

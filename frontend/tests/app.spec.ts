@@ -8,7 +8,9 @@ async function signIn(page: import("@playwright/test").Page) {
   const response = await page.request.get("/api/me");
   await page.goto("/");
   if (response.status() !== 200) {
-    await page.getByLabel("Usuário", { exact: true }).fill("admin");
+    await page
+      .getByLabel("Usuário", { exact: true })
+      .fill(process.env.TEST_ADMIN_USERNAME || "admin");
     await page.getByLabel("Senha", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Entrar no espaço" }).click();
   }
@@ -183,7 +185,7 @@ async function joinVoice(page: import("@playwright/test").Page) {
     timeout: 15000,
   });
   await expect(
-    page.getByRole("button", { name: "Desligar mic" }),
+    page.getByRole("button", { name: "Desligar mic", exact: true }),
   ).toBeVisible();
 }
 
@@ -199,10 +201,12 @@ test("silenciar o áudio também desliga o mic e ouvir de novo o devolve", async
   await expect(
     page.getByRole("button", { name: "Ouvir áudio", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ligar mic" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Ligar mic", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Ouvir áudio", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Desligar mic" }),
+    page.getByRole("button", { name: "Desligar mic", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Sair da voz", exact: true }).click();
 });
@@ -219,6 +223,13 @@ test("atalho pessoal gravado nas configurações alterna o microfone", async ({
   const row = page
     .locator(".shortcut-list li")
     .filter({ hasText: "Ligar/desligar microfone" });
+  // A previous interrupted run may have saved this disposable account's binding.
+  const remove = row.getByRole("button", { name: /^Remover/ });
+  if (await remove.count()) {
+    await remove.click();
+    await page.getByRole("button", { name: "Salvar atalhos" }).click();
+    await expect(row.getByText("Sem atalho")).toBeVisible();
+  }
   await row.getByRole("button", { name: /^(Gravar|Trocar)$/ }).click();
   await page.keyboard.press("Control+Alt+KeyM");
   await expect(row.locator("kbd")).toHaveCount(3);

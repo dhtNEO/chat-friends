@@ -26,15 +26,33 @@ export function useSpeaking(sources: Source[], active: boolean) {
     .map((s) => s.identity + ":" + s.track.id)
     .sort()
     .join("|");
+  // Own the meter context for the entire active call, including unmount.
+  // Track reconciliation below must not tear it down on every track change.
   useEffect(() => {
     if (!active) return;
-    if (!context.current) {
-      context.current = new AudioContext();
-      sink.current = context.current.createGain();
-      sink.current.gain.value = 0;
-      // Chrome only processes nodes that reach the destination.
-      sink.current.connect(context.current.destination);
-    }
+    const ctx = new AudioContext();
+    const muted = ctx.createGain();
+    muted.gain.value = 0;
+    // Chrome only processes nodes that reach the destination.
+    muted.connect(ctx.destination);
+    context.current = ctx;
+    sink.current = muted;
+    return () => {
+      for (const meter of meters.current.values()) {
+        meter.source.disconnect();
+        meter.analyser.disconnect();
+      }
+      meters.current.clear();
+      muted.disconnect();
+      if (context.current === ctx) {
+        context.current = null;
+        sink.current = null;
+      }
+      if (ctx.state !== "closed") void ctx.close().catch(() => {});
+    };
+  }, [active]);
+  useEffect(() => {
+    if (!active || !context.current || !sink.current) return;
     const ctx = context.current;
     void ctx.resume().catch(() => {});
     const wanted = new Map(latest.current.map((s) => [s.identity, s.track]));
@@ -76,18 +94,6 @@ export function useSpeaking(sources: Source[], active: boolean) {
       );
     }, 80);
     return () => clearInterval(timer);
-  }, [active]);
-  // Close everything when the call ends.
-  useEffect(() => {
-    if (active) return;
-    for (const meter of meters.current.values()) {
-      meter.source.disconnect();
-      meter.analyser.disconnect();
-    }
-    meters.current.clear();
-    void context.current?.close().catch(() => {});
-    context.current = null;
-    sink.current = null;
   }, [active]);
   return speaking;
 }

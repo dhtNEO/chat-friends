@@ -14,8 +14,17 @@ import {
   type DockviewReadyEvent,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { api, login, type Member, type User, type Message } from "./api";
+import {
+  ApiError,
+  api,
+  login,
+  type Member,
+  type User,
+  type Message,
+} from "./api";
 import { MfaGate, type SecurityState } from "./AccountSecurity";
+import { GamesClub } from "./GamesClub";
+import { Outlook } from "./Outlook";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
@@ -47,11 +56,22 @@ export default function App() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const load = useCallback(async () => {
+  const load = useCallback(async (afterLogin = false) => {
     try {
       setMe(await api("/me"));
-    } catch {
+    } catch (e) {
       setMe(null);
+      if (afterLogin) {
+        if (e instanceof ApiError && e.status === 401)
+          throw new Error(
+            "O login foi aceito, mas a sessão não foi mantida. Permita os cookies deste site e confira se está usando o endereço correto.",
+          );
+        if (e instanceof ApiError && e.status >= 500)
+          throw new Error(
+            "O servidor está indisponível no momento. Tente novamente em instantes.",
+          );
+        throw e;
+      }
     } finally {
       setLoading(false);
     }
@@ -75,7 +95,7 @@ export default function App() {
         notice={notice}
         onLogin={async () => {
           setNotice("");
-          await load();
+          await load(true);
         }}
       />
     );
@@ -214,6 +234,7 @@ function Workspace({
     void loadShortcuts().catch(() => {});
     return () => setShortcuts(null);
   }, [me.user.id]);
+  const [voiceIdentity, setVoiceIdentity] = useState<string>();
   const [members, setMembers] = useState<Member[]>([]);
   const loadMembers = useCallback(
     () =>
@@ -239,7 +260,8 @@ function Workspace({
     [pending, setPending] = useState<{ clientId: string; body: string }[]>([]);
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({}),
     [dock, setDock] = useState<DockviewApi | null>(null),
-    [stageMaximized, setStageMaximized] = useState(false);
+    [stageMaximized, setStageMaximized] = useState(false),
+    [streamMaximized, setStreamMaximized] = useState(false);
   const initialized = useRef(false);
   const latest = useRef(0),
     queue = useRef(pending);
@@ -287,9 +309,10 @@ function Workspace({
   useEffect(() => {
     if (!dock) return;
     const saving = dock.onDidLayoutChange(() => saveLayout(dock));
-    const maximized = dock.onDidMaximizedGroupChange(() =>
-      setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized()),
-    );
+    const maximized = dock.onDidMaximizedGroupChange(() => {
+      setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized());
+      setStreamMaximized(!!dock.getPanel("stream")?.api.isMaximized());
+    });
     // Phone and desktop keep separate layouts; switch when crossing over.
     const media = matchMedia(compactQuery),
       switchLayout = () => {
@@ -445,6 +468,18 @@ function Workspace({
         <span className="eyebrow">CANAIS DE VOZ</span>
         <div ref={setRoster} />
       </div>
+      <div className="channel-section">
+        <span className="eyebrow">MAIS UMA RODADA?</span>
+        <button className="channel" onClick={() => open("games")}>
+          <Icon name="games" size={18} /> Clube da Sorte <small>NOVO</small>
+        </button>
+      </div>
+      <div className="channel-section">
+        <span className="eyebrow">MARQUE COM A GALERA</span>
+        <button className="channel" onClick={() => open("outlook")}>
+          <Icon name="calendar" size={18} /> Outlook
+        </button>
+      </div>
       <footer className="me">
         <Avatar name={me.user.displayName} src={avatarSrc(me.user)} size={34} />
         <div className="me-name">
@@ -470,6 +505,15 @@ function Workspace({
           onOlder={() => void older()}
           onSend={post}
           onRetry={(p) => void send(p)}
+        />
+      );
+    if (kind === "outlook") return <Outlook me={me.user} />;
+    if (kind === "games")
+      return (
+        <GamesClub
+          me={me.user}
+          voiceIdentity={voiceIdentity}
+          onOpenVoice={() => open("voice")}
         />
       );
     if (kind === "members")
@@ -567,6 +611,20 @@ function Workspace({
             onClick={() => open("voice")}
           />
           <ActivityButton
+            icon="screen"
+            label="Painel da transmissão"
+            title="Separar transmissão"
+            active={!!slots.stream}
+            onClick={() => open("stream")}
+          />
+          <ActivityButton
+            icon="music"
+            label="Painel do bot de música"
+            title="Separar música"
+            active={!!slots.music}
+            onClick={() => open("music")}
+          />
+          <ActivityButton
             icon="chat"
             label="Conversa"
             title="Conversa #geral"
@@ -586,6 +644,20 @@ function Workspace({
             active={!!slots.members}
             badge={online.length}
             onClick={() => open("members")}
+          />
+          <ActivityButton
+            icon="games"
+            label="Jogos"
+            title="Clube da Sorte"
+            active={!!slots.games}
+            onClick={() => open("games")}
+          />
+          <ActivityButton
+            icon="calendar"
+            label="Outlook"
+            title="Outlook · calendário da galera"
+            active={!!slots.outlook}
+            onClick={() => open("outlook")}
           />
           <span className="activity-spacer" />
           <ActivityButton
@@ -667,13 +739,32 @@ function Workspace({
         <Voice
           key={me.user.id}
           userId={me.user.id}
+          onIdentityChange={setVoiceIdentity}
           admin={me.user.admin}
-          hosts={{ stage: slots.voice ?? null, roster, quick }}
+          hosts={{
+            stage: slots.voice ?? null,
+            stream: slots.stream ?? null,
+            music: slots.music ?? null,
+            roster,
+            quick,
+          }}
           maximized={stageMaximized}
+          streamMaximized={streamMaximized}
+          onSeparate={(kind) => open(kind)}
+          onReturn={(kind) => {
+            close(kind);
+            open("voice");
+          }}
           onOpen={() => open("voice")}
           onStreaming={(active) => {
             streaming.current = active;
-            if (active) open("voice");
+            if (active) open(dock?.getPanel("stream") ? "stream" : "voice");
+          }}
+          onMaximizeStream={() => {
+            const panel = dock?.getPanel(slots.stream ? "stream" : "voice");
+            if (!panel) return;
+            if (panel.api.isMaximized()) panel.api.exitMaximized();
+            else panel.api.maximize();
           }}
           onMaximize={() => {
             const panel = dock?.getPanel("voice");

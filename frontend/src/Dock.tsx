@@ -14,13 +14,21 @@ import {
 export type PanelKind =
   | "nav"
   | "voice"
+  | "stream"
+  | "music"
   | "chat"
   | "members"
   | "account"
-  | "admin";
+  | "admin"
+  | "games"
+  | "outlook";
 export const TITLES: Record<PanelKind, string> = {
+  games: "Clube da Sorte",
+  outlook: "Outlook",
   nav: "Canais",
   voice: "Sala de estar",
+  stream: "Transmissão",
+  music: "Bot de música",
   chat: "# geral",
   members: "Membros",
   account: "Configurações",
@@ -165,7 +173,16 @@ export function openPanel(api: DockviewApi, kind: PanelKind) {
         ? { referencePanel: chat, direction: "left" }
         : { direction: "left" },
     );
-  else if (kind === "chat") add(api, kind, { direction: "right" });
+  else if (kind === "stream" || kind === "music") {
+    const room = api.getPanel("voice");
+    add(
+      api,
+      kind,
+      room
+        ? { referencePanel: room, direction: "right" }
+        : { direction: "right" },
+    );
+  } else if (kind === "chat") add(api, kind, { direction: "right" });
   else add(api, kind, chat ? { referencePanel: chat } : undefined);
   fitSides(api);
 }

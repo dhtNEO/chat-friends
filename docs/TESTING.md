@@ -4,7 +4,29 @@ Backend: suíte IntegrationTest com PostgreSQL real separado (`friends_test`), S
 
 Frontend: TypeScript strict, ESLint, build Vite e Playwright contra stack real para login, persistência após reload, XSS como texto, criação/desativação, entrega em tempo real e viewport móvel. Relatórios de falha podem conter campos preenchidos: não versionar ou publicar sem redigir segredos. Capturas em USER_GUIDE usam somente dados sintéticos.
 
+Informe `TEST_ADMIN_PASSWORD` por ambiente privado; `TEST_ADMIN_USERNAME` é opcional e mantém `admin` como padrão. Use contas descartáveis separadas ao repetir suítes para respeitar o limite de tentativas por usuário. Não reduza os limites de autenticação para acomodar o runner.
+
 `./scripts/check.sh` usa containers; banco teste separado. CI valida Compose sem imprimir segredos, Terraform sem apply, dependências e segredos proporcionais. O teste de backup deve restaurar um dump em outro banco e comparar dados; pg_dump bem-sucedido sozinho não prova restauração.
+
+## Organização e tamanho da sala
+
+Os testes da organização pessoal usam o modo demo, sem iniciar backend, banco ou LiveKit. No frontend, inicie `npm run demo` e, em outro terminal na mesma pasta, execute:
+
+```bash
+ROOM_LAYOUT_DEMO_TEST=1 MUSIC_DEMO_TEST=1 APP_TEST_URL=http://localhost:5173 npx playwright test tests/room-layout.spec.ts tests/music.spec.ts tests/detached-media.spec.ts
+```
+
+É necessário ter o Chromium do Playwright instalado; `CHROMIUM_PATH` permite usar um executável já disponível. A suíte de layout exercita arraste, redimensionamento, teclado/toque, persistência e adaptação a telas pequenas. A transmissão do demo é um canvas local: manter o mesmo vídeo e `srcObject` durante a reorganização verifica a continuidade do player, mas não substitui um teste de chamada real entre dispositivos. Ao terminar, encerre o servidor demo com Ctrl+C.
+
+`detached-media.spec.ts` exercita painéis independentes e janelas do navegador para transmissão e música, Shift + arraste e redimensionamento pelo mouse de painéis flutuantes, retorno ao fechar, logout com as duas janelas abertas, bloqueio de pop-up e uso em 320/390/1024/1280 px. A identidade do vídeo e do stream, avanço do player, estado da busca/fila e volume pessoal precisam sobreviver aos movimentos sem sair da chamada ou duplicar os elementos de áudio. Ao separar, o bloco da mídia não pode reservar altura, largura ou um cartão de retorno na sala; Pessoas continua visível mesmo se o bloco separado estava focado. Voltar ou fechar restaura a organização salva.
+
+`tests/demo.spec.ts` inicia seu próprio servidor demo e verifica também a convivência entre os controles de voz, configurações, atalhos e organização da sala. Instrumenta `AudioContext` para conferir seu fechamento ao sair da chamada e ao fazer logout. Execute servidores demo e normal em sequência: dois modos Vite no mesmo checkout podem disputar o cache de dependências e produzir `Outdated Optimize Dep` durante os testes.
+
+`tests/auth.spec.ts` usa respostas de API simuladas para distinguir senha inválida, cookies/sessão, limite de tentativas, rede e indisponibilidade do servidor. Os casos de MFA pendente e inscrição obrigatória precisam chegar à verificação de segurança antes de abrir o espaço. Esses testes não substituem a suíte de segurança com backend e PostgreSQL reais.
+
+`npx playwright test tests/microphone-gain.spec.ts` verifica sete corridas do processador sem navegador nem stack. Executa a classe real com as fronteiras de Web Audio/RNNoise simuladas e carga controlada, conferindo que trocar o filtro não duplica caminhos, operações antigas não reconectam nós, saída/reinício interrompe a saída antiga e falhas preservam o microfone sem filtro.
+
+`tests/voice-lifecycle.spec.ts` usa a stack descartável, uma conta nova e o microfone artificial do Chromium. Retém o download do WASM e exige que logout encerre a captura e os contextos de áudio antes de liberar esse download; depois confere conexões encerradas e ausência de erro ou publicação tardia.
 
 ## Roteiro de mídia 2 → 4 → 8 → 16
 
@@ -33,7 +55,9 @@ Não rodar scripts destrutivos contra o banco de prd. `scripts/check.sh` recusa 
 
 O teste `frontend/tests/csp.spec.ts` inicia a imagem web com a CSP de prd e verifica no Chromium a consulta HTTPS ao domínio de mídia, incluindo porta 18443. A resposta de validação é simulada; outro destino HTTPS deve ser bloqueado. Não comprova conectividade WAN nem certificado do servidor real.
 
-Os testes `frontend/tests/audio.spec.ts` usam fontes de áudio por oscilador e tela de canvas 1920×1080. Medidores na saída Web Audio verificam ganho de microfone, volume local por participante, volume geral e da transmissão, mudo/recepção, independência entre clientes e ausência de som após parar. A decodificação de vídeo verifica 1080 linhas. A qualidade de supressão nativa e o desempenho em telas/jogos reais precisam de teste humano no dispositivo.
+Para uma stack descartável com outro nome, `TEST_COMPOSE_PROJECT` seleciona o prefixo das redes e `TEST_WEB_IMAGE` seleciona a imagem nesse teste de CSP. Os padrões continuam `chat-friends` e `chat-friends-web`; não reutilize a stack de produção para testes que criam contas, mensagens e sessões.
+
+Os testes `frontend/tests/audio.spec.ts` usam fontes de áudio por oscilador e tela de canvas 1920×1080. Medidores na saída Web Audio verificam ganho de microfone, volume local por participante, volume geral e da transmissão, mudo da chamada separado do som da live, independência entre clientes e ausência de som após parar. Silenciar a chamada deve cortar o microfone do ouvinte e as vozes, mantendo a transmissão audível; silenciar só a transmissão não muda esse estado e volume geral zero continua cortando todas as fontes. A decodificação de vídeo verifica 1080 linhas. A qualidade de supressão nativa e o desempenho em telas/jogos reais precisam de teste humano no dispositivo.
 
 Regressão de layout durante a transmissão: verificar 320×568, 390×844 e 768×1024, com recepção ligada e silenciada. O campo de mensagem não pode ultrapassar o painel de voz nem ser cortado pela área do chat. O chat móvel com transmissão cresce conforme a altura dos controles; a lista de mensagens mantém rolagem própria. A versão/fonte do browser pode alterar a quebra dos controles, portanto um único viewport com o Chromium do sistema não representa toda a matriz do CI.
 

@@ -17,9 +17,15 @@ import { AudioTrack, Screen } from "./MediaPlayback";
 import { useAudioSettings } from "./useAudioSettings";
 import { Icon } from "./Icon";
 import { Avatar, Popover, avatarSrc, usePeople } from "./ui";
-import { PopoutStage, usePopout } from "./Popout";
+import { DetachedMedia, type MediaPanel } from "./DetachedMedia";
 import { loadSounds, playEffect, type Effect } from "./sounds";
 import { Music, MUSIC_IDENTITY } from "./Music";
+import {
+  RoomLayout,
+  orderedItems,
+  usePointerOrder,
+  useRoomLayout,
+} from "./RoomLayout";
 import { useSpeaking } from "./speaking";
 import { publishVoice } from "./voiceStore";
 type Connection = {
@@ -64,9 +70,14 @@ export function Voice({
   userId,
   hosts,
   maximized,
+  streamMaximized,
+  onSeparate,
+  onReturn,
   onOpen,
   onStreaming,
+  onIdentityChange,
   onMaximize,
+  onMaximizeStream,
   onError,
 }: {
   admin: boolean;
@@ -74,18 +85,29 @@ export function Voice({
   // Panels may be closed or moved; the call lives here and keeps playing.
   hosts: {
     stage: HTMLElement | null;
+    stream: HTMLElement | null;
+    music: HTMLElement | null;
     roster: HTMLElement | null;
     quick: HTMLElement | null;
   };
   maximized: boolean;
+  streamMaximized: boolean;
+  onSeparate: (kind: MediaPanel) => void;
+  onReturn: (kind: MediaPanel) => void;
   onOpen: () => void;
   onStreaming: (active: boolean) => void;
+  onIdentityChange?: (identity: string | undefined) => void;
   onMaximize: () => void;
+  onMaximizeStream: () => void;
   onError: (s: string) => void;
 }) {
   const [settings, setSettings] = useAudioSettings(userId);
+  const roomLayout = useRoomLayout(userId);
   const directory = usePeople();
-  const popout = usePopout(onError);
+  const [screenHome, setScreenHome] = useState<HTMLElement | null>(null);
+  const [musicHome, setMusicHome] = useState<HTMLElement | null>(null);
+  const [streamDetached, setStreamDetached] = useState(false);
+  const [musicDetached, setMusicDetached] = useState(false);
   useEffect(() => {
     loadSounds(userId);
   }, [userId]);
@@ -97,10 +119,28 @@ export function Voice({
   };
   const micProcessor = useRef<MicrophoneGain | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [cardNotice, setCardNotice] = useState("");
   const room = useRef<Room | null>(null),
     connection = useRef<Connection | null>(null),
     lease = useRef<Lease | null>(null),
     screenTracks = useRef<LocalTrack[]>([]);
+  // The SDK does not own an AudioContext supplied through webAudioMix.
+  // Keep ownership per room so an old disconnect cannot close a new call.
+  const roomAudio = useRef(new WeakMap<Room, AudioContext>());
+  // Unpublished tracks are not tracked or stopped by Room.disconnect yet.
+  const pendingMicrophones = useRef(
+    new WeakMap<
+      Room,
+      Set<{ tracks: LocalTrack[]; processor: MicrophoneGain }>
+    >(),
+  );
+  const lifecycle = useRef({ mounted: true, generation: 0, joining: false });
+  async function closeRoomAudio(r: Room) {
+    const context = roomAudio.current.get(r);
+    roomAudio.current.delete(r);
+    if (context && context.state !== "closed")
+      await context.close().catch(() => {});
+  }
   const [joined, setJoined] = useState(false),
     [busy, setBusy] = useState(false),
     [mic, setMic] = useState(false),
@@ -125,45 +165,69 @@ export function Voice({
     lease: { identity: null, leaseId: null, expiresAt: null },
     participants: [],
   });
+  useEffect(() => {
+    onIdentityChange?.(joined ? connection.current?.identity : undefined);
+  }, [joined, onIdentityChange]);
   const noiseSupported =
     navigator.mediaDevices?.getSupportedConstraints().noiseSuppression === true;
   const bump = () => setVersion((x) => x + 1);
   async function release() {
-    const c = connection.current,
-      l = lease.current;
+    const r = room.current,
+      c = connection.current,
+      l = lease.current,
+      tracks = screenTracks.current;
     lease.current = null;
-    const tracks = screenTracks.current;
-    screenTracks.current = [];
-    for (const t of tracks) {
-      t.stop();
-      if (room.current) await room.current.localParticipant.unpublishTrack(t);
-    }
     screenTracks.current = [];
     setSharing(false);
+    // Stop every capture synchronously; unpublishing may complete later.
+    for (const t of tracks) t.stop();
+    await Promise.allSettled(
+      tracks.map((t) => r?.localParticipant.unpublishTrack(t)),
+    );
     if (c && l)
       await api("/media/screen", "DELETE", {
         identity: c.identity,
         leaseId: l.leaseId,
       });
   }
-  async function leave() {
-    const c = connection.current;
+  async function leave(message = "Fora da chamada") {
+    lifecycle.current.generation++;
+    lifecycle.current.joining = false;
+    const r = room.current,
+      c = connection.current;
+    if (r) {
+      const pending = pendingMicrophones.current.get(r);
+      pendingMicrophones.current.delete(r);
+      for (const job of pending ?? []) {
+        for (const track of job.tracks) track.stop();
+        // setProcessor assigns its processor only after init resolves, so
+        // stopping the raw track alone cannot cancel a pending RNNoise init.
+        void job.processor.destroy().catch(() => {});
+      }
+      r.localParticipant
+        .getTrackPublication(Track.Source.Microphone)
+        ?.track?.stop();
+    }
     if (sound.current.inCall) effect("leave");
     sound.current.inCall = false;
-    try {
-      await release();
-    } finally {
-      connection.current = null;
-      await room.current?.disconnect();
-      room.current = null;
-      setJoined(false);
-      setMic(false);
-      setStatus("Fora da chamada");
-      if (c) await api("/media/leave", "POST", { identity: c.identity });
-    }
+    const released = release();
+    // Detach before awaiting anything: callbacks belong to the old call.
+    room.current = null;
+    connection.current = null;
+    micProcessor.current = null;
+    setJoined(false);
+    setMic(false);
+    setBusy(false);
+    setStatus(message);
+    const disconnected = r?.disconnect();
+    // Local capture/processing must not wait for signaling to finish closing.
+    const audioClosed = r ? closeRoomAudio(r) : undefined;
+    await Promise.allSettled([released, disconnected, audioClosed]);
+    if (c) await api("/media/leave", "POST", { identity: c.identity });
   }
   useEffect(() => {
     let alive = true;
+    lifecycle.current.mounted = true;
     const poll = async () => {
       try {
         const value = await api<typeof state>("/media/state");
@@ -180,6 +244,7 @@ export function Voice({
       if (c)
         void api("/media/heartbeat", "POST", { identity: c.identity }).catch(
           (e) => {
+            if (connection.current !== c) return;
             onError(mediaError(e));
             void leave().catch(() => {});
           },
@@ -189,12 +254,14 @@ export function Voice({
           identity: c.identity,
           leaseId: l.leaseId,
         }).catch((e) => {
+          if (connection.current !== c || lease.current !== l) return;
           onError(mediaError(e));
           void release().catch(() => {});
         });
     }, 10000);
     return () => {
       alive = false;
+      lifecycle.current.mounted = false;
       clearInterval(timer);
       clearInterval(heartbeat);
       void leave().catch(() => {});
@@ -202,21 +269,34 @@ export function Voice({
     // A single room lifecycle is owned by this component.
   }, []);
   async function join() {
+    if (!lifecycle.current.mounted || lifecycle.current.joining || room.current)
+      return;
+    lifecycle.current.joining = true;
+    const generation = ++lifecycle.current.generation;
+    const current = () =>
+      lifecycle.current.mounted && lifecycle.current.generation === generation;
+    let audioContext: AudioContext | undefined;
+    let joiningRoom: Room | undefined;
     setBusy(true);
     setStatus("Conectando à voz…");
     try {
       const c = await api<Connection>("/media/join", "POST");
+      if (!current()) {
+        await api("/media/leave", "POST", { identity: c.identity }).catch(
+          () => {},
+        );
+        return;
+      }
       connection.current = c;
+      audioContext = new AudioContext({
+        sampleRate: 48000,
+        latencyHint: "interactive",
+      });
       const r = new Room({
         adaptiveStream: true,
         dynacast: true,
         // RNNoise needs 48 kHz; the whole call mix runs at that rate.
-        webAudioMix: {
-          audioContext: new AudioContext({
-            sampleRate: 48000,
-            latencyHint: "interactive",
-          }),
-        },
+        webAudioMix: { audioContext },
         audioCaptureDefaults: {
           deviceId: device,
           noiseSuppression: settings.noise && settings.noiseMode === "browser",
@@ -224,6 +304,8 @@ export function Voice({
           autoGainControl: false,
         },
       });
+      joiningRoom = r;
+      roomAudio.current.set(r, audioContext);
       room.current = r;
       for (const event of [
         RoomEvent.ParticipantConnected,
@@ -236,52 +318,66 @@ export function Voice({
         RoomEvent.TrackMuted,
         RoomEvent.TrackUnmuted,
       ])
-        r.on(event, bump);
+        r.on(event, () => {
+          if (room.current === r) bump();
+        });
       r.on(RoomEvent.ParticipantConnected, (p) => {
-        if (p.identity !== MUSIC_IDENTITY) effect("join", true);
+        if (room.current === r && p.identity !== MUSIC_IDENTITY)
+          effect("join", true);
       });
       r.on(RoomEvent.ParticipantDisconnected, (p) => {
-        if (p.identity !== MUSIC_IDENTITY) effect("leave", true);
+        if (room.current === r && p.identity !== MUSIC_IDENTITY)
+          effect("leave", true);
       });
-      r.on(RoomEvent.Reconnecting, () => setStatus("Reconectando à voz…"));
+      r.on(RoomEvent.Reconnecting, () => {
+        if (room.current === r) setStatus("Reconectando à voz…");
+      });
       r.on(RoomEvent.Reconnected, () => {
+        if (room.current !== r) return;
         setStatus("Voz conectada");
         if (lease.current) void release().catch((e) => onError(mediaError(e)));
       });
       r.on(RoomEvent.Disconnected, () => {
-        setJoined(false);
-        setMic(false);
-        setStatus("Conexão de voz encerrada");
-        void release().catch(() => {});
-        const old = connection.current;
-        connection.current = null;
-        // Only an unexpected drop gets here with a connection still set.
-        if (old && sound.current.inCall) effect("leave");
-        sound.current.inCall = false;
-        if (old)
-          void api("/media/leave", "POST", { identity: old.identity }).catch(
-            () => {},
-          );
+        if (room.current !== r) return;
+        void leave("Conexão de voz encerrada").catch(() => {});
       });
       await r.connect(signalUrl(), c.token);
+      if (!current()) return;
       await r.startAudio();
+      if (!current()) return;
       await api("/media/audio", "PUT", { identity: c.identity, deaf });
+      if (!current()) return;
       setJoined(true);
       setStatus("Voz conectada");
       sound.current.inCall = true;
       effect("join");
       try {
         await enableMicrophone(r);
+        if (!current()) return;
         setMic(true);
-        setDevices(await Room.getLocalDevices("audioinput"));
+        const inputs = await Room.getLocalDevices("audioinput");
+        if (current()) setDevices(inputs);
       } catch (e) {
-        onError(mediaError(e));
+        if (current()) onError(mediaError(e));
       }
     } catch (e) {
-      onError(mediaError(e));
-      await leave().catch(() => {});
+      if (current()) {
+        onError(mediaError(e));
+        await leave().catch(() => {});
+      }
     } finally {
-      setBusy(false);
+      if (!current()) {
+        // connect/startAudio may finish after leave or logout already ran.
+        if (joiningRoom) {
+          await joiningRoom.disconnect().catch(() => {});
+          await closeRoomAudio(joiningRoom);
+        } else if (audioContext && audioContext.state !== "closed")
+          await audioContext.close().catch(() => {});
+      }
+      if (lifecycle.current.generation === generation) {
+        lifecycle.current.joining = false;
+        setBusy(false);
+      }
     }
   }
   async function enableMicrophone(r: Room) {
@@ -299,19 +395,40 @@ export function Voice({
         autoGainControl: false,
       },
     });
+    if (room.current !== r) {
+      tracks.forEach((item) => item.stop());
+      return;
+    }
     const track = tracks[0] as LocalAudioTrack;
+    const processor = new MicrophoneGain(
+      settings.microphone,
+      settings.noise && settings.noiseMode === "strong",
+    );
+    const job = { tracks, processor };
+    let pending = pendingMicrophones.current.get(r);
+    if (!pending) {
+      pending = new Set();
+      pendingMicrophones.current.set(r, pending);
+    }
+    pending.add(job);
     try {
-      micProcessor.current = new MicrophoneGain(
-        settings.microphone,
-        settings.noise && settings.noiseMode === "strong",
-      );
-      await track.setProcessor(micProcessor.current);
+      micProcessor.current = processor;
+      await track.setProcessor(processor);
+      if (room.current !== r) {
+        tracks.forEach((item) => item.stop());
+        return;
+      }
       await r.localParticipant.publishTrack(track, {
         source: Track.Source.Microphone,
       });
     } catch (error) {
       tracks.forEach((item) => item.stop());
+      void processor.destroy().catch(() => {});
       throw error;
+    } finally {
+      pending.delete(job);
+      if (!pending.size && pendingMicrophones.current.get(r) === pending)
+        pendingMicrophones.current.delete(r);
     }
   }
   // Silencing what you hear also closes your microphone, like Discord;
@@ -320,7 +437,7 @@ export function Voice({
   async function setMicOpen(r: Room, open: boolean) {
     if (open) await enableMicrophone(r);
     else await r.localParticipant.setMicrophoneEnabled(false);
-    setMic(r.localParticipant.isMicrophoneEnabled);
+    if (room.current === r) setMic(r.localParticipant.isMicrophoneEnabled);
   }
   async function setDeafened(next: boolean) {
     const c = connection.current;
@@ -569,6 +686,7 @@ export function Voice({
   // Identities are "accountId:connection"; names and photos follow profiles.
   const account = (identity: string) =>
     directory.byId.get(identity.split(":")[0]);
+  const memberOccurrences = new Map<string, number>();
   const people = (
     joined
       ? participants
@@ -586,11 +704,37 @@ export function Voice({
                   )?.deaf ?? false),
           }))
       : state.participants.map((p) => ({ ...p, speaking: false }))
-  ).map((p) => ({
-    ...p,
-    name: account(p.identity)?.displayName ?? p.name,
-    src: avatarSrc(account(p.identity)),
-  }));
+  ).map((p) => {
+    const member = p.identity.split(":")[0];
+    const occurrence = memberOccurrences.get(member) ?? 0;
+    memberOccurrences.set(member, occurrence + 1);
+    return {
+      ...p,
+      layoutKey: occurrence ? `${member}:${occurrence}` : member,
+      name: account(p.identity)?.displayName ?? p.name,
+      src: avatarSrc(account(p.identity)),
+    };
+  });
+  const cardIds = orderedItems(
+    people.map((p) => p.layoutKey),
+    roomLayout.layout.cards,
+  );
+  const cardDrag = usePointerOrder(
+    ".person.tile",
+    ".tiles",
+    cardIds,
+    (from, to) => {
+      roomLayout.reorderCards(
+        people.map((p) => p.layoutKey),
+        from,
+        to,
+      );
+      if (from !== to)
+        setCardNotice(
+          `${people.find((p) => p.layoutKey === from)?.name ?? "Participante"} mudou para a posição ${cardIds.indexOf(to) + 1}.`,
+        );
+    },
+  );
   // Our own state is exact; others' comes from tracks or the polled lease.
   const isLive = (identity: string) =>
     identity === self
@@ -630,9 +774,160 @@ export function Voice({
   useEffect(() => () => publishVoice(null), []);
   const fullHd = (connection.current?.screen.height ?? 1080) >= 1080,
     sixty = (connection.current?.screen.fps ?? 60) >= 60;
-  const featuredName = featured
-    ? (account(featured.identity)?.displayName ?? featured.name)
-    : "";
+  const screenContent = (
+    <div className="stage-main">
+      {featured ? (
+        <Screen
+          key={featured.track.sid || "local"}
+          track={featured.track}
+          name={account(featured.identity)?.displayName ?? featured.name}
+          avatar={avatarSrc(account(featured.identity))}
+          local={featured.identity === self}
+          viewers={Math.max(people.length - 1, 0)}
+          volume={settings.stream}
+          expanded={hosts.stream ? streamMaximized : maximized}
+          onExpand={onMaximizeStream}
+          onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
+          onError={onError}
+        />
+      ) : (
+        <div className="stage-empty">
+          <span className="stage-empty-icon">
+            <Icon name="screen" size={34} />
+          </span>
+          <h3>Ninguém está transmitindo</h3>
+          <p>
+            {joined
+              ? "Compartilhe sua tela para todo mundo assistir junto."
+              : people.length
+                ? "Tem gente na sala. Entre e puxe uma cadeira."
+                : "A sala está tranquila. Seja o primeiro a entrar."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+  const peopleContent =
+    people.length > 0 ? (
+      <div className="tiles" role="list" aria-label="Cards dos participantes">
+        <span className="sr-only" role="status" aria-live="polite">
+          {cardNotice}
+        </span>
+        {people.map((p) => (
+          <div
+            key={p.identity}
+            className={
+              "person tile" +
+              (p.speaking && !p.micMuted ? " speaking" : "") +
+              (isLive(p.identity) ? " live" : "") +
+              (featured?.identity === p.identity ? " featured" : "") +
+              (adjusting === p.identity ? " adjusting" : "") +
+              (cardDrag.dragging === p.layoutKey ? " is-dragging" : "") +
+              (cardDrag.over === p.layoutKey &&
+              cardDrag.dragging !== p.layoutKey
+                ? " is-drop-target"
+                : "")
+            }
+            data-reorder-id={p.layoutKey}
+            role="listitem"
+            aria-posinset={cardIds.indexOf(p.layoutKey) + 1}
+            aria-setsize={cardIds.length}
+            style={{ order: cardIds.indexOf(p.layoutKey) }}
+            onClick={() => {
+              if (isLive(p.identity)) setFocus(p.identity);
+              // Touch screens have no hover: a tap reveals the volume.
+              setAdjusting(adjusting === p.identity ? null : p.identity);
+            }}
+          >
+            <button
+              className="person-grip"
+              aria-label={`Reordenar ${p.name}`}
+              title="Arraste ou use as setas para mudar a ordem"
+              {...cardDrag.bind(p.layoutKey)}
+            >
+              ⠿
+            </button>
+            <span className="tile-avatar">
+              <Avatar
+                name={p.name}
+                src={p.src}
+                size={Math.round(
+                  Math.min(84, Math.max(36, roomLayout.layout.cardSize * 0.34)),
+                )}
+                speaking={p.speaking && !p.micMuted}
+              />
+              <StatusBadges micMuted={p.micMuted} deaf={p.deaf} />
+            </span>
+            {isLive(p.identity) && <span className="live-badge">AO VIVO</span>}
+            {joined && p.identity !== self && (
+              <button
+                className="tile-volume-toggle"
+                aria-label={`Ajustar volume de ${p.name}`}
+                aria-expanded={adjusting === p.identity}
+                title={`Volume de ${p.name}: ${personVolume(p.identity)}%`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAdjusting(adjusting === p.identity ? null : p.identity);
+                }}
+              >
+                <Icon
+                  name={personVolume(p.identity) ? "volume" : "volumeOff"}
+                  size={14}
+                />
+              </button>
+            )}
+            <div className="tile-footer">
+              <strong>
+                {p.name}
+                {p.identity === self ? " (você)" : ""}
+              </strong>
+              <span className="sr-only">
+                {p.micMuted ? "Mic desligado" : "Mic ligado"} ·{" "}
+                {p.deaf ? "Vozes da chamada silenciadas" : "Ouvindo"}
+                {p.speaking && !p.micMuted ? " · falando" : ""}
+              </span>
+            </div>
+            {joined && p.identity !== self && (
+              <label className="tile-volume" title={`Volume de ${p.name}`}>
+                <span className="sr-only">Volume de {p.name}</span>
+                <Icon name="volume" size={14} />
+                <input
+                  type="range"
+                  min="0"
+                  max="200"
+                  value={personVolume(p.identity)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    const value = +e.target.value;
+                    setSettings((old) => ({
+                      ...old,
+                      people: {
+                        ...old.people,
+                        [p.identity.split(":")[0]]: value,
+                      },
+                    }));
+                  }}
+                />
+                <span className="volume-value" aria-hidden="true">
+                  {personVolume(p.identity)}%
+                </span>
+              </label>
+            )}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="room-empty-people">
+        Os cards aparecem aqui quando seus amigos entram na voz.
+      </p>
+    );
+  const musicContent = (
+    <Music
+      identity={joined ? self : undefined}
+      volume={settings.music}
+      onVolume={(music) => setSettings((old) => ({ ...old, music }))}
+    />
+  );
   const stage = (
     <section className="stage" aria-label="Sala de voz" data-version={version}>
       <header className="stage-header">
@@ -646,141 +941,19 @@ export function Voice({
           {status}
         </div>
       </header>
-      <div className="stage-main">
-        {popout.win ? (
-          <div className="stage-empty">
-            <span className="stage-empty-icon">
-              <Icon name="popout" size={34} />
-            </span>
-            <h3>Transmissão em outra janela</h3>
-            <p>Arraste a janela para outro monitor. O som continua aqui.</p>
-            <button className="primary" onClick={popout.close}>
-              Trazer de volta
-            </button>
-          </div>
-        ) : featured ? (
-          <Screen
-            key={featured.track.sid || "local"}
-            track={featured.track}
-            name={account(featured.identity)?.displayName ?? featured.name}
-            avatar={avatarSrc(account(featured.identity))}
-            local={featured.identity === self}
-            viewers={Math.max(people.length - 1, 0)}
-            volume={settings.stream}
-            deaf={deaf}
-            expanded={maximized}
-            onExpand={onMaximize}
-            onPopout={popout.open}
-            onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
-            onError={onError}
-          />
-        ) : (
-          <div className="stage-empty">
-            <span className="stage-empty-icon">
-              <Icon name="screen" size={34} />
-            </span>
-            <h3>Ninguém está transmitindo</h3>
-            <p>
-              {joined
-                ? "Compartilhe sua tela para todo mundo assistir junto."
-                : people.length
-                  ? "Tem gente na sala. Entre e puxe uma cadeira."
-                  : "A sala está tranquila. Seja o primeiro a entrar."}
-            </p>
-          </div>
-        )}
-      </div>
-      {people.length > 0 && (
-        <div className="tiles">
-          {people.map((p) => (
-            <div
-              key={p.identity}
-              className={
-                "person tile" +
-                (p.speaking && !p.micMuted ? " speaking" : "") +
-                (isLive(p.identity) ? " live" : "") +
-                (featured?.identity === p.identity ? " featured" : "") +
-                (adjusting === p.identity ? " adjusting" : "")
-              }
-              onClick={() => {
-                if (isLive(p.identity)) setFocus(p.identity);
-                // Touch screens have no hover: a tap reveals the volume.
-                setAdjusting(adjusting === p.identity ? null : p.identity);
-              }}
-            >
-              <span className="tile-avatar">
-                <Avatar
-                  name={p.name}
-                  src={p.src}
-                  size={52}
-                  speaking={p.speaking && !p.micMuted}
-                />
-                <StatusBadges micMuted={p.micMuted} deaf={p.deaf} />
-              </span>
-              {isLive(p.identity) && (
-                <span className="live-badge">AO VIVO</span>
-              )}
-              {joined && p.identity !== self && (
-                <button
-                  className="tile-volume-toggle"
-                  aria-label={`Ajustar volume de ${p.name}`}
-                  title={`Volume de ${p.name}: ${personVolume(p.identity)}%`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setAdjusting(adjusting === p.identity ? null : p.identity);
-                  }}
-                >
-                  <Icon
-                    name={personVolume(p.identity) ? "volume" : "volumeOff"}
-                    size={14}
-                  />
-                </button>
-              )}
-              <div className="tile-footer">
-                <strong>
-                  {p.name}
-                  {p.identity === self ? " (você)" : ""}
-                </strong>
-                <span className="sr-only">
-                  {p.micMuted ? "Mic desligado" : "Mic ligado"} ·{" "}
-                  {p.deaf ? "Áudio silenciado" : "Ouvindo"}
-                  {p.speaking && !p.micMuted ? " · falando" : ""}
-                </span>
-              </div>
-              {joined && p.identity !== self && (
-                <label className="tile-volume" title={`Volume de ${p.name}`}>
-                  <span className="sr-only">Volume de {p.name}</span>
-                  <Icon name="volume" size={14} />
-                  <input
-                    type="range"
-                    min="0"
-                    max="200"
-                    value={personVolume(p.identity)}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => {
-                      const value = +e.target.value;
-                      setSettings((old) => ({
-                        ...old,
-                        people: {
-                          ...old.people,
-                          [p.identity.split(":")[0]]: value,
-                        },
-                      }));
-                    }}
-                  />
-                  <span className="volume-value" aria-hidden="true">
-                    {personVolume(p.identity)}%
-                  </span>
-                </label>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <Music
-        identity={joined ? self : undefined}
-        volume={settings.music}
-        onVolume={(music) => setSettings((old) => ({ ...old, music }))}
+      <RoomLayout
+        controller={roomLayout}
+        hiddenSections={[
+          ...(streamDetached ? (["screen"] as const) : []),
+          ...(musicDetached ? (["music"] as const) : []),
+        ]}
+        expanded={maximized}
+        onRestoreExpanded={onMaximize}
+        content={{
+          screen: <div className="media-home" ref={setScreenHome} />,
+          people: peopleContent,
+          music: <div className="media-home" ref={setMusicHome} />,
+        }}
       />
       <div className="control-bar">
         {!joined ? (
@@ -912,12 +1085,13 @@ export function Voice({
             <button
               className={"control" + (deaf ? " off" : "")}
               aria-label={deaf ? "Ouvir áudio" : "Silenciar áudio"}
+              title="Silencia as vozes e o microfone. Transmissão e música continuam."
               aria-pressed={deaf}
               disabled={audioBusy}
               onClick={() => void toggleDeaf()}
             >
               <Icon name={deaf ? "headphonesOff" : "headphones"} />
-              <span>Áudio</span>
+              <span>Áudio da call</span>
             </button>
             <div className="control-group">
               <button
@@ -1053,7 +1227,11 @@ export function Voice({
       <button
         className={"icon-button" + (deaf ? " off" : "")}
         aria-label="Alternar áudio"
-        title={deaf ? "Ouvir áudio" : "Silenciar áudio"}
+        title={
+          deaf
+            ? "Ouvir vozes da chamada"
+            : "Silenciar vozes e microfone; transmissão e música continuam"
+        }
         aria-pressed={deaf}
         disabled={!joined || audioBusy}
         onClick={() => void toggleDeaf()}
@@ -1065,14 +1243,28 @@ export function Voice({
   return (
     <>
       {hosts.stage && createPortal(stage, hosts.stage)}
-      {popout.win && (
-        <PopoutStage
-          win={popout.win}
-          track={featured?.track ?? null}
-          name={featuredName}
-          onClose={popout.close}
-        />
-      )}
+      <DetachedMedia
+        kind="stream"
+        onDetachedChange={setStreamDetached}
+        home={screenHome}
+        dock={hosts.stream}
+        onSeparate={() => onSeparate("stream")}
+        onReturn={() => onReturn("stream")}
+        onError={onError}
+      >
+        {screenContent}
+      </DetachedMedia>
+      <DetachedMedia
+        kind="music"
+        onDetachedChange={setMusicDetached}
+        home={musicHome}
+        dock={hosts.music}
+        onSeparate={() => onSeparate("music")}
+        onReturn={() => onReturn("music")}
+        onError={onError}
+      >
+        {musicContent}
+      </DetachedMedia>
       {hosts.roster && createPortal(roster, hosts.roster)}
       {hosts.quick && createPortal(quick, hosts.quick)}
       {audio.map(({ track, identity, source }) => (
@@ -1082,7 +1274,9 @@ export function Voice({
           identity={identity}
           source={source}
           volume={
-            deaf
+            deaf &&
+            source !== Track.Source.ScreenShareAudio &&
+            identity !== MUSIC_IDENTITY
               ? 0
               : ((settings.output / 100) *
                   (source === Track.Source.ScreenShareAudio
@@ -1117,7 +1311,7 @@ function StatusBadges({
         </span>
       )}
       {deaf && (
-        <span className="status-badge" title="Áudio silenciado">
+        <span className="status-badge" title="Vozes da chamada silenciadas">
           <Icon name="headphonesOff" size={12} />
         </span>
       )}

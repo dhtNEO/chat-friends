@@ -68,3 +68,15 @@ Heartbeat/estado de áudio de uma conexão expirada retorna 409 e exige nova ent
 ## Bot de música
 
 Rotas autenticadas: `GET /api/music/state` retorna `{status,current,queue,error,elapsed}`; `GET /api/music/search?identity=...&q=...` busca até cinco músicas; `POST /api/music/queue` recebe `{identity,videoId}`; `POST /api/music/control` recebe `{identity,action}` (`pause`, `resume`, `skip`, `stop`); `DELETE /api/music/queue/{id}` recebe `{identity}`. Mutação exige CSRF. Busca e controles exigem conexão de voz ativa na mesma sessão e participante presente na SFU. Nenhum token/chave do bot aparece nas respostas. A fila não persiste em reinícios; veja [MUSIC](MUSIC.md).
+
+## Clube da Sorte
+
+Carteira, giros gratuitos e salas de Roleta Royale: contratos, autenticação e limites em [GAMES.md](GAMES.md).
+
+## Blackjack Social e Beat Club
+
+Rotas autenticadas `/api/party`, mãos de blackjack, prontidão e acertos de ritmo: contratos e regras em [PARTY_GAMES.md](PARTY_GAMES.md). A música exige conexão de voz pertencente à mesma conta/sessão.
+
+## Outlook
+
+Calendário compartilhado autenticado: listagem por intervalo, criação de jogatinas, edição/cancelamento pelo criador ou administrador e respostas individuais de presença. Rotas e contratos em [OUTLOOK.md](OUTLOOK.md#api-autenticada). Requer o esquema de agenda da V11 (linha de jogos) ou V12 (integração com atalhos).

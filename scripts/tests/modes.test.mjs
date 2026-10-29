@@ -77,7 +77,7 @@ test("dev padrão gera credenciais privadas e anuncia loopback", () =>
 test("bot recebe chave própria estável e diretório privado; rotação acompanha LiveKit", () =>
   fixture((cwd) => {
     const generated = path.join(cwd, "infra/compose/generated");
-    const keyPath = path.join(generated, "music-secret");
+    const keyPath = path.join(generated, "music/control.key");
     const envPath = path.join(cwd, ".env");
     const originalEnv = fs.readFileSync(envPath, "utf8");
     const key = fs.readFileSync(keyPath, "utf8");
@@ -97,8 +97,13 @@ test("bot recebe chave própria estável e diretório privado; rotação acompan
         }).status,
         0,
       );
+    const opened = fs.openSync(keyPath, "r");
+    const inode = fs.statSync(keyPath).ino;
     render();
     assert.equal(fs.readFileSync(keyPath, "utf8"), key);
+    assert.notEqual(fs.statSync(keyPath).ino, inode);
+    assert.equal(fs.statSync(path.dirname(keyPath)).mode & 0o777, 0o755);
+    fs.closeSync(opened);
     assert.equal(fs.readFileSync(envPath, "utf8"), originalEnv);
     fs.writeFileSync(
       envPath,

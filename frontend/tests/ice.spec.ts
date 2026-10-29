@@ -140,7 +140,10 @@ test("portas Docker de mídia respondem ao ICE autenticado por UDP e TCP", async
   expect(
     (
       await page.request.post("/api/login", {
-        form: { username: "admin", password },
+        form: {
+          username: process.env.TEST_ADMIN_USERNAME || "admin",
+          password,
+        },
         headers: { "X-CSRF-TOKEN": csrf },
       })
     ).status(),

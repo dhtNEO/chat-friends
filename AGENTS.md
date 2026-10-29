@@ -2,7 +2,7 @@
 
 - Use the existing checkout. Cloud tasks are already isolated; do not create a worktree unless requested.
 - App/UI and documentation are in Portuguese. Keep source, API docs and operational instructions consistent.
-- Stack: Java 25 / Spring Boot 3.5.16 / Maven Wrapper 3.9.11; PostgreSQL/Flyway; React/TypeScript/Vite; LiveKit/Caddy/Compose. No Redis, Kubernetes, webcam, recording or AI features in the MVP.
+- Stack: Java 25 / Spring Boot 4.1.2 / Maven Wrapper 3.9.11; PostgreSQL/Flyway; React/TypeScript 6.0.3/Vite; LiveKit/Caddy/Compose. No Redis, Kubernetes, webcam, recording or AI features in the MVP.
 - Modes: only CHAT_MODE=dev (default, loopback) and CHAT_MODE=prd (internet). Persisted legacy markers migrate internally; old mode inputs are rejected. Prefix production admin/compose/backup/restore/diagnose commands with CHAT_MODE=prd.
 - Standard dev workflow: `./scripts/up.sh`, `./scripts/admin.sh admin`, `./scripts/diagnose.sh`. Host needs Docker Compose >=2.24.4 and Bash; runtimes run in containers.
 - `./scripts/check.sh` creates a separate friends_test database and runs backend tests plus frontend lint/build. Never point the integration suite at the friends application database; its fixtures truncate tables.
@@ -13,7 +13,7 @@
 - Do not bypass TLS, checksums or managed browser policies. Cloud Chromium restricts non-proxied UDP; browser media tests passed over TCP without changing policy. Native ICE probes separately validate both Docker media ports. Keep container loopback candidates disabled. The SFU entrypoint restricts ICE to its default-route media NIC; keep this filter when changing Docker networks so duplicate NAT candidates cannot select a control/signaling NIC.
 - Database locks serialize chat commits and screen leases. Preserve idempotency and revoke-before-grant ordering. All public self-hosted signaling must pass MediaAdmission; never publish LiveKit 7880 or forward incoming elevated tokens unchanged.
 - See docs/SECURITY.md for the residual multi-track publication limitation and docs/STATUS.md for evidence/external checks. Fixes to these areas need meaningful race/auth tests.
-- Append new Flyway migrations; do not rewrite applied ones. MigrationHistory selects the exact released V3 from db/legacy-main or db/legacy-security using existing history; shared V5 completes the other feature set without repair or renumbering. Keep both original V3 checksums intact. Preserve existing user changes and LICENSE. The owner still needs to confirm licensing intent before distribution.
+- Append new Flyway migrations; do not rewrite applied ones. MigrationHistory selects the exact released V3 from db/legacy-main or db/legacy-security and V6 from db/legacy-shortcuts or db/legacy-games using existing history. Shared V5 and V12 complete the missing feature sets without repair, out-of-order execution or renumbering. Keep every original V3/V6–V11 checksum intact; new installations use legacy-main plus legacy-games. Preserve existing user changes and LICENSE. The owner still needs to confirm licensing intent before distribution.
 
 - DuckDNS: docs/DUCKDNS_SETUP.md. Token privado em generated/duckdns/token, nunca em argv/logs. Preservar lock Docker e pending/applied; diagnóstico não confirma aplicação. CI testa mocks e lock real sem conta; nunca alegar validação WAN/ACME sem executá-la.
 

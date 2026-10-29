@@ -2,9 +2,9 @@ package com.chatfriends;
 
 import static org.springframework.http.HttpStatus.*;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import java.security.Principal;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -83,7 +83,7 @@ public class Shortcuts {
               try {
                 return new Settings(platform, r.getLong(1), r.getBoolean(2), r.getBoolean(3),
                     json.readValue(r.getString(4), BINDINGS));
-              } catch (JsonProcessingException e) {
+              } catch (JacksonException e) {
                 throw new IllegalStateException("Atalhos armazenados inválidos", e);
               }
             },
@@ -100,7 +100,7 @@ public class Shortcuts {
   }
 
   @PutMapping
-  public Settings save(Principal p, @RequestBody Settings b) throws JsonProcessingException {
+  public Settings save(Principal p, @RequestBody Settings b) throws JacksonException {
     var a = accounts.active(p.getName());
     if (!rate.allow("shortcuts:" + a.id(), 30, 60))
       throw new ResponseStatusException(TOO_MANY_REQUESTS, "Muitas alterações; aguarde um minuto");

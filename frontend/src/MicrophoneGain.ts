@@ -49,6 +49,8 @@ export class MicrophoneGain
   private destination?: MediaStreamAudioDestinationNode;
   private volume: number;
   private denoise: boolean;
+  private noiseRevision = 0;
+  private generation = 0;
   constructor(volume: number, denoise = false) {
     this.volume = volume;
     this.denoise = denoise;
@@ -71,21 +73,50 @@ export class MicrophoneGain
   }
   async setDenoise(on: boolean) {
     this.denoise = on;
-    if (!this.source || !this.gain || !this.context) return;
-    this.source.disconnect();
-    if (on && MicrophoneGain.supported(this.context)) {
+    const revision = ++this.noiseRevision;
+    const source = this.source,
+      gain = this.gain,
+      context = this.context;
+    if (!source || !gain || !context) return;
+    const current = () =>
+      revision === this.noiseRevision &&
+      this.source === source &&
+      this.gain === gain &&
+      this.context === context &&
+      context.state !== "closed";
+    if (on && MicrophoneGain.supported(context)) {
+      let candidate: RnnoiseWorkletNode | undefined;
       try {
-        this.noise ??= await denoiser(this.context);
-        this.source.connect(this.noise).connect(this.gain);
+        // Do not attach a late worklet to a destroyed or restarted graph.
+        // Keep the existing audio path connected while the filter loads.
+        candidate = this.noise ?? (await denoiser(context));
+        if (!current()) {
+          if (candidate !== this.noise) {
+            candidate.disconnect();
+            candidate.destroy();
+          }
+          return;
+        }
+        source.disconnect();
+        this.noise?.disconnect();
+        this.noise = candidate;
+        source.connect(candidate).connect(gain);
         return;
       } catch {
+        if (candidate && candidate !== this.noise) {
+          candidate.disconnect();
+          candidate.destroy();
+        }
         // WebAssembly or worklets blocked: keep the raw microphone working.
       }
     }
+    if (!current()) return;
+    source.disconnect();
     this.noise?.disconnect();
-    this.source.connect(this.gain);
+    source.connect(gain);
   }
   async init({ track, audioContext }: AudioProcessorOptions) {
+    const generation = ++this.generation;
     this.context = audioContext;
     this.source = audioContext.createMediaStreamSource(
       new MediaStream([track]),
@@ -98,16 +129,23 @@ export class MicrophoneGain
     this.limiter.ratio.value = 20;
     this.limiter.attack.value = 0.003;
     this.limiter.release.value = 0.1;
-    this.destination = audioContext.createMediaStreamDestination();
-    this.gain.connect(this.limiter).connect(this.destination);
+    const destination = audioContext.createMediaStreamDestination();
+    this.destination = destination;
+    this.gain.connect(this.limiter).connect(destination);
     await this.setDenoise(this.denoise);
-    this.processedTrack = this.destination.stream.getAudioTracks()[0];
+    if (generation !== this.generation || this.destination !== destination) {
+      destination.stream.getTracks().forEach((item) => item.stop());
+      return;
+    }
+    this.processedTrack = destination.stream.getAudioTracks()[0];
   }
   async restart(options: AudioProcessorOptions) {
     await this.destroy();
     await this.init(options);
   }
   async destroy() {
+    this.generation++;
+    this.noiseRevision++;
     this.source?.disconnect();
     this.noise?.disconnect();
     this.noise?.destroy();
@@ -119,6 +157,7 @@ export class MicrophoneGain
     this.gain = undefined;
     this.limiter = undefined;
     this.destination = undefined;
+    this.context = undefined;
     this.processedTrack = undefined;
   }
 }

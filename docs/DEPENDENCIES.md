@@ -30,7 +30,7 @@ Edge DuckDNS: Caddy 2.11.7, `caddy-dns/duckdns` v0.5.0 e `libdns/duckdns` v0.3.0
 
 ## Artefatos de segurança
 
-Java mantém Boot 3.5.16/Spring 6.2.19 com Tomcat 10.1.61, Jackson 2.21.8 e JRE 25.0.4.1. Caddy 2.11.7 é compilado com Go 1.27.3 sobre Alpine 3.24.3; web usa o mesmo módulo/lock e não recebe token DNS. LiveKit 1.13.11 é recompilado com Go 1.27.3 e x/net 0.60.0, única alteração do módulo upstream. PostgreSQL 17.11 permanece na mesma major e tem gosu 1.19 recompilado com Go 1.27.3. Fontes dos dois últimos têm checksum no Dockerfile. Não desativar validação de checksums/TLS para construir.
+Java usa Spring Boot 4.1.2 e Jackson 3 (`tools.jackson`), com versões transitivas resolvidas pelo BOM e JRE 25.0.4.1. Caddy 2.11.7 é compilado com Go 1.27.3 sobre Alpine 3.24.3; web usa o mesmo módulo/lock e não recebe token DNS. LiveKit 1.13.11 é recompilado com Go 1.27.3 e x/net 0.60.0, única alteração do módulo upstream. PostgreSQL 17.11 permanece na mesma major e tem gosu 1.19 recompilado com Go 1.27.3. Fontes dos dois últimos têm checksum no Dockerfile. Não desativar validação de checksums/TLS para construir.
 
 `mvn verify` gera CycloneDX `backend/target/bom.json` com dependências resolvidas. CI analisa esse SBOM e SO das imagens Java, e SO/bibliotecas Go das demais imagens. Duas exceções temporárias e específicas de Spring MVC têm justificativa e vencimento em `security/vulnerability-exceptions.json`; novos HIGH/CRITICAL ou exceções vencidas bloqueiam o gate. Isso não é uma alegação de ausência de vulnerabilidades. Fontes/recursos XSLT/SSE não podem ser adicionados sem reavaliar essas exceções.
 
@@ -41,3 +41,5 @@ Guava é fixada em `33.7.2-jre` por `dependencyManagement` no backend. A depend�
 ### JOSE no Caddy — 28/10/2026
 
 O lock compartilhado por web e edge usa `go-jose/v4` 4.1.6, corrigindo CVE-2026-116587. A linha v3 não tem versão corrigida upstream; v3.0.5 continua transitiva via Smallstep. A triagem temporária vale somente para `usr/bin/caddy`/`gobinary`, vence em 11/11/2026 e depende de admin desativado, ausência de PKI/ACME servidor e handlers limitados aos proxies/arquivos atuais. Não é uma correção da biblioteca v3. Evidência, restrições e plano de saída: [JOSE_TRIAGE](../security/JOSE_TRIAGE.md). CI valida os JSONs adaptados dos três Caddyfiles e mantém o bloqueio de outros achados/versões/binários.
+
+Clube da Sorte adiciona Three.js 0.186.1 e @types/three 0.186.0 (MIT), com renderização carregada sob demanda. A branch integrada atualiza Spring Boot para 4.1.2, TypeScript para 6.0.3 e Dockview para 8.8.0. O starter de sessões JDBC preserva a persistência e o cookie SESSION; os atalhos usam o mesmo Jackson 3 do restante do backend.
