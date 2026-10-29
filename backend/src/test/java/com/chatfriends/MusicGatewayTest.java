@@ -72,20 +72,20 @@ class MusicGatewayTest {
 
   @Test
   void readsStateThroughRealJavaHttpClient() {
-    assertEquals("idle", gateway().state().path("status").asText());
+    assertEquals("idle", gateway().state().path("status").asString());
     assertTrue(logs.list.isEmpty());
   }
 
   @Test
   void keyRotationIsReadWithoutRecreatingTheClient() throws Exception {
     var client = gateway();
-    assertEquals("idle", client.state().path("status").asText());
+    assertEquals("idle", client.state().path("status").asString());
     String rotated = "rotated-test-only-control-credential-000000000";
     Path next = temp.resolve("next");
     Files.writeString(next, rotated);
     Files.move(next, key, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     accepted.set(rotated);
-    assertEquals("idle", client.state().path("status").asText());
+    assertEquals("idle", client.state().path("status").asString());
   }
 
   @Test
