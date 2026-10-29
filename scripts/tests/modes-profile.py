@@ -12,6 +12,12 @@ result = compose('dev')
 assert result.returncode == 0
 services = json.loads(result.stdout)['services']
 assert set(services) == {'db', 'backend', 'livekit', 'music', 'web'}
+for name in ['backend', 'music']:
+    assert services[name]['environment']['MUSIC_SECRET_FILE'] == '/run/music/control.key'
+    scoped = [v for v in services[name]['volumes'] if v['target'] == '/run/music']
+    assert len(scoped) == 1 and scoped[0].get('read_only')
+    assert scoped[0]['source'].replace('\\','/').endswith('/generated/music')
+    assert not any(v['target'] == '/run/secrets/music' for v in services[name]['volumes'])
 ports = [p for service in services.values() for p in service.get('ports', [])]
 assert {(p['target'],p['protocol']) for p in ports} == {(8080,'tcp'),(7881,'tcp'),(7882,'udp')}
 assert all(p['host_ip'] == '127.0.0.1' for p in ports)

@@ -1,0 +1,827 @@
+.casino-hero .club-art-card {
+  background: linear-gradient(145deg, #183c31, #315947);
+  border-color: #e8c988;
+  color: #efd59a;
+}
+.roulette-room {
+  background: linear-gradient(150deg, #162a26, #111d1c 70%);
+  border-color: #a7864b66;
+  padding: clamp(14px, 3cqw, 30px);
+}
+.roulette-room .club-eyebrow {
+  color: #d8bd84;
+}
+.roulette-theatre {
+  position: relative;
+  background: radial-gradient(
+    ellipse at 50% 55%,
+    #234b37,
+    #11261e 65%,
+    #101e1b
+  );
+  border: 1px solid #c5a36838;
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 20px 0;
+}
+.roulette-stage {
+  position: relative;
+  height: clamp(260px, 43cqw, 490px);
+  perspective: 900px;
+  overflow: hidden;
+}
+.roulette-canvas {
+  position: absolute;
+  inset: 0;
+}
+.roulette-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.roulette-stage-label {
+  position: absolute;
+  bottom: 13px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-size: 8px;
+  color: #c6ae7c;
+  pointer-events: none;
+}
+.roulette-stage-label i {
+  font-style: normal;
+  color: #9c753b;
+  padding: 0 10px;
+}
+.roulette-announcer {
+  min-height: 105px;
+  padding: 16px 20px 22px;
+  display: flex;
+  gap: 6px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(transparent, #07120e70);
+  border-top: 1px solid #ffffff09;
+}
+.roulette-announcer strong {
+  font-family: Georgia, serif;
+  font-size: 25px;
+  color: #f0dfb8;
+}
+.roulette-announcer small {
+  font-size: 11px;
+  color: #b0b7a4;
+}
+.roulette-live-dot {
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  background: #f1cc7c;
+  box-shadow: 0 0 20px #ffd58799;
+  margin-bottom: 5px;
+}
+.roulette-live-dot.open {
+  background: #8ac797;
+  box-shadow: 0 0 20px #8ac79766;
+}
+.roulette-result-number {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border: 2px solid #d7b670;
+  border-radius: 10px;
+  font: bold 36px Georgia;
+  box-shadow: 0 6px 25px #0005;
+}
+.roulette-room .red,
+.roulette-number-grid .red {
+  background: #9e2531;
+  color: #fff0e5;
+}
+.roulette-room .black,
+.roulette-number-grid .black {
+  background: #14191c;
+  color: #fff0e5;
+}
+.roulette-room .green,
+.roulette-number-grid .green {
+  background: #146548;
+  color: #fff5dc;
+}
+.roulette-players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin: 18px 0;
+}
+.roulette-players > div {
+  padding: 12px;
+  border: 1px solid #c3ab6a22;
+  border-radius: 10px;
+  background: #ffffff04;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.roulette-players > div.is-me {
+  border-color: #d2af6366;
+}
+.roulette-players > div > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #d2af6322;
+  color: #f0d79b;
+  flex-shrink: 0;
+}
+.roulette-players > div > div {
+  flex: 1;
+  min-width: 0;
+}
+.roulette-players strong {
+  font-size: 12px;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.roulette-players small {
+  display: block;
+  font-size: 10px;
+}
+.roulette-players b {
+  font-size: 11px;
+  color: #dec18b;
+  white-space: nowrap;
+}
+.roulette-players .won {
+  color: #b6e0a7;
+}
+.roulette-players .lost {
+  color: #bca6a1;
+}
+.roulette-betting {
+  display: grid;
+  grid-template-columns: minmax(185px, 1fr) minmax(0, 2.1fr);
+  gap: 18px;
+  margin-top: 24px;
+}
+.roulette-ticket {
+  padding: 19px;
+  background: #ffffff04;
+  border: 1px solid #c3ab6a22;
+  border-radius: 12px;
+  min-width: 0;
+}
+.roulette-ticket h3 {
+  font-size: 25px;
+}
+.roulette-ticket p {
+  font-size: 11px;
+}
+.roulette-ticket label {
+  display: block;
+  font-size: 11px;
+  color: #c6c2b4;
+}
+.roulette-ticket input {
+  display: block;
+  width: 100%;
+  border: 1px solid #a88e5266;
+  border-radius: 8px;
+  background: #0f1917;
+  color: #ffe7ab;
+  padding: 13px;
+  margin-top: 7px;
+  font-size: 23px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.roulette-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 11px 0 20px;
+}
+.club .roulette-chip-row button {
+  border-radius: 99px;
+  font-size: 9px;
+  padding: 7px 9px;
+  border-style: dashed;
+  border-color: #c6a57066;
+}
+.roulette-ticket-choice {
+  border-top: 1px solid #ffffff12;
+  padding: 15px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.roulette-ticket-choice small {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+.roulette-ticket-choice strong {
+  font-size: 18px;
+  color: #ead19a;
+}
+.roulette-ticket-choice > span {
+  font-size: 11px;
+  color: #c1bba7;
+}
+.roulette-ticket > .club-gold {
+  width: 100%;
+}
+.roulette-ticket > small {
+  display: block;
+  margin-top: 12px;
+  font-size: 9px;
+}
+.roulette-felt {
+  min-width: 0;
+  border: 1px solid #c3ab6a44;
+  border-radius: 12px;
+  padding: 15px;
+  background: radial-gradient(ellipse at 50% 25%, #1e4b3a, #12392c);
+  box-shadow: inset 0 0 40px #041e1699;
+  overflow-x: auto;
+  align-self: start;
+}
+.roulette-number-grid {
+  display: grid;
+  grid-template-columns: 35px repeat(12, minmax(26px, 1fr));
+  grid-template-rows: repeat(3, 52px);
+  gap: 3px;
+  min-width: 440px;
+}
+.club .roulette-number-grid button {
+  padding: 0;
+  border-radius: 3px;
+  border: 1px solid #dfcb9a55;
+  font: 700 16px Georgia;
+}
+.roulette-number-grid .zero {
+  grid-row: 1 / 4;
+  grid-column: 1;
+}
+.roulette-number-grid button:hover:not(:disabled) {
+  filter: brightness(1.4);
+}
+.club .roulette-number-grid button.selected,
+.club .roulette-outside button.selected {
+  outline: 2px solid #f4d694;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 20px #f5d28d44;
+  position: relative;
+}
+.club .roulette-number-grid button.selected:after,
+.club .roulette-outside button.selected:after {
+  content: "C";
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 2px dashed #ffeabc;
+  border-radius: 50%;
+  background: #cda15a;
+  color: #3d2b15;
+  font: bold 10px sans-serif;
+}
+.roulette-outside {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+  min-width: 440px;
+}
+.club .roulette-outside button {
+  border: 1px solid #dbbd7e66;
+  border-radius: 5px;
+  padding: 11px 4px;
+  font-family: Georgia, serif;
+  font-size: 13px;
+  background: #ffffff06;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 5px;
+}
+.roulette-outside button:nth-child(n + 7) {
+  grid-column: span 2;
+}
+.club .roulette-outside .red {
+  background: #8b2533;
+}
+.club .roulette-outside .black {
+  background: #151b1c;
+}
+.roulette-outside small {
+  font: 9px sans-serif;
+  color: #d7c6a2;
+}
+.roulette-felt > p {
+  font-size: 10px;
+  text-align: center;
+  margin: 18px 0 5px;
+  color: #b1c2ad;
+  min-width: 320px;
+}
+.roulette-table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+  padding-top: 22px;
+  margin-top: 18px;
+  border-top: 1px solid #c3ab6a33;
+}
+.roulette-table-actions strong {
+  font-size: 13px;
+  color: #e6d3a6;
+}
+.roulette-table-actions small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+}
+.roulette-table-actions p {
+  margin: 0;
+}
+.roulette-table-actions .club-gold {
+  min-width: 190px;
+}
+.roulette-exit-note {
+  color: #9da69c !important;
+  font-size: 10px !important;
+  max-width: 640px;
+}
+.roulette-recent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 25px;
+  padding-top: 15px;
+  border-top: 1px solid #ffffff12;
+}
+.roulette-recent > small {
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  margin-right: 6px;
+}
+.roulette-recent > span {
+  border: 1px solid #c4a36166;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  font: 700 15px Georgia;
+}
+.club-ledger-row b.debit {
+  color: #e49e9e;
+}
+.roulette-card {
+  background: linear-gradient(145deg, #173b30, #1c2927);
+  border-color: #ba995450;
+}
+.roulette-card .club-machine-top {
+  color: #d7bc83;
+}
+.roulette-card-art {
+  height: 240px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  perspective: 600px;
+}
+.roulette-card-dial {
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  border: 14px ridge #be954e;
+  background: repeating-conic-gradient(#9a2633 0deg 9deg, #121b1b 9deg 18deg);
+  transform: rotateX(35deg) rotate(-20deg);
+  box-shadow:
+    0 12px 0 #69421f,
+    0 23px 30px #0007;
+  display: grid;
+  place-items: center;
+  color: #e8c675;
+  font-size: 80px;
+}
+.roulette-card-dial:before {
+  content: "";
+  position: absolute;
+  inset: 35px;
+  border: 4px solid #be954e;
+  background: radial-gradient(
+    #e4c87f 0 9%,
+    #4b2819 10% 55%,
+    #c7a660 56% 60%,
+    #342019 61%
+  );
+  border-radius: 50%;
+  z-index: -1;
+}
+.roulette-card-chip {
+  position: absolute;
+  bottom: 7px;
+  right: 14%;
+  width: 58px;
+  height: 58px;
+  border: 5px dashed #f0d398;
+  background: #a6353f;
+  box-shadow: 3px 5px 0 #651722;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #ffe7af;
+  font-size: 18px;
+  font-weight: bold;
+  transform: rotate(15deg);
+}
+.roulette-card-ball {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(at 30% 25%, white, #d5c5a3);
+  top: 60px;
+  left: 25%;
+  box-shadow: 1px 3px 5px #0009;
+}
+.slot-card {
+  padding-right: 35px;
+}
+.slot-cabinet {
+  position: relative;
+  margin: 24px 17px 24px 0;
+  padding: 10px;
+  background: linear-gradient(
+    100deg,
+    #8a5e2c,
+    #e0bf77 9%,
+    #ab7b38 25%,
+    #f1d799 50%,
+    #ad7734 80%,
+    #e9cd87 94%,
+    #72502b
+  );
+  border-radius: 55px 55px 15px 15px;
+  box-shadow:
+    0 8px 0 #62411f,
+    0 16px 30px #0005,
+    inset 0 0 0 2px #f4dca0;
+  isolation: isolate;
+}
+.slot-marquee {
+  height: 106px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: radial-gradient(#512a2b, #25191d);
+  border: 2px solid #ffe0a044;
+  border-radius: 45px 45px 6px 6px;
+  box-shadow: inset 0 0 20px #0008;
+  text-align: center;
+  color: #ffe2a1;
+}
+.slot-marquee > span {
+  font-size: 13px;
+  letter-spacing: 0.65em;
+  color: #e6b868;
+  padding-left: 0.65em;
+}
+.slot-marquee > strong {
+  font-family: Georgia, serif;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  font-size: clamp(24px, 4cqw, 40px);
+  text-shadow:
+    0 2px 0 #93502b,
+    0 0 18px #e8b15933;
+}
+.slot-marquee > small {
+  font-size: 7px;
+  letter-spacing: 0.42em;
+  color: #cfa775;
+}
+.slot-machine-body {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #331d20;
+  border-radius: 7px;
+  padding: 15px 5px;
+  margin-top: 8px;
+  border: 2px solid #633e22;
+  box-shadow: inset 0 3px 18px #0009;
+}
+.slot-payline {
+  font-size: 11px;
+  color: #f3c26b;
+}
+.slot-windows {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.slot-window {
+  --reel-height: 105px;
+  height: var(--reel-height);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: #f1e8ce;
+  border: 2px inset #d1b279;
+  border-radius: 6px;
+  position: relative;
+  box-shadow: inset 0 4px 16px #3f231266;
+}
+.slot-window:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(#38201899, transparent 30% 70%, #38201899);
+  border-radius: 4px;
+  border-bottom: 1px solid #fff9;
+}
+.slot-strip {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(calc(-1 * var(--reel-height)));
+}
+.slot-strip > span {
+  display: grid;
+  place-items: center;
+  height: var(--reel-height);
+  flex-shrink: 0;
+  font: bold 58px Georgia;
+  color: #a62b37;
+  line-height: 1;
+  text-shadow: 0 2px 0 white;
+}
+.slot-window:nth-child(2) .slot-strip > span {
+  color: #71519c;
+}
+.slot-window:nth-child(3) .slot-strip > span {
+  color: #1f6648;
+}
+.slot-machine-trim {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  background: #3a2225;
+  border: 1px solid #ffd99544;
+  color: #d2b883;
+  padding: 12px 5px;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  margin-top: 7px;
+  border-radius: 4px;
+}
+.slot-machine-trim b {
+  display: block;
+  font: 700 15px Georgia;
+  color: #f7d88f;
+  text-align: center;
+}
+.slot-tray {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 6px;
+  margin-top: 10px;
+  background: linear-gradient(#171311, #5b4937 40%, #191512);
+  border: 3px inset #bea16b;
+  border-radius: 4px;
+  padding: 15px 3px;
+  box-shadow: inset 0 7px 12px #0008;
+}
+.slot-tray strong {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: #eed9a7;
+  text-align: center;
+}
+.slot-tray > span {
+  color: #b89b64;
+  font-size: 12px;
+}
+.club .slot-lever {
+  position: absolute;
+  right: -32px;
+  top: 120px;
+  height: 155px;
+  width: 34px;
+  border: 0;
+  padding: 0;
+  background: none;
+  transform: none;
+  overflow: visible;
+  z-index: 3;
+  touch-action: none;
+}
+.club .slot-lever:hover:not(:disabled) {
+  background: none;
+  transform: none;
+}
+.slot-lever-base {
+  position: absolute;
+  bottom: 25px;
+  left: -6px;
+  width: 27px;
+  height: 33px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #a97837, #f7dfa2, #926125);
+  border: 2px solid #ddc286;
+  box-shadow: 2px 3px 4px #0007;
+}
+.slot-lever-arm {
+  position: absolute;
+  bottom: 44px;
+  left: 12px;
+  height: 108px;
+  width: 9px;
+  transform: rotate(12deg);
+  transform-origin: 50% 100%;
+  background: linear-gradient(90deg, #777, #f3e8cb, #7e7868);
+  border-radius: 5px;
+  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.4, 1);
+  box-shadow: 2px 2px 3px #0007;
+}
+.slot-lever-knob {
+  position: absolute;
+  top: -15px;
+  left: -12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(at 30% 25%, #ff9e96, #c92e3d 45%, #60121f 90%);
+  box-shadow:
+    2px 4px 5px #0007,
+    inset 0 0 2px #ffd5bb;
+  border: 1px solid #f78876;
+}
+.lever-pulled .slot-lever-arm {
+  transform: rotate(105deg) scaleY(0.7);
+}
+.slot-lever > small {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  color: #e7c888;
+}
+.roulette-fallback {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -155px 0 0 -155px;
+  width: 310px;
+  height: 310px;
+  border-radius: 50%;
+  border: 12px ridge #c19a58;
+  background: repeating-conic-gradient(
+    #a22936 0deg 9.73deg,
+    #111b19 9.73deg 19.46deg
+  );
+  box-shadow:
+    0 12px #503017,
+    0 18px 20px #0008;
+  display: grid;
+  place-items: center;
+}
+.roulette-fallback > span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  margin-left: -10px;
+  margin-top: -10px;
+  color: #fff4d7;
+  font: 12px Georgia;
+  background: transparent !important;
+}
+.roulette-fallback > b {
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(#e0bd72, #65401d);
+  border: 6px double #e6c37e;
+  color: #e9c87e;
+  font-size: 60px;
+}
+.roulette-fallback-note {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 9px;
+  color: #b7b5a3;
+}
+@container (max-width:800px) {
+  .roulette-betting {
+    grid-template-columns: 1fr;
+  }
+  .roulette-ticket {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px 15px;
+  }
+  .roulette-ticket > .club-eyebrow,
+  .roulette-ticket > h3,
+  .roulette-ticket > p,
+  .roulette-ticket > small {
+    grid-column: 1 / -1;
+  }
+  .roulette-ticket-choice {
+    grid-column: 2;
+    grid-row: 4 / 6;
+    align-self: center;
+  }
+  .roulette-ticket > label {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  .roulette-chip-row {
+    grid-column: 1;
+    grid-row: 5;
+  }
+  .roulette-ticket > .club-gold {
+    grid-column: 1 / -1;
+  }
+  .roulette-felt {
+    width: 100%;
+  }
+}
+@container (max-width:620px) {
+  .slot-cabinet {
+    margin-right: 15px;
+  }
+  .slot-window {
+    --reel-height: 95px;
+  }
+  .slot-strip > span {
+    font-size: 47px;
+  }
+  .slot-card {
+    padding-right: 35px;
+  }
+  .roulette-stage {
+    height: 285px;
+  }
+  .roulette-announcer strong {
+    font-size: 22px;
+  }
+  .roulette-players {
+    grid-template-columns: 1fr;
+  }
+  .roulette-ticket {
+    display: block;
+  }
+  .roulette-room .club-section-heading {
+    flex-wrap: wrap;
+  }
+  .roulette-card-art {
+    height: 220px;
+  }
+  .roulette-table-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .roulette-table-actions > button {
+    width: 100%;
+  }
+  .roulette-number-grid {
+    grid-template-rows: repeat(3, 44px);
+  }
+  .slot-marquee > strong {
+    font-size: 28px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot-lever-arm {
+    transition: none !important;
+  }
+  .slot-strip {
+    will-change: auto;
+  }
+}

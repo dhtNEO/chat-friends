@@ -43,10 +43,14 @@ class MigrationHistoryTest {
   }
 
   void assertComplete() {
-    for (var table : new String[] {"accounts", "avatars", "account_mfa", "mfa_recovery", "user_shortcuts"})
+    for (var table :
+        new String[] {
+          "accounts", "avatars", "account_mfa", "mfa_recovery", "user_shortcuts",
+          "coin_ledger", "roulette_bets", "party_rooms", "outlook_events"
+        })
       assertNotNull(db.queryForObject("select to_regclass(?)", String.class, schema + "." + table));
     assertEquals(
-        "6",
+        "12",
         db.queryForObject(
             "select version from "
                 + schema
@@ -170,5 +174,122 @@ class MigrationHistoryTest {
     var config = config();
     MigrationHistory.select(config);
     assertFalse(config.load().validateWithResult().validationSuccessful);
+  }
+
+  FluentConfiguration releasedFeatures(String features, String target) {
+    return config()
+        .locations(
+            "classpath:db/migration",
+            "classpath:db/legacy-main",
+            "classpath:db/legacy-" + features)
+        .target(target);
+  }
+
+  UUID retainedAccount() {
+    var id = UUID.randomUUID();
+    db.update(
+        "insert into "
+            + schema
+            + ".accounts(id,username,display_name,password_hash) values(?,?,?,?)",
+        id, "retained", "Conta preservada", "test-only");
+    return id;
+  }
+
+  @Test
+  void shortcutsHistoryKeepsChecksumAndBindingsWhenAddingGames() {
+    releasedFeatures("shortcuts", "6").load().migrate();
+    var history =
+        db.queryForMap(
+            "select script, checksum from " + schema + ".flyway_schema_history where version='6'");
+    var id = retainedAccount();
+    db.update(
+        "insert into "
+            + schema
+            + ".user_shortcuts(account_id,platform,revision,bindings) values(?,'other',7,'[]')",
+        id);
+    upgrade();
+    assertComplete();
+    assertEquals(
+        history,
+        db.queryForMap(
+            "select script, checksum from " + schema + ".flyway_schema_history where version='6'"));
+    assertEquals(
+        7L,
+        db.queryForObject("select revision from " + schema + ".user_shortcuts", Long.class));
+    assertEquals(
+        0,
+        db.queryForObject(
+            "select count(*) from " + schema + ".flyway_schema_history where version in ('7','8','9','10','11')",
+            Integer.class));
+    // Selecting the same lineage on subsequent starts must still validate.
+    upgrade();
+  }
+
+  @Test
+  void gamesHistoryKeepsEveryChecksumCoinsAndCalendarWhenAddingShortcuts() {
+    releasedFeatures("games", "11").load().migrate();
+    var history =
+        db.queryForList(
+            "select version, script, checksum from "
+                + schema
+                + ".flyway_schema_history where version in ('6','7','8','9','10','11') order by installed_rank");
+    var id = retainedAccount();
+    db.update(
+        "insert into "
+            + schema
+            + ".coin_ledger(account_id,reference,amount,reason,created_at) values(?,?,123,'test',42)",
+        id, UUID.randomUUID());
+    db.update(
+        "insert into "
+            + schema
+            + ".outlook_events(id,creator_id,client_id,title,starts_at,ends_at)"
+            + " values(?,?,?,'Jogatina preservada',now(),now()+interval '1 hour')",
+        UUID.randomUUID(), id, UUID.randomUUID());
+    upgrade();
+    assertComplete();
+    assertEquals(
+        history,
+        db.queryForList(
+            "select version, script, checksum from "
+                + schema
+                + ".flyway_schema_history where version in ('6','7','8','9','10','11') order by installed_rank"));
+    assertEquals(
+        123L,
+        db.queryForObject("select amount from " + schema + ".coin_ledger", Long.class));
+    assertEquals(
+        "Jogatina preservada",
+        db.queryForObject("select title from " + schema + ".outlook_events", String.class));
+    upgrade();
+  }
+
+  @Test
+  void partialGamesHistoryUpgradesWithoutChangingItsChecksum() {
+    releasedFeatures("games", "6").load().migrate();
+    var history =
+        db.queryForMap(
+            "select script, checksum from " + schema + ".flyway_schema_history where version='6'");
+    upgrade();
+    assertComplete();
+    assertEquals(
+        history,
+        db.queryForMap(
+            "select script, checksum from " + schema + ".flyway_schema_history where version='6'"));
+  }
+
+  @Test
+  void alteredV6ChecksumIsStillRejected() {
+    releasedFeatures("shortcuts", "6").load().migrate();
+    db.update("update " + schema + ".flyway_schema_history set checksum=0 where version='6'");
+    var config = config();
+    MigrationHistory.select(config);
+    assertFalse(config.load().validateWithResult().validationSuccessful);
+  }
+
+  @Test
+  void unknownV6HistoryFailsClosed() {
+    releasedFeatures("games", "6").load().migrate();
+    db.update(
+        "update " + schema + ".flyway_schema_history set script='V6__unknown.sql' where version='6'");
+    assertThrows(IllegalStateException.class, () -> MigrationHistory.select(config()));
   }
 }

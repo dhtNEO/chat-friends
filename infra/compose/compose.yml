@@ -53,10 +53,11 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SPACE_NAME: ${SPACE_NAME:-Entre amigos}
+      MUSIC_SECRET_FILE: /run/music/control.key
       SCREEN_BITRATE: ${SCREEN_BITRATE:-8000000}
       SCREEN_HEIGHT: ${SCREEN_HEIGHT:-1080}
       SCREEN_FPS: ${SCREEN_FPS:-60}
-    volumes: ["./generated/music-secret:/run/secrets/music:ro"]
+    volumes: ["./generated/music:/run/music:ro"]
     depends_on:
       db: {condition: service_healthy}
       livekit: {condition: service_started}
@@ -76,11 +77,11 @@ services:
     networks: [media_net, control_net]
     environment:
       LIVEKIT_URL: ws://livekit:7880
-      MUSIC_SECRET_FILE: /run/secrets/music
+      MUSIC_SECRET_FILE: /run/music/control.key
       NO_PROXY: livekit,localhost,127.0.0.1
       no_proxy: livekit,localhost,127.0.0.1
     # No public ports, credentials for users, signing keys or persistent media files.
-    volumes: ["./generated/music-secret:/run/secrets/music:ro"]
+    volumes: ["./generated/music:/run/music:ro"]
     depends_on:
       livekit: {condition: service_started}
     read_only: true
@@ -90,7 +91,7 @@ services:
     mem_limit: 512m
     stop_grace_period: 15s
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; from pathlib import Path; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8090/state', headers={'Authorization':'Bearer '+Path('/run/secrets/music').read_text().strip()}), timeout=3).close()"]
+      test: ["CMD", "python", "-c", "import urllib.request; from pathlib import Path; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8090/state', headers={'Authorization':'Bearer '+Path('/run/music/control.key').read_text().strip()}), timeout=3).close()"]
       interval: 10s
       timeout: 5s
       retries: 6

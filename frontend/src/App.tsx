@@ -23,6 +23,8 @@ import {
   type Message,
 } from "./api";
 import { MfaGate, type SecurityState } from "./AccountSecurity";
+import { GamesClub } from "./GamesClub";
+import { Outlook } from "./Outlook";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
@@ -232,6 +234,7 @@ function Workspace({
     void loadShortcuts().catch(() => {});
     return () => setShortcuts(null);
   }, [me.user.id]);
+  const [voiceIdentity, setVoiceIdentity] = useState<string>();
   const [members, setMembers] = useState<Member[]>([]);
   const loadMembers = useCallback(
     () =>
@@ -465,6 +468,18 @@ function Workspace({
         <span className="eyebrow">CANAIS DE VOZ</span>
         <div ref={setRoster} />
       </div>
+      <div className="channel-section">
+        <span className="eyebrow">MAIS UMA RODADA?</span>
+        <button className="channel" onClick={() => open("games")}>
+          <Icon name="games" size={18} /> Clube da Sorte <small>NOVO</small>
+        </button>
+      </div>
+      <div className="channel-section">
+        <span className="eyebrow">MARQUE COM A GALERA</span>
+        <button className="channel" onClick={() => open("outlook")}>
+          <Icon name="calendar" size={18} /> Outlook
+        </button>
+      </div>
       <footer className="me">
         <Avatar name={me.user.displayName} src={avatarSrc(me.user)} size={34} />
         <div className="me-name">
@@ -490,6 +505,15 @@ function Workspace({
           onOlder={() => void older()}
           onSend={post}
           onRetry={(p) => void send(p)}
+        />
+      );
+    if (kind === "outlook") return <Outlook me={me.user} />;
+    if (kind === "games")
+      return (
+        <GamesClub
+          me={me.user}
+          voiceIdentity={voiceIdentity}
+          onOpenVoice={() => open("voice")}
         />
       );
     if (kind === "members")
@@ -621,6 +645,20 @@ function Workspace({
             badge={online.length}
             onClick={() => open("members")}
           />
+          <ActivityButton
+            icon="games"
+            label="Jogos"
+            title="Clube da Sorte"
+            active={!!slots.games}
+            onClick={() => open("games")}
+          />
+          <ActivityButton
+            icon="calendar"
+            label="Outlook"
+            title="Outlook · calendário da galera"
+            active={!!slots.outlook}
+            onClick={() => open("outlook")}
+          />
           <span className="activity-spacer" />
           <ActivityButton
             icon="reset"
@@ -701,6 +739,7 @@ function Workspace({
         <Voice
           key={me.user.id}
           userId={me.user.id}
+          onIdentityChange={setVoiceIdentity}
           admin={me.user.admin}
           hosts={{
             stage: slots.voice ?? null,

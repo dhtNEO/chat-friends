@@ -3,6 +3,9 @@ package com.chatfriends;
 import static org.springframework.http.HttpStatus.*;
 
 import io.livekit.server.*;
+import io.livekit.server.okhttp.OkHttpFactory;
+
+import java.time.Duration;
 import java.util.*;
 import livekit.LivekitModels.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,13 +23,19 @@ public class LiveKitGateway {
       @Value("${app.livekit-secret}") String secret,
       @Value("${app.room}") String room,
       @Value("${app.livekit-public-url}") String publicUrl) {
+
     this.key = key;
     this.secret = secret;
     this.room = room;
     this.publicUrl = publicUrl;
-    client =
-        RoomServiceClient.create(
-            url, key, secret, false, b -> b.callTimeout(java.time.Duration.ofSeconds(5)));
+
+    this.client = RoomServiceClient.createClient(
+        url,
+        key,
+        secret,
+        new OkHttpFactory(
+            false,
+            builder -> builder.callTimeout(Duration.ofSeconds(5))));
   }
 
   public String token(String identity, String name) {
@@ -59,8 +68,10 @@ public class LiveKitGateway {
   public List<ParticipantInfo> participants() {
     try {
       var r = client.listParticipants(room).execute();
-      if (r.code() == 404) return List.of();
-      if (!r.isSuccessful() || r.body() == null) throw new IllegalStateException();
+      if (r.code() == 404)
+        return List.of();
+      if (!r.isSuccessful() || r.body() == null)
+        throw new IllegalStateException();
       return r.body();
     } catch (Exception e) {
       throw new ResponseStatusException(SERVICE_UNAVAILABLE, "Mídia indisponível; tente novamente");
@@ -68,18 +79,18 @@ public class LiveKitGateway {
   }
 
   public void permission(String identity, boolean screen) {
-    var p =
-        ParticipantPermission.newBuilder()
-            .setCanSubscribe(true)
-            .setCanPublish(true)
-            .setCanPublishData(false)
-            .addCanPublishSources(TrackSource.MICROPHONE);
+    var p = ParticipantPermission.newBuilder()
+        .setCanSubscribe(true)
+        .setCanPublish(true)
+        .setCanPublishData(false)
+        .addCanPublishSources(TrackSource.MICROPHONE);
     if (screen)
       p.addCanPublishSources(TrackSource.SCREEN_SHARE)
           .addCanPublishSources(TrackSource.SCREEN_SHARE_AUDIO);
     try {
       var r = client.updateParticipant(room, identity, null, null, p.build()).execute();
-      if (!r.isSuccessful()) throw new IllegalStateException();
+      if (!r.isSuccessful())
+        throw new IllegalStateException();
     } catch (Exception e) {
       throw new ResponseStatusException(
           SERVICE_UNAVAILABLE, "Não foi possível atualizar permissão de mídia");
@@ -89,7 +100,8 @@ public class LiveKitGateway {
   public void remove(String identity) {
     try {
       var r = client.removeParticipant(room, identity).execute();
-      if (!r.isSuccessful() && r.code() != 404) throw new IllegalStateException();
+      if (!r.isSuccessful() && r.code() != 404)
+        throw new IllegalStateException();
     } catch (Exception e) {
       throw new ResponseStatusException(
           SERVICE_UNAVAILABLE, "Expulsão de mídia pendente; reconciliação tentará novamente");

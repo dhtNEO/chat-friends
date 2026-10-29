@@ -38,7 +38,7 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 
 ## O que está incluído
 
-- Java 25 / Spring Boot 3.5.16, Maven Wrapper 3.9.11, PostgreSQL 17 / Flyway / sessões JDBC.
+- Java 25 / Spring Boot 4.1.2, Maven Wrapper 3.9.11, PostgreSQL 17 / Flyway / sessões JDBC.
 - React 19 / TypeScript / Vite, SDK oficial LiveKit, Caddy e LiveKit self-hosted.
 - Bot de música na chamada: busca por nome ou link do YouTube, fila compartilhada, pausa/pular e volume individual. Serviço privado incluído no Compose; detalhes e limites em [MUSIC](docs/MUSIC.md).
 - Contas individuais, administrador, alteração/redefinição de senha, desativação e invalidação de sessões. Cada pessoa troca nick, usuário, foto de perfil, cores do tema, tamanho da interface e sons da chamada.
@@ -69,3 +69,11 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 O repositório já continha [LICENSE](LICENSE), GPL-3.0. Esse arquivo foi preservado; a intenção de licenciamento do código novo precisa ser confirmada pelo proprietário antes de distribuir. Não houve publicação de imagens ou recursos em nuvem. Dependências e suas licenças: [DEPENDENCIES](docs/DEPENDENCIES.md).
 
 Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](docs/SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.
+
+## Clube da Sorte
+
+Abra **Jogos** para o caça-níquel com manivela e a Roleta Royale 3D, individual ou em salas para até oito pessoas. Coins, apostas, devoluções, extrato e pódio são controlados pelo servidor. A música da main permanece disponível; integração da fila com Coins fica para depois. Regras e operação em [GAMES](docs/GAMES.md). Blackjack Social e Beat Club acrescentam salas de 2–8 pessoas com premiação em Coins; no blackjack, Vega acompanha a mesa em 3D e as mãos dos adversários só são reveladas no resultado. No ritmo, escolha até cinco minutos de uma faixa do bot, entre na voz e toque D/F/J/K (ou as pistas no celular), com pista 3D e Riff na guitarra neon. Veja [PARTY_GAMES](docs/PARTY_GAMES.md).
+
+## Outlook
+
+Aba de calendário compartilhado para marcar jogatinas: todos criam eventos e respondem Vou/Talvez/Não vou. Calendário mensal, horários no seu fuso, lista de presença e edição/cancelamento pelo organizador ou administrador. Uso e API em [OUTLOOK](docs/OUTLOOK.md).
