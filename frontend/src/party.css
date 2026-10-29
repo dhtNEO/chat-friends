@@ -621,3 +621,136 @@
   flex: 1;
   max-width: 260px;
 }
+
+.party-stage {
+  position: relative;
+  height: 260px;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 70%, #28695155, #081e1b22 70%);
+}
+.party-stage-canvas {
+  width: 100%;
+  height: 100%;
+}
+.party-stage-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.party-stage-caption {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: #f2d9a0;
+  pointer-events: none;
+}
+.party-stage-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  text-align: center;
+  color: #cfbaff;
+  font-size: 12px;
+}
+.blackjack-felt .party-stage {
+  margin: -10px 0 14px;
+}
+.blackjack-hand {
+  perspective: 800px;
+  transform-style: preserve-3d;
+}
+.blackjack-hand .blackjack-card {
+  animation: party-deal-3d 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  backface-visibility: hidden;
+  transform-origin: center;
+  border-bottom: 3px solid #bdb39b;
+}
+.blackjack-hand .blackjack-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.blackjack-hand .blackjack-card:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.blackjack-hand .blackjack-card:nth-child(n + 4) {
+  animation-delay: 0.3s;
+}
+.party-finished {
+  animation: party-result 0.5s ease-out both;
+}
+.beat-visual {
+  position: relative;
+  min-height: 400px;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 15%, #673d8544, transparent 65%), #090c1c;
+}
+.beat-visual .party-stage.guitar {
+  height: 430px;
+  background: transparent;
+}
+.beat-visual:has(.party-stage:not(.stage-unavailable)) > .beat-highway {
+  display: none;
+}
+.beat-visual .stage-unavailable {
+  height: 105px;
+}
+.beat-visual .stage-unavailable .party-stage-canvas,
+.stage-unavailable .party-stage-caption {
+  display: none;
+}
+.beat-visual > .beat-highway {
+  perspective: 650px;
+}
+.beat-note {
+  border-bottom: 4px solid #ffffff66;
+  transform: perspective(400px) rotateX(22deg);
+}
+.beat-keys button {
+  box-shadow:
+    0 4px 0 #0009,
+    inset 0 0 14px #ffffff09;
+}
+@keyframes party-deal-3d {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -60px, -140px) rotateY(100deg) rotateZ(-12deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotateY(0);
+  }
+}
+@keyframes party-result {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@container (max-width:620px) {
+  .party-stage {
+    height: 215px;
+  }
+  .beat-visual .party-stage.guitar {
+    height: 360px;
+  }
+  .beat-visual {
+    min-height: 360px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blackjack-hand .blackjack-card,
+  .party-finished {
+    animation: none;
+  }
+}

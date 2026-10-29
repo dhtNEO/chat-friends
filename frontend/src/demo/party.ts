@@ -19,6 +19,9 @@ const player = (id: string, name: string, ready: boolean): PartyPlayer => ({
   standing: false,
   hand: [],
   total: 0,
+  cardCount: 0,
+  handHidden: false,
+  outcome: null,
   score: 0,
   hits: 0,
   combo: 0,
@@ -71,11 +74,11 @@ export function demoParty(
         if (p.departed) continue;
         const desired =
           room.kind === "blackjack"
-            ? p.total > 21
+            ? (p.total ?? 0) > 21
               ? 2
               : p.total === 21 && p.hand.length === 2
                 ? 30
-                : p.total > 17
+                : (p.total ?? 0) > 17
                   ? 20
                   : p.total === 17
                     ? 8
@@ -104,6 +107,33 @@ export function demoParty(
       room: room
         ? {
             ...room,
+            players: room.players.map((p) => {
+              const hidden =
+                room!.kind === "blackjack" &&
+                room!.status !== "finished" &&
+                p.id !== user.id;
+              return {
+                ...p,
+                cardCount: p.hand.length,
+                handHidden: hidden,
+                hand: hidden ? [] : [...p.hand],
+                total: hidden ? null : p.total,
+                outcome:
+                  room!.kind === "blackjack" && room!.status === "finished"
+                    ? p.departed
+                      ? "left"
+                      : p.total! > 21
+                        ? "bust"
+                        : p.total === 21 && p.hand.length === 2
+                          ? "blackjack"
+                          : p.total! > 17
+                            ? "win"
+                            : p.total === 17
+                              ? "tie"
+                              : "loss"
+                    : null,
+              };
+            }),
             dealer: room.dealerHidden ? room.dealer.slice(0, 1) : room.dealer,
           }
         : null,

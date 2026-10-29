@@ -56,15 +56,40 @@ test("blackjack multiplayer, carta oculta, pedir, parar e Coins", async ({
   await room
     .getByRole("button", { name: "Distribuir cartas", exact: false })
     .click();
-  await expect(room.getByLabel("Carta oculta", { exact: true })).toBeVisible();
+  await expect(
+    room
+      .locator(".blackjack-dealer")
+      .getByLabel("Carta oculta", { exact: true }),
+  ).toBeVisible();
   await room.getByRole("button", { name: "Pedir carta", exact: false }).click();
   await expect(room.locator(".own-hand header>b")).toHaveText("17");
+  await expect(
+    room.locator(".blackjack-tables article:not(.own-hand) header>b"),
+  ).toHaveText("••");
+  const hidden = await page.evaluate(() =>
+    fetch("/api/party").then((r) => r.json()),
+  );
+  expect(hidden.room.players[1].hand).toEqual([]);
+  expect(hidden.room.players[1].total).toBeNull();
+  await expect(
+    room.getByRole("img", { name: "Vega, dealer robô 3D de smoking" }),
+  ).toBeVisible();
   await room.getByRole("button", { name: "Parar", exact: false }).click();
   await expect(room.getByText("Resultado", { exact: true })).toBeVisible({
     timeout: 10000,
   });
   await expect(room.locator(".own-hand small").last()).toContainText("8 Coins");
-  await expect(room.getByLabel("Carta oculta", { exact: true })).toHaveCount(0);
+  await expect(
+    room
+      .locator(".blackjack-dealer")
+      .getByLabel("Carta oculta", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    room.locator(".blackjack-tables article:not(.own-hand) header>b"),
+  ).toHaveText("17");
+  await expect(
+    room.locator(".blackjack-tables article:not(.own-hand) > small"),
+  ).toContainText("Empate com a banca");
   const first = await page.evaluate(() =>
     fetch("/api/party").then((r) => r.json()),
   );
@@ -148,6 +173,11 @@ test("ritmo usa seleção do bot e teclas; acertos rendem Coins", async ({
     .click();
   await expect(
     room.getByRole("img", { name: "Notas da música em quatro pistas" }),
+  ).toBeVisible();
+  await expect(
+    room.getByRole("img", {
+      name: "Riff, raposa robótica 3D tocando guitarra neon",
+    }),
   ).toBeVisible();
   const state = await page.evaluate(() =>
     fetch("/api/party").then((r) => r.json()),

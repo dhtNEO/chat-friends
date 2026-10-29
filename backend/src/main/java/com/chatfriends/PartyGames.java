@@ -159,6 +159,11 @@ public class PartyGames {
   }
 
   Map<String, Object> view(UUID id, UUID u) {
+    // Read phase and cards together: reopening a finished room must never reveal new hands.
+    return games.locked(() -> roomView(id, u));
+  }
+
+  private Map<String, Object> roomView(UUID id, UUID u) {
     var r = row(id);
     var state = state(r);
     var out = new LinkedHashMap<String, Object>();
@@ -177,8 +182,26 @@ public class PartyGames {
                 + " a.id=p.account_id where p.room_id=? order by p.joined_at,p.account_id",
             id);
     for (var p : players) {
-      p.put("hand", hand((String) p.get("hand")));
-      p.put("total", total((List<?>) p.get("hand")));
+      var cards = hand((String) p.get("hand"));
+      boolean hidden =
+          r.get("kind").equals("blackjack")
+              && !r.get("status").equals("finished")
+              && !u.equals(p.get("id"));
+      p.put("cardCount", cards.size());
+      p.put("handHidden", hidden);
+      p.put("hand", hidden ? List.of() : cards);
+      if (hidden) {
+        p.put("score", 0);
+        p.put("reward", 0);
+      }
+      p.put("total", hidden ? null : total(cards));
+      p.put(
+          "outcome",
+          r.get("kind").equals("blackjack") && r.get("status").equals("finished")
+              ? Boolean.TRUE.equals(p.get("departed"))
+                  ? "left"
+                  : blackjackOutcome(cards, (List<?>) state.getOrDefault("dealer", List.of()))
+              : null);
     }
     out.put("players", players);
     var dealer = (List<?>) state.getOrDefault("dealer", List.of());
@@ -215,6 +238,15 @@ public class PartyGames {
 
   static boolean natural(List<?> cards) {
     return cards.size() == 2 && total(cards) == 21;
+  }
+
+  static String blackjackOutcome(List<?> cards, List<?> dealer) {
+    int score = total(cards), bank = total(dealer);
+    if (score > 21) return "bust";
+    if (natural(cards) && !natural(dealer)) return "blackjack";
+    if (natural(dealer) && !natural(cards)) return "loss";
+    if (score == bank) return "tie";
+    return bank > 21 || score > bank ? "win" : "loss";
   }
 
   int draw(Map<String, Object> state) {
@@ -530,9 +562,9 @@ public class PartyGames {
       require(
           notes.isArray()
               && notes.size() >= 8
-              && notes.size() <= 200
+              && notes.size() <= 1200
               && duration >= 15000
-              && duration <= 45000,
+              && duration <= 300000,
           "A música não gerou um desafio válido.");
       long start = now() + 6000;
       bot.startRhythm(id.toString(), start);
@@ -656,15 +688,15 @@ public class PartyGames {
                 + " where p.room_id=? and not p.departed and a.enabled",
             id)) {
       var cards = hand((String) p.get("hand"));
-      int score = total(cards), bank = total(dealer);
+      int score = total(cards);
       int desired =
-          score > 21
-              ? 2
-              : natural(cards) && !natural(dealer)
-                  ? 30
-                  : natural(dealer) && !natural(cards)
-                      ? 3
-                      : score == bank ? 8 : bank > 21 || score > bank ? 20 : 3;
+          switch (blackjackOutcome(cards, dealer)) {
+            case "bust" -> 2;
+            case "blackjack" -> 30;
+            case "tie" -> 8;
+            case "win" -> 20;
+            default -> 3;
+          };
       int reward =
           games.credit(
               (UUID) p.get("account_id"),

@@ -1,6 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { api, type User } from "./api";
 import "./party.css";
+const PartyStage3D = lazy(() => import("./PartyStage3D"));
+const OUTCOMES: Record<string, string> = {
+  blackjack: "Blackjack! Vitória",
+  win: "Vitória contra a banca",
+  tie: "Empate com a banca",
+  loss: "A banca venceu",
+  bust: "Estourou",
+  left: "Saiu da rodada",
+};
 export type PartyPlayer = {
   id: string;
   name: string;
@@ -8,7 +24,10 @@ export type PartyPlayer = {
   departed: boolean;
   standing: boolean;
   hand: number[];
-  total: number;
+  total: number | null;
+  cardCount: number;
+  handHidden: boolean;
+  outcome: string | null;
   score: number;
   hits: number;
   combo: number;
@@ -134,7 +153,9 @@ export function PartyClub({
   const room = data?.room,
     playing =
       !!room && ["waiting", "preparing", "running"].includes(room.status),
-    players = room?.players.filter((p) => !p.departed) ?? [],
+    players =
+      room?.players.filter((p) => !p.departed || room.status === "finished") ??
+      [],
     own = players.find((p) => p.id === me.id),
     host = room?.hostId === me.id;
   useEffect(() => {
@@ -321,7 +342,7 @@ export function PartyClub({
           <span className="club-eyebrow">O MELHOR PRÊMIO É JOGAR JUNTO</span>
           <h2>Uma mesa. Um palco. A galera toda.</h2>
         </div>
-        <span className="club-tag">MULTIPLAYER · COINS GRÁTIS</span>
+        <span className="club-tag">MULTIPLAYER · COINS</span>
       </div>
       {error && (
         <div className="club-alert" role="alert">
@@ -405,20 +426,35 @@ export function PartyClub({
               <span>♫</span>
               <h3>O bot está ouvindo a música.</h3>
               <p>
-                Preparando até 45 segundos e identificando batidas no áudio.
+                Preparando até 5 minutos e identificando batidas no áudio.
                 Aguarde: isso pode levar até dois minutos.
               </p>
             </div>
           )}
+          {room.kind === "blackjack" && room.status === "waiting" && (
+            <Suspense fallback={null}>
+              <PartyStage3D variant="dealer" active serverNow={clock} />
+            </Suspense>
+          )}
           {room.kind === "blackjack" && room.status !== "waiting" && (
-            <div className="blackjack-felt">
+            <div className="blackjack-felt" key={room.roundId}>
+              <Suspense fallback={null}>
+                <PartyStage3D
+                  variant="dealer"
+                  active={room.status === "running"}
+                  serverNow={clock}
+                />
+              </Suspense>
               <span className="club-eyebrow">
                 BANCA · PARA NO 17, INCLUSIVE COM ÁS SUAVE
               </span>
               <div className="blackjack-dealer">
                 <div className="blackjack-hand">
                   {room.dealer.map((card, i) => (
-                    <Card key={i} card={card} />
+                    <Card
+                      key={`${room.roundId}:${room.status}:${i}`}
+                      card={card}
+                    />
                   ))}
                   {room.dealerHidden && <Card hidden />}
                 </div>
@@ -440,21 +476,30 @@ export function PartyClub({
                         {p.id === me.id ? " (você)" : ""}
                       </strong>
                       <b>
-                        {p.total > 21
-                          ? "ESTOUROU"
-                          : p.total === 21
-                            ? "21!"
-                            : p.total}
+                        {p.total === null
+                          ? "••"
+                          : p.total > 21
+                            ? "ESTOUROU"
+                            : p.total === 21
+                              ? "21!"
+                              : p.total}
                       </b>
                     </header>
                     <div className="blackjack-hand">
-                      {p.hand.map((c, i) => (
-                        <Card key={i} card={c} />
-                      ))}
+                      {p.handHidden
+                        ? Array.from({ length: p.cardCount }, (_, i) => (
+                            <Card key={i} hidden />
+                          ))
+                        : p.hand.map((c, i) => (
+                            <Card
+                              key={`${room.roundId}:${room.status}:${i}`}
+                              card={c}
+                            />
+                          ))}
                     </div>
                     <small>
                       {room.status === "finished"
-                        ? `+${p.reward} Coins`
+                        ? `${OUTCOMES[p.outcome ?? ""] ?? "Resultado"} · +${p.reward} Coins`
                         : p.standing
                           ? "✓ Parou"
                           : "Escolhendo a próxima jogada…"}
@@ -516,34 +561,51 @@ export function PartyClub({
                     </span>
                   </div>
                   <div
-                    className="beat-highway"
+                    className="beat-visual"
                     role="img"
                     aria-label="Notas da música em quatro pistas"
                   >
-                    {KEYS.map((key, lane) => (
-                      <div
-                        className={`beat-lane lane-${lane} ${flash === lane ? "pressed" : ""}`}
-                        key={key}
-                      >
-                        {room.notes.map((n, i) => {
-                          const delta =
-                            room.startsAt + n.at + 150 + adjust - clock;
-                          return n.lane === lane &&
-                            delta > -150 &&
-                            delta < 1900 &&
-                            !(room.judged ?? []).some((h) => h.note === i) &&
-                            !locallyJudged.current.has(i) ? (
-                            <span
-                              className="beat-note"
-                              key={i}
-                              style={{ top: `${(1 - delta / 1800) * 81}%` }}
-                            />
-                          ) : null;
-                        })}
-                        <span className="beat-hit-line" />
-                        <b>{key}</b>
-                      </div>
-                    ))}
+                    <Suspense fallback={null}>
+                      <PartyStage3D
+                        variant="guitar"
+                        active
+                        serverNow={clock}
+                        startsAt={room.startsAt}
+                        adjust={adjust}
+                        notes={room.notes}
+                        judged={[
+                          ...(room.judged ?? []).map((n) => n.note),
+                          ...locallyJudged.current,
+                        ]}
+                        flash={flash}
+                      />
+                    </Suspense>
+                    <div className="beat-highway">
+                      {KEYS.map((key, lane) => (
+                        <div
+                          className={`beat-lane lane-${lane} ${flash === lane ? "pressed" : ""}`}
+                          key={key}
+                        >
+                          {room.notes.map((n, i) => {
+                            const delta =
+                              room.startsAt + n.at + 150 + adjust - clock;
+                            return n.lane === lane &&
+                              delta > -150 &&
+                              delta < 1900 &&
+                              !(room.judged ?? []).some((h) => h.note === i) &&
+                              !locallyJudged.current.has(i) ? (
+                              <span
+                                className="beat-note"
+                                key={i}
+                                style={{ top: `${(1 - delta / 1800) * 81}%` }}
+                              />
+                            ) : null;
+                          })}
+                          <span className="beat-hit-line" />
+                          <b>{key}</b>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="beat-keys">
                     {KEYS.map((key, lane) => (
@@ -599,7 +661,7 @@ export function PartyClub({
                       ? "✓ Pronto"
                       : "Aguardando"
                     : room.status === "finished"
-                      ? `${p.score} ${room.kind === "rhythm" ? "pts" : "na mão"} · +${p.reward} Coins`
+                      ? `${room.kind === "blackjack" ? (OUTCOMES[p.outcome ?? ""] ?? "Resultado") : `${p.score} pts`} · +${p.reward} Coins`
                       : room.kind === "rhythm"
                         ? `${p.score} pts · ${p.hits} acertos · combo ${p.combo}`
                         : p.standing
@@ -727,8 +789,8 @@ export function PartyClub({
           <span className="club-eyebrow">04 · SUA MÚSICA, SEU MOMENTO</span>
           <h3>Beat Club</h3>
           <p>
-            Escolha uma música do bot, siga as batidas e dispute a melhor
-            apresentação.
+            Escolha até 5 minutos de uma música do bot, siga as batidas com Riff
+            e dispute a melhor apresentação.
           </p>
           <div className="beat-card-art" aria-hidden="true">
             {KEYS.map((k, i) => (
@@ -793,7 +855,7 @@ export function PartyClub({
             Criar sala de ritmo ♫
           </button>
           <small>
-            2–8 pessoas · trecho de até 45 segundos · teclado ou toque
+            2–8 pessoas · música de até 5 minutos · teclado ou toque
           </small>
         </article>
       </div>

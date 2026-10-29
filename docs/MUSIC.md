@@ -26,4 +26,4 @@ Referências de implementação: [LiveKit raw audio](https://docs.livekit.io/tra
 
 ## Beat Club
 
-O bot também prepara e publica um trecho de até 45 segundos para as salas de ritmo. Durante a sessão, músicas e controles normais ficam reservados ao jogo; o volume continua individual. Preparação analisa o próprio PCM que será transmitido, sem guardar arquivo. Fluxo, limites e diagnóstico em [PARTY_GAMES.md](PARTY_GAMES.md). Rebuild do worker é necessário para disponibilizar as novas rotas privadas.
+O bot também prepara e publica um trecho de até 5 minutos para as salas de ritmo. Durante a sessão, músicas e controles normais ficam reservados ao jogo; o volume continua individual. Preparação analisa o próprio PCM que será transmitido, sem guardar arquivo. Fluxo, limites e diagnóstico em [PARTY_GAMES.md](PARTY_GAMES.md). Rebuild do worker é necessário para disponibilizar as novas rotas privadas.

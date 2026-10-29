@@ -105,11 +105,11 @@ class PartyGamesTest {
     party.action("ana", id, UUID.randomUUID(), "ready", voice(ana, "ana"));
     party.action("bia", id, UUID.randomUUID(), "ready", voice(bia, "bia"));
     var notes = new ArrayList<Map<String, Integer>>();
-    for (int i = 0; i < 12; i++) notes.add(Map.of("at", 2000 + i * 500, "lane", i % 4));
+    for (int i = 0; i < 600; i++) notes.add(Map.of("at", 2000 + i * 490, "lane", i % 4));
     when(bot.prepareRhythm(eq(id.toString()), anyString(), anyString(), anyString()))
         .thenReturn(
             party.json.valueToTree(
-                Map.of("title", "Batidas", "durationMs", 15000, "notes", notes)));
+                Map.of("title", "Batidas", "durationMs", 300000, "notes", notes)));
     when(bot.state())
         .thenReturn(
             party.json.valueToTree(
@@ -150,6 +150,46 @@ class PartyGamesTest {
     assertFalse(view.containsKey("cursor"));
     expire(id);
     assertEquals(false, party.view(id, ana).get("dealerHidden"));
+  }
+
+  @Test
+  void opponentsCardsAndTotalsStayPrivateUntilTheResult() {
+    UUID id = blackjack();
+    var anaView = (List<Map<String, Object>>) party.view(id, ana).get("players");
+    var own = anaView.stream().filter(p -> ana.equals(p.get("id"))).findFirst().orElseThrow();
+    var other = anaView.stream().filter(p -> bia.equals(p.get("id"))).findFirst().orElseThrow();
+    assertEquals(2, ((List<?>) own.get("hand")).size());
+    assertEquals(List.of(), other.get("hand"));
+    assertNull(other.get("total"));
+    assertNull(other.get("outcome"));
+    assertEquals(0, other.get("score"));
+    assertEquals(0, other.get("reward"));
+    assertEquals(true, other.get("handHidden"));
+    assertEquals(2, other.get("cardCount"));
+    var biaView = (List<Map<String, Object>>) party.view(id, bia).get("players");
+    assertEquals(
+        List.of(),
+        biaView.stream()
+            .filter(p -> ana.equals(p.get("id")))
+            .findFirst()
+            .orElseThrow()
+            .get("hand"));
+    expire(id);
+    for (var player : (List<Map<String, Object>>) party.view(id, ana).get("players")) {
+      assertFalse(((List<?>) player.get("hand")).isEmpty());
+      assertNotNull(player.get("total"));
+      assertNotNull(player.get("outcome"));
+      assertEquals(false, player.get("handHidden"));
+    }
+  }
+
+  @Test
+  void blackjackResultsDistinguishNaturalAndDealerNatural() {
+    assertEquals("blackjack", PartyGames.blackjackOutcome(List.of(0, 9), List.of(9, 6)));
+    assertEquals("loss", PartyGames.blackjackOutcome(List.of(4, 5, 9), List.of(0, 9)));
+    assertEquals("tie", PartyGames.blackjackOutcome(List.of(0, 9), List.of(0, 9)));
+    assertEquals("win", PartyGames.blackjackOutcome(List.of(9, 8), List.of(9, 6)));
+    assertEquals("bust", PartyGames.blackjackOutcome(List.of(9, 9, 9), List.of(9, 6)));
   }
 
   @Test
@@ -354,11 +394,13 @@ class PartyGamesTest {
   @Test
   void serverJudgesRhythmAndDuplicateNotesCannotFarmCoins() throws Exception {
     UUID id = rhythm();
+    assertEquals(
+        300600L, (Long) party.row(id).get("ends_at") - (Long) party.row(id).get("starts_at"));
     assertThrows(ResponseStatusException.class, () -> party.note("ana", id, 0, 0));
     for (int n = 0; n < 3; n++) {
       games.db.update(
           "update party_rooms set starts_at=? where id=?",
-          System.currentTimeMillis() - (2000 + n * 500) - 150,
+          System.currentTimeMillis() - (2000 + n * 490) - 150,
           id);
       int score = party.note("ana", id, n, n % 4);
       assertEquals(100, score);

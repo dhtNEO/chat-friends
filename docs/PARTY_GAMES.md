@@ -10,7 +10,7 @@ A mesma sala permite jogar várias rodadas: após o resultado, o anfitrião clic
 
 O jogo tem ações **pedir carta** e **parar**. Todos jogam contra a mesma banca, com mãos independentes e decisões simultâneas. Cada rodada usa seis baralhos embaralhados por SecureRandom. Ás vale 11 ou 1; figuras valem 10. A banca mantém uma carta oculta até o fim e para em 17, incluindo ás suave.
 
-A rodada termina quando todos pararam/estouraram ou após 45 segundos. No prazo final, as mãos restantes param automaticamente e a banca completa a sua. O navegador nunca recebe o baralho, sua ordem ou a carta oculta. Jogadores podem acompanhar as mãos abertas dos amigos.
+A rodada termina quando todos pararam/estouraram ou após 45 segundos. No prazo final, as mãos restantes param automaticamente e a banca completa a sua. O navegador nunca recebe o baralho, sua ordem ou a carta oculta. Cada jogador vê somente sua própria mão durante a rodada. O servidor omite cartas, total e resultado dos adversários até o encerramento. Ao final, todas as mãos são reveladas, com vitória, empate, derrota ou estouro de cada participante; quem saiu aparece sem premiação. A leitura da fase e das mãos usa o mesmo lock das ações, evitando revelar cartas da próxima rodada durante a troca de fase.
 
 | Resultado da mão | Prêmio bruto em Coins |
 |---|---:|
@@ -28,12 +28,12 @@ O blackjack natural da banca vence 21 feito com mais cartas. Duas mãos naturais
 
 1. Entre na sala de voz. No cartão Beat Club, pesquise uma música ou cole um link do YouTube, usando o bot existente.
 2. Selecione o resultado e crie a sala. Convide os amigos; todos devem estar na voz e confirmar prontidão.
-3. O anfitrião prepara a partida. O bot precisa estar livre, sem música ou fila normal. Ele reserva seu controle para a sessão e prepara **até os primeiros 45 segundos** da faixa; preparação pode levar até dois minutos.
+3. O anfitrião prepara a partida. O bot precisa estar livre, sem música ou fila normal. Ele reserva seu controle para a sessão e prepara **até os primeiros 5 minutos** da faixa; preparação pode levar até dois minutos.
 4. O bot decodifica esse trecho em PCM, detecta ataques de energia no áudio e gera notas de quatro pistas. O mesmo PCM analisado é publicado na chamada: não é uma sequência aleatória gerada apenas a partir de um BPM. Trechos com menos de quinze segundos ou poucas batidas identificáveis são rejeitados; escolha outra música.
 5. Após a contagem, pressione **D, F, J, K**, ou toque nos quatro botões do celular. Ajuste a sincronia visual conforme o que você ouve. Todos recebem os mesmos tempos e pistas.
 6. Ao terminar a reprodução confirmada pelo bot, o servidor publica os resultados e entrega as Coins.
 
-O trecho é limitado a 8,64 MB de PCM em memória, sem arquivo ou cache persistente. A análise usa somente bibliotecas padrão do Python. URLs de mídia resolvidas, token LiveKit e segredo interno não vão para o navegador. O bot usa a publicação privada de áudio já existente.
+O trecho é limitado a 57,6 MB de PCM em memória (48 kHz, estéreo, 16 bits), sem arquivo ou cache persistente. Há uma única sessão de jogo no bot. Buffers de leitura são liberados antes da análise; em máquinas little-endian, a análise usa uma visão do PCM sem copiar as amostras. O limite do container permanece 512 MB. A detecção roda fora do event loop e gera até 1.200 notas distribuídas pelo trecho inteiro; o prazo da reserva acompanha a duração, com margem de 45 segundos. Músicas maiores usam apenas os primeiros cinco minutos; menores usam sua duração disponível. A análise usa somente bibliotecas padrão do Python. URLs de mídia resolvidas, token LiveKit e segredo interno não vão para o navegador. O bot usa a publicação privada de áudio já existente.
 
 ### Pontuação, latência e moedas
 
@@ -50,6 +50,12 @@ Durante a partida o bot rejeita novas músicas e controles de pausa/troca/parada
 Reserva, preparação, início e liberação usam o UUID da sala. Repetições não iniciam dois publicadores. Uma liberação de outra sessão não interrompe a atual, e liberar uma sessão vazia não afeta a música normal. A reserva tem prazo de segurança e é liberada após resultado/cancelamento, falha ou reinício. Se o worker reiniciar ou não concluir o áudio, a partida é cancelada sem premiação artificial.
 
 O backend verifica presença e conexão de voz antes e depois da preparação. Não é possível usar a identidade de voz de outra conta/sessão. Lobby expira sem presença por trinta segundos ou após dez minutos. A preparação expira em 150 segundos; o worker também limpa sua reserva por prazo próprio. Controles de cartas e sessões de música ficam persistidos e recuperáveis pela conta após recarga da página.
+
+## Visuais 3D
+
+**Vega**, dealer robô de smoking, acompanha a mesa; cartas recebem animações de distribuição e revelação em perspectiva. **Riff**, raposa robótica original com guitarra neon, toca no fundo de uma pista 3D de quatro trilhos inspirada nos jogos de guitarra. Notas e alvos seguem os mesmos tempos usados no julgamento do servidor. O placar, as teclas e os botões por toque permanecem em HTML acessível.
+
+Personagens são modelados por geometria no Three.js já usado pela roleta; não há download de modelos, imagens ou texturas externas. A cena carrega sob demanda, limita resolução, pausa desenho fora da tela/aba e libera recursos ao sair. Redução de movimento desliga os movimentos decorativos; notas mantêm o deslocamento necessário ao jogo. Sem WebGL, o ritmo mantém a pista HTML e os controles, com aviso de visual indisponível.
 
 ## Implementação e operação
 

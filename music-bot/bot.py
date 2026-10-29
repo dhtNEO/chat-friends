@@ -19,6 +19,8 @@ from aiohttp import web
 IDENTITY = "music-bot"
 MAX_SECONDS = 20 * 60
 MAX_QUEUE = 30
+RHYTHM_SECONDS = 5 * 60
+RHYTHM_MAX_NOTES = 1200
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 YTDLP = ["yt-dlp", "--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist",
          "--no-warnings", "--socket-timeout", "15", "--retries", "1",
@@ -373,21 +375,22 @@ class Player:
                         stdout=write_fd, stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
                     decoder = await asyncio.create_subprocess_exec(
                         "ffmpeg", "-nostdin", "-loglevel", "error", "-protocol_whitelist", "pipe",
-                        "-i", "pipe:0", "-t", "45", "-vn", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+                        "-i", "pipe:0", "-t", str(RHYTHM_SECONDS), "-vn", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
                         stdin=read_fd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
                     os.close(read_fd); read_fd = None
                     os.close(write_fd); write_fd = None
                     chunks = []
                     count = 0
-                    maximum = 45 * 48000 * 2 * 2
+                    maximum = RHYTHM_SECONDS * 48000 * 2 * 2
                     while count < maximum:
                         chunk = await decoder.stdout.read(min(65536, maximum-count))
                         if not chunk:
                             break
                         chunks.append(chunk); count += len(chunk)
                     pcm = b"".join(chunks)
+                    chunks.clear()  # Do not retain a second full PCM buffer during analysis.
                     pcm = pcm[:len(pcm)//3840*3840]
-                    notes = detect_notes(pcm)
+                    notes = await asyncio.to_thread(detect_notes, pcm)
                     if len(pcm) < 15*192000 or len(notes) < 8:
                         raise ValueError("Não foi possível identificar batidas suficientes. Escolha outra música.")
             if self.rhythm_id != session:
@@ -419,7 +422,7 @@ class Player:
                 raise ValueError("Horário de início inválido.")
             self.rhythm_starts = starts
             self.rhythm_phase = "scheduled"
-            self.rhythm_expires = time.monotonic()+90
+            self.rhythm_expires = time.monotonic() + self.rhythm_data["durationMs"] / 1000 + 45
             self.rhythm_task = asyncio.create_task(self.play_rhythm(session, starts))
             return self.snapshot()
 
@@ -468,8 +471,10 @@ class Player:
 
 def detect_notes(pcm):
     """Transient-energy onset detection on the exact PCM later published by the bot."""
-    samples = array.array("h"); samples.frombytes(pcm)
-    if sys.byteorder != "little":
+    if sys.byteorder == "little":
+        samples = memoryview(pcm).cast("h")
+    else:
+        samples = array.array("h"); samples.frombytes(pcm)
         samples.byteswap()
     energies = []
     for pos in range(0, len(samples)-1919, 1920):
@@ -483,7 +488,7 @@ def detect_notes(pcm):
             at = i*20
             if not notes or at-notes[-1]["at"] >= 260:
                 notes.append({"at": at, "lane": [0, 2, 1, 3, 0, 1, 2, 3][len(notes)%8]})
-    return notes[:160]
+    return notes[:RHYTHM_MAX_NOTES]
 
 
 def create_app(secret, player=None):
