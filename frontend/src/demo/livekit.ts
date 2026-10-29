@@ -177,14 +177,14 @@ export class Room {
         if (announce) this.emit(RoomEvent.ParticipantConnected, p);
       }
       const screen = p.getTrackPublication(Track.Source.ScreenShare);
-      if (world.lease === identity && !screen) {
+      if (world.leases.includes(identity) && !screen) {
         const video = new DemoTrack("video", gameFeed().getVideoTracks()[0]);
         p.trackPublications.set(video.sid, {
           source: Track.Source.ScreenShare,
           track: video,
         });
         this.emit(RoomEvent.TrackSubscribed);
-      } else if (world.lease !== identity && screen?.track) {
+      } else if (!world.leases.includes(identity) && screen?.track) {
         p.trackPublications.delete(screen.track.sid);
         this.emit(RoomEvent.TrackUnsubscribed);
       }

@@ -16,7 +16,7 @@ Os testes da organização pessoal usam o modo demo, sem iniciar backend, banco 
 ROOM_LAYOUT_DEMO_TEST=1 MUSIC_DEMO_TEST=1 APP_TEST_URL=http://localhost:5173 npx playwright test tests/room-layout.spec.ts tests/music.spec.ts tests/detached-media.spec.ts
 ```
 
-É necessário ter o Chromium do Playwright instalado; `CHROMIUM_PATH` permite usar um executável já disponível. A suíte de layout exercita arraste, redimensionamento, teclado/toque, persistência e adaptação a telas pequenas. A transmissão do demo é um canvas local: manter o mesmo vídeo e `srcObject` durante a reorganização verifica a continuidade do player, mas não substitui um teste de chamada real entre dispositivos. Ao terminar, encerre o servidor demo com Ctrl+C.
+É necessário ter o Chromium do Playwright instalado; `CHROMIUM_PATH` permite usar um executável já disponível. A suíte de layout exercita arraste, redimensionamento, teclado/toque, persistência e adaptação a telas pequenas. As transmissões do demo usam canvas local: manter o mesmo vídeo e `srcObject` durante a reorganização verifica a continuidade do player, mas não substitui um teste de chamada real entre dispositivos. Ao terminar, encerre o servidor demo com Ctrl+C.
 
 `detached-media.spec.ts` exercita painéis independentes e janelas do navegador para transmissão e música, Shift + arraste e redimensionamento pelo mouse de painéis flutuantes, retorno ao fechar, logout com as duas janelas abertas, bloqueio de pop-up e uso em 320/390/1024/1280 px. A identidade do vídeo e do stream, avanço do player, estado da busca/fila e volume pessoal precisam sobreviver aos movimentos sem sair da chamada ou duplicar os elementos de áudio. Ao separar, o bloco da mídia não pode reservar altura, largura ou um cartão de retorno na sala; Pessoas continua visível mesmo se o bloco separado estava focado. Voltar ou fechar restaura a organização salva.
 
@@ -64,3 +64,7 @@ Regressão de layout durante a transmissão: verificar 320×568, 390×844 e 768�
 Para atualizar a instalação com privilégios separados, MFA e recuperação, siga [o procedimento de segurança](SECURITY_UPGRADE.md) antes do próximo deploy. Preserve `generated/runtime.env` e a chave MFA junto ao backup criptografado.
 
 O job de stack fixa Ubuntu 24.04 e usa o Google Chrome fornecido pelo runner via `CHROMIUM_PATH`, com as mesmas fontes sintéticas e assertivas completas. Isso evita uma segunda instalação de Chromium/dependências no host. Não desativa TLS, CSP nem testes de áudio/tela. A versão efetiva do Chrome é registrada pelo job.
+
+## Três transmissões simultâneas
+
+Com `npm run demo` ativo, execute `STREAMS_DEMO_TEST=1 APP_TEST_URL=http://localhost:5173 npx playwright test tests/streams.spec.ts`. Verifica seleção, terceira transmissão local, parada independente e encerramento administrativo em desktop e celular. A suíte Java usa PostgreSQL descartável para verificar quatro reservas concorrentes (três aceitas), idempotência, heartbeat, expiração, revogação antes de conceder, falha fechada, isolamento/autorização e migração V13 preservando a reserva existente. O canvas e os mocks administrativos não comprovam três streams WebRTC reais nem capacidade da rede.

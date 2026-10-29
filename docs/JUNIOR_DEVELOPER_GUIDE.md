@@ -517,7 +517,7 @@ erDiagram
 
 No diagrama, `PK` é chave primária, `FK` é chave estrangeira e `UK` indica unicidade. Os símbolos representam relações como uma conta para várias mensagens. Colunas secundárias foram omitidas para facilitar a leitura.
 
-Há também `rate_limits`, para limites persistentes de negócio, e `screen_lease`, com uma linha que representa a reserva da única transmissão autorizada. O Flyway mantém `flyway_schema_history` para registrar migrações.
+Há também `rate_limits`, para limites persistentes de negócio, e `screen_lease`, com três vagas fixas que representam as reservas de até três transmissões simultâneas autorizadas. O Flyway mantém `flyway_schema_history` para registrar migrações.
 
 `media_connections.session_id` é uma associação lógica conferida pelo código; não há uma FK correspondente desenhada para sessões. O identificador público de gerenciamento de uma sessão também é diferente do valor secreto do cookie.
 
@@ -652,21 +652,21 @@ Para investigar uma chamada, observe conexão, protocolo escolhido, bytes enviad
 
 O teste nativo de ICE envia STUN com autenticação e valida a resposta, inclusive integridade, nas duas portas. Uma sonda UDP precisa tolerar perda com retransmissão; ela não pode considerar qualquer pacote como sucesso. O teste também aguarda a conexão de mídia estar estabelecida antes de usar suas credenciais.
 
-### 9.3. Como só uma pessoa recebe autorização de tela
+### 9.3. Como até três conexões recebem autorização de tela
 
-A aplicação possui uma lease com identidade, UUID e expiração de 30 segundos. Ela é renovada por heartbeat. A reserva no banco e a mudança de permissão na SFU são coordenadas, mas não constituem uma transação distribuída única.
+A aplicação possui até três leases simultâneas, uma por conexão, cada uma com identidade, UUID e expiração de 30 segundos. Ela é renovada por heartbeat. A reserva no banco e a mudança de permissão na SFU são coordenadas, mas não constituem uma transação distribuída única.
 
 ```mermaid
 flowchart TD
     A["Pessoa clica em Compartilhar"] --> B["Navegador pede a fonte e cria tracks locais"]
     B --> C["POST /api/media/screen"]
     C --> D["Validar conexão/sessão e obter lock 2"]
-    D --> E{"Existe reserva ativa de outra pessoa?"}
-    E -->|"Sim"| F["Recusar com conflito e parar a captura local"]
-    E -->|"Não"| G["Reconciliar estado e revogar permissão anterior"]
+    D --> G["Reconciliar estado e revogar permissões expiradas"]
     G --> H{"Revogação foi confirmada?"}
     H -->|"Não"| I["Falhar fechado; não conceder outra tela"]
-    H -->|"Sim"| J["Conceder fontes de tela e salvar lease"]
+    H -->|"Sim"| E{"As três vagas estão ocupadas?"}
+    E -->|"Sim"| F["Recusar com conflito e parar a captura local"]
+    E -->|"Não"| J["Conceder fontes de tela e salvar lease"]
     J --> K["Cliente aguarda permissão e publica as tracks"]
     K --> L["Renovar enquanto a transmissão continua"]
     L --> M["Parar, perder sessão ou expirar"]
@@ -677,7 +677,7 @@ A captura é iniciada diretamente pelo gesto da pessoa, antes do pedido de rede,
 
 O reconciliador roda nominalmente a cada 3 segundos. Webhooks assinados também acionam verificação. Um webhook fora de ordem não é aplicado cegamente; o backend consulta o estado atual da SFU.
 
-Revogar antes de conceder reduz o risco de duas pessoas receberem autorização. Ainda existe uma limitação: um cliente modificado que já tem a lease pode tentar publicar mais de uma track da mesma fonte. O reconciliador remove a conexão ao detectar o excesso, mas isso não garante zero sobreposição instantânea. Veja [SECURITY](SECURITY.md).
+Revogar antes de conceder preserva o limite de três reservas autorizadas. Ainda existe uma limitação: um cliente modificado que já tem a lease pode tentar publicar mais de uma track da mesma fonte. O reconciliador remove a conexão ao detectar o excesso, mas isso não garante zero sobreposição instantânea. Veja [SECURITY](SECURITY.md).
 
 ### 9.4. Heartbeats e desaparecimento de participantes
 

@@ -2374,3 +2374,27 @@ kbd {
     display: none;
   }
 }
+.stream-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+}
+.stream-selector button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.stream-selector button[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.stream-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.stream-stage > .stage-main {
+  flex: 1;
+  min-height: 0;
+}

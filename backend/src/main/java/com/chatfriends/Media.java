@@ -52,17 +52,16 @@ public class Media {
 
   public record Lease(String identity, UUID leaseId, Instant expiresAt) {}
 
-  Lease lease() {
+  List<Lease> leases() {
     return db.query(
-            "select * from screen_lease where id=1",
-            (r, n) ->
-                new Lease(
-                    r.getString("identity"),
-                    r.getObject("lease_id", UUID.class),
-                    r.getTimestamp("expires_at") == null
-                        ? null
-                        : r.getTimestamp("expires_at").toInstant()))
-        .getFirst();
+        "select * from screen_lease where identity is not null order by id",
+        (r, n) ->
+            new Lease(
+                r.getString("identity"),
+                r.getObject("lease_id", UUID.class),
+                r.getTimestamp("expires_at") == null
+                    ? null
+                    : r.getTimestamp("expires_at").toInstant()));
   }
 
   void lock() {
@@ -178,9 +177,9 @@ public class Media {
             s -> {
               lock();
               reconcileLocked();
-              return Map.of(
-                  "lease",
-                  lease(),
+              return Map.<String, Object>of(
+                  "leases",
+                  leases(),
                   "participants",
                   live.participants().stream()
                       .filter(p -> validConnection(p.getIdentity()))
@@ -218,23 +217,27 @@ public class Media {
         s -> {
           lock();
           reconcileLocked();
-          var l = lease();
-          if (l.identity() != null) {
-            if (l.identity().equals(b.identity())) return l;
-            throw new ResponseStatusException(CONFLICT, "Outra pessoa está compartilhando");
-          }
+          var current = leases();
+          for (var l : current) if (l.identity().equals(b.identity())) return l;
+          if (current.size() >= 3)
+            throw new ResponseStatusException(
+                CONFLICT, "Sala cheia: máximo de 3 transmissões simultâneas");
           if (!validConnection(b.identity())
               || live.participants().stream().noneMatch(x -> x.getIdentity().equals(b.identity())))
             throw new ResponseStatusException(CONFLICT, "Entre na voz primeiro");
           UUID id = UUID.randomUUID();
           db.update(
               "update screen_lease set identity=?,lease_id=?,expires_at=now()+interval '30 seconds'"
-                  + " where id=1",
+                  + " where id=(select id from screen_lease where identity is null order by id"
+                  + " limit 1)",
               b.identity(),
               id);
           // External grant occurs inside the lock; crash after grant is repaired by reconciliation.
           live.permission(b.identity(), true);
-          return lease();
+          return leases().stream()
+              .filter(l -> l.identity().equals(b.identity()))
+              .findFirst()
+              .orElseThrow();
         });
   }
 
@@ -248,7 +251,7 @@ public class Media {
           lock();
           reconcileLocked();
           if (db.update(
-                  "update screen_lease set expires_at=now()+interval '30 seconds' where id=1 and"
+                  "update screen_lease set expires_at=now()+interval '30 seconds' where"
                       + " identity=? and lease_id=? and expires_at>now()",
                   b.identity(),
                   b.leaseId())
@@ -263,20 +266,22 @@ public class Media {
     tx.executeWithoutResult(
         s -> {
           lock();
-          var l = lease();
-          if (Objects.equals(l.identity(), b.identity())
-              && Objects.equals(l.leaseId(), b.leaseId())) clear(l);
+          for (var l : leases())
+            if (Objects.equals(l.identity(), b.identity())
+                && Objects.equals(l.leaseId(), b.leaseId())) clear(l);
         });
   }
 
   @PostMapping("/screen/force-stop")
-  public void force(Principal p) {
+  public void force(Principal p, @RequestBody Renew b) {
     invalidateState();
     if (!accounts.active(p.getName()).admin()) throw new ResponseStatusException(FORBIDDEN);
     tx.executeWithoutResult(
         s -> {
           lock();
-          clear(lease());
+          for (var l : leases())
+            if (Objects.equals(l.identity(), b.identity())
+                && Objects.equals(l.leaseId(), b.leaseId())) clear(l);
         });
   }
 
@@ -284,7 +289,11 @@ public class Media {
     if (l.identity() != null
         && live.participants().stream().anyMatch(p -> p.getIdentity().equals(l.identity())))
       live.permission(l.identity(), false);
-    db.update("update screen_lease set identity=null,lease_id=null,expires_at=null where id=1");
+    db.update(
+        "update screen_lease set identity=null,lease_id=null,expires_at=null where identity=? and"
+            + " lease_id=?",
+        l.identity(),
+        l.leaseId());
   }
 
   void reconcileLocked() {
@@ -299,15 +308,13 @@ public class Media {
     for (String id : joined)
       if (!identities.contains(id))
         db.update("update media_connections set expires_at=now() where identity=?", id);
-    var l = lease();
-    String initialOwner = l.identity();
-    if (l.identity() != null
-        && (l.expiresAt().isBefore(Instant.now())
-            || !validConnection(l.identity())
-            || participants.stream().noneMatch(p -> p.getIdentity().equals(initialOwner)))) {
-      clear(l);
-      l = lease();
+    for (var l : leases()) {
+      if (l.expiresAt().isBefore(Instant.now())
+          || !validConnection(l.identity())
+          || !identities.contains(l.identity())) clear(l);
     }
+    var owners = new HashMap<String, Lease>();
+    for (var l : leases()) owners.put(l.identity(), l);
     for (var p : participants) {
       // Only the private worker receives this identity's token. Public admission still rejects it.
       if (Music.IDENTITY.equals(p.getIdentity())) {
@@ -326,7 +333,7 @@ public class Media {
         live.remove(p.getIdentity());
         continue;
       }
-      boolean owner = Objects.equals(l.identity(), p.getIdentity());
+      boolean owner = owners.containsKey(p.getIdentity());
       long screens =
           p.getTracksList().stream().filter(t -> t.getSource() == TrackSource.SCREEN_SHARE).count();
       boolean elevated =
@@ -341,7 +348,7 @@ public class Media {
         db.update(
             "update media_connections set expires_at=now() where identity=?", p.getIdentity());
         live.remove(p.getIdentity());
-        if (owner) clear(l);
+        if (owner) clear(owners.get(p.getIdentity()));
         continue;
       }
       if (elevated && !owner) live.permission(p.getIdentity(), false);

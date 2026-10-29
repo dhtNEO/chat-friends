@@ -154,7 +154,7 @@ export function Voice({
     [focus, setFocus] = useState<string | null>(null),
     [adjusting, setAdjusting] = useState<string | null>(null);
   const [state, setState] = useState<{
-    lease: Lease;
+    leases: Lease[];
     participants: {
       identity: string;
       name: string;
@@ -162,7 +162,7 @@ export function Voice({
       deaf: boolean;
     }[];
   }>({
-    lease: { identity: null, leaseId: null, expiresAt: null },
+    leases: [],
     participants: [],
   });
   useEffect(() => {
@@ -666,7 +666,8 @@ export function Voice({
   const self = connection.current?.identity;
   const live = tracks.filter(
     (t) =>
-      t.identity === state.lease.identity || (t.identity === self && sharing),
+      state.leases.some((l) => l.identity === t.identity) ||
+      (t.identity === self && sharing),
   );
   const streaming = live.length > 0;
   const notifyStreaming = useRef(onStreaming);
@@ -740,7 +741,7 @@ export function Voice({
     identity === self
       ? sharing
       : live.some((t) => t.identity === identity) ||
-        state.lease.identity === identity;
+        state.leases.some((l) => l.identity === identity);
   const personVolume = (identity: string) =>
     settings.people[identity.split(":")[0]] ?? 100;
   useEffect(() => {
@@ -775,36 +776,55 @@ export function Voice({
   const fullHd = (connection.current?.screen.height ?? 1080) >= 1080,
     sixty = (connection.current?.screen.fps ?? 60) >= 60;
   const screenContent = (
-    <div className="stage-main">
-      {featured ? (
-        <Screen
-          key={featured.track.sid || "local"}
-          track={featured.track}
-          name={account(featured.identity)?.displayName ?? featured.name}
-          avatar={avatarSrc(account(featured.identity))}
-          local={featured.identity === self}
-          viewers={Math.max(people.length - 1, 0)}
-          volume={settings.stream}
-          expanded={hosts.stream ? streamMaximized : maximized}
-          onExpand={onMaximizeStream}
-          onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
-          onError={onError}
-        />
-      ) : (
-        <div className="stage-empty">
-          <span className="stage-empty-icon">
-            <Icon name="screen" size={34} />
-          </span>
-          <h3>Ninguém está transmitindo</h3>
-          <p>
-            {joined
-              ? "Compartilhe sua tela para todo mundo assistir junto."
-              : people.length
-                ? "Tem gente na sala. Entre e puxe uma cadeira."
-                : "A sala está tranquila. Seja o primeiro a entrar."}
-          </p>
+    <div className="stream-stage">
+      {live.length > 1 && (
+        <div
+          className="stream-selector"
+          role="group"
+          aria-label="Escolher transmissão"
+        >
+          {live.map((t) => (
+            <button
+              key={t.identity}
+              aria-pressed={featured?.identity === t.identity}
+              onClick={() => setFocus(t.identity)}
+            >
+              Tela de {account(t.identity)?.displayName ?? t.name}
+            </button>
+          ))}
         </div>
       )}
+      <div className="stage-main">
+        {featured ? (
+          <Screen
+            key={featured.track.sid || "local"}
+            track={featured.track}
+            name={account(featured.identity)?.displayName ?? featured.name}
+            avatar={avatarSrc(account(featured.identity))}
+            local={featured.identity === self}
+            viewers={Math.max(people.length - 1, 0)}
+            volume={settings.stream}
+            expanded={hosts.stream ? streamMaximized : maximized}
+            onExpand={onMaximizeStream}
+            onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
+            onError={onError}
+          />
+        ) : (
+          <div className="stage-empty">
+            <span className="stage-empty-icon">
+              <Icon name="screen" size={34} />
+            </span>
+            <h3>Ninguém está transmitindo</h3>
+            <p>
+              {joined
+                ? "Compartilhe sua tela para todo mundo assistir junto."
+                : people.length
+                  ? "Tem gente na sala. Entre e puxe uma cadeira."
+                  : "A sala está tranquila. Seja o primeiro a entrar."}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
   const peopleContent =
@@ -1152,17 +1172,23 @@ export function Voice({
                 </small>
               </Popover>
             </div>
-            {admin && state.lease.identity && (
+            {admin && state.leases.length > 0 && (
               <Popover label="Mais opções" icon="more" className="solo">
-                <button
-                  onClick={() =>
-                    void api("/media/screen/force-stop", "POST").catch((e) =>
-                      onError(mediaError(e)),
-                    )
-                  }
-                >
-                  Encerrar transmissão travada
-                </button>
+                {state.leases.map((l) => (
+                  <button
+                    key={l.leaseId}
+                    onClick={() =>
+                      void api("/media/screen/force-stop", "POST", {
+                        identity: l.identity,
+                        leaseId: l.leaseId,
+                      }).catch((e) => onError(mediaError(e)))
+                    }
+                  >
+                    Encerrar transmissão de{" "}
+                    {people.find((p) => p.identity === l.identity)?.name ??
+                      "Amigo"}
+                  </button>
+                ))}
               </Popover>
             )}
             <button
@@ -1274,9 +1300,11 @@ export function Voice({
           identity={identity}
           source={source}
           volume={
-            deaf &&
-            source !== Track.Source.ScreenShareAudio &&
-            identity !== MUSIC_IDENTITY
+            (deaf &&
+              source !== Track.Source.ScreenShareAudio &&
+              identity !== MUSIC_IDENTITY) ||
+            (source === Track.Source.ScreenShareAudio &&
+              identity !== featured?.identity)
               ? 0
               : ((settings.output / 100) *
                   (source === Track.Source.ScreenShareAudio

@@ -1,6 +1,6 @@
 # Entre amigos
 
-Espaço privado para até 16 conexões: chat persistente, uma sala de voz e uma tela compartilhada. Interface em português. Sem cadastro público, anúncios, IA, gravação ou serviços pagos obrigatórios.
+Espaço privado para até 16 conexões: chat persistente, uma sala de voz e até 3 telas compartilhadas simultaneamente. Interface em português. Sem cadastro público, anúncios, IA, gravação ou serviços pagos obrigatórios.
 
 **Dois modos: dev (local) e prd (internet).** O proprietário confirmou o funcionamento em produção no Mac com DuckDNS. Leia [STATUS](docs/STATUS.md) para evidências e limites; capacidade para 16 pessoas precisa de medição.
 
@@ -17,7 +17,7 @@ Espaço privado para até 16 conexões: chat persistente, uma sala de voz e uma 
 
 ## Modo demo (sem conexão real)
 
-Para mexer na interface sem Docker, backend ou LiveKit: `cd frontend && npm ci && npm run demo` e abra http://localhost:5173. Qualquer usuário/senha entra. Amigos simulados conversam, falam na call, entram e saem (para ouvir os efeitos sonoros) e um deles transmite uma tela animada; "Encerrar transmissão travada" (botão ⋯) libera a tela para você testar o compartilhamento com sua tela real, que fica só no seu navegador. Mudanças no código aparecem na hora. Sem Node no host: `docker run --rm -it -p 127.0.0.1:5173:5173 -e npm_config_cache=/tmp/npm-cache -v "$PWD/frontend:/src" -w /src -u "$(id -u):$(id -g)" node:24.22.1-alpine sh -c "npm ci && npm run demo"`. A simulação fica em `frontend/src/demo/` e não entra no build de produção.
+Para mexer na interface sem Docker, backend ou LiveKit: `cd frontend && npm ci && npm run demo` e abra http://localhost:5173. Qualquer usuário/senha entra. Amigos simulados conversam, falam na call, entram e saem (para ouvir os efeitos sonoros) e dois deles transmitem telas animadas; há uma terceira vaga para você testar o compartilhamento com sua tela real, que fica só no seu navegador. Mudanças no código aparecem na hora. Sem Node no host: `docker run --rm -it -p 127.0.0.1:5173:5173 -e npm_config_cache=/tmp/npm-cache -v "$PWD/frontend:/src" -w /src -u "$(id -u):$(id -g)" node:24.22.1-alpine sh -c "npm ci && npm run demo"`. A simulação fica em `frontend/src/demo/` e não entra no build de produção.
 
 ## Início rápido no Mac ou Linux
 

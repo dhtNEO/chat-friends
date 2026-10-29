@@ -68,9 +68,9 @@ sequenceDiagram
  U->>L: Conectar via proxy com JWT restrito
  U->>U: Pedir captura de tela na ação do usuário
  U->>B: POST /media/screen
- B->>P: BEGIN + advisory lock 2; reconciliar lease
- B->>L: Revogar transmissor anterior antes de conceder nova fonte
- B->>P: Reservar UUID / expiração 30 s
+ B->>P: BEGIN + advisory lock 2; reconciliar leases
+ B->>L: Revogar reservas inválidas antes de reutilizar vagas
+ B->>P: Reservar vaga livre (máximo 3), UUID / expiração 30 s
  B->>L: Habilitar screen_share e screen_share_audio
  B->>P: COMMIT
  B-->>U: Lease
@@ -83,9 +83,9 @@ sequenceDiagram
 
 Reconciliação a cada 3 s, também acionada por webhook assinado. Eventos duplicados/fora de ordem são gatilhos: consultamos estado atual na SFU, não reaplicamos cegamente eventos antigos. Se LiveKit não responde, novas reservas falham com 503. Lease persistente permite recuperar reinício. Conexões precisam heartbeat em 45 s e sessão válida. Página precisa ping WebSocket; é removida da presença em até 45 s, com verificação a cada 10 s.
 
-Não há transação distribuída PostgreSQL/LiveKit. Concessão externa seguida de falha de commit pode deixar permissão órfã por alguns segundos; reconciliador a remove. JWTs renovados pela SFU podem carregar permissões elevadas; a admissão de sinalização os substitui por grants só de microfone. [SECURITY](SECURITY.md) registra as fronteiras desse controle. Não confundir uma única lease autorizada com garantia adversarial de uma única track em cada instante.
+Não há transação distribuída PostgreSQL/LiveKit. Concessão externa seguida de falha de commit pode deixar permissão órfã por alguns segundos; reconciliador a remove. JWTs renovados pela SFU podem carregar permissões elevadas; a admissão de sinalização os substitui por grants só de microfone. [SECURITY](SECURITY.md) registra as fronteiras desse controle. Não confundir o limite de três leases autorizadas com garantia adversarial de três tracks em cada instante.
 
-Modelo: accounts → messages; accounts → media_connections → session_id; screen_lease tem uma linha. Sessões JDBC persistem no PostgreSQL. Senhas não são recuperáveis. Backup inclui contas, histórico, esquema; restauração apaga sessões/conexões/leases por segurança.
+Modelo: accounts → messages; accounts → media_connections → session_id; screen_lease tem três vagas fixas e identidade única entre as vagas ocupadas. Sessões JDBC persistem no PostgreSQL. Senhas não são recuperáveis. Backup inclui contas, histórico, esquema; restauração apaga sessões/conexões/leases por segurança.
 
 ## Separação operacional
 
