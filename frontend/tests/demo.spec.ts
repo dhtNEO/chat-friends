@@ -50,7 +50,9 @@ test("demo abre a nova interface e indica que MFA exige aplicação conectada", 
   await page
     .getByRole("button", { name: "Configurações", exact: true })
     .click();
-  await page.getByRole("tab", { name: "Segurança", exact: true }).click();
+  await expect(
+    page.getByRole("tab", { name: "Conta", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByRole("heading", { name: "Segurança", exact: true }),
   ).toBeVisible();

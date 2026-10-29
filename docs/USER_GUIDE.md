@@ -31,7 +31,7 @@ Capturas históricas do Chromium Linux, anteriores aos novos controles de áudio
 
 ## Ajustes de outubro de 2026
 
-- **Configurações** (avatar na barra de ícones) agora tem abas: Perfil, Voz e áudio, Atalhos, Aparência, Sons e Segurança. Em **Voz e áudio** ficam microfone, supressão de ruído, volumes e o **volume de cada pessoa** (também pelo ícone de volume no cartão da pessoa, na sala).
+- **Configurações** (avatar na barra de ícones) tem abas: Conta, Voz e áudio, Atalhos, Aparência e Sons. **Conta** reúne perfil, senha e a seção Segurança, com autenticador e sessões abertas. Em **Voz e áudio** ficam microfone, supressão de ruído, volumes e o **volume de cada pessoa** (também pelo ícone de volume no cartão da pessoa, na sala).
 - **Supressão de ruído forte** (padrão): RNNoise roda no seu navegador para reduzir ruído de fundo, sem enviar o áudio a um serviço de filtragem. O resultado precisa ser testado com seu microfone e ambiente. A opção **Leve** usa o filtro do próprio navegador.
 - **Silenciar a chamada também desliga o microfone**; ao voltar a ouvir, o microfone volta como estava. Transmissão e música mantêm seus próprios controles e continuam audíveis. Ligar o microfone enquanto silenciado volta a ouvir a chamada.
 - Cartões e lista da sala mostram em vermelho quem está com o **mic desligado** e com o **áudio silenciado**; o anel verde de quem fala é medido no seu navegador e responde na hora.

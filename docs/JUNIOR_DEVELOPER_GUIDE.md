@@ -429,7 +429,7 @@ MFA adiciona uma prova além da senha. O TOTP é um código de seis dígitos que
 3. O servidor ativa MFA e mostra oito códigos de recuperação de uso único.
 4. Nos logins seguintes, a senha é seguida de um código TOTP ou de recuperação.
 
-Administradores precisam concluir a inscrição em prd; usuários comuns podem ativá-la em **Configurações → Minha conta → Segurança**. Enquanto houver etapa obrigatória pendente, chat, administração, eventos e mídia permanecem bloqueados.
+Administradores precisam concluir a inscrição em prd; usuários comuns podem ativá-la na seção **Segurança**, em **Configurações → Conta**. Enquanto houver etapa obrigatória pendente, chat, administração, eventos e mídia permanecem bloqueados.
 
 A inatividade da sessão tem limite de **2 horas**; o prazo absoluto é de **8 horas**, mesmo com uso contínuo. Depois de **15 minutos** sem confirmação recente, operações administrativas, alteração da própria senha e encerramento forçado de tela podem exigir reautenticação. A resposta é HTTP `428`; a pessoa confirma sua identidade e repete a ação.
 

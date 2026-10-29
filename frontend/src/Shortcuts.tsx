@@ -170,13 +170,27 @@ export function useKeyboardShortcuts() {
       held = null;
       void getVoice()?.pushToTalk(false);
     };
+    // The outcome of the last key press, readable in tests and devtools.
+    const note = (outcome: string) =>
+      (document.documentElement.dataset.shortcut = outcome);
     const down = (e: KeyboardEvent) => {
-      if (!config?.enabled || recording || e.isComposing) return;
-      if (editable(e.target) && !config.allowWhileTyping) return;
+      if (MODIFIER.test(e.code)) return;
+      if (!config?.enabled) return note(config ? "disabled" : "not-loaded");
+      if (recording || e.isComposing) return note("recording");
+      if (editable(e.target) && !config.allowWhileTyping) return note("typing");
       const pressed = id(fromEvent(e));
       const binding = config.bindings.find((b) => id(b) === pressed);
       const voice = getVoice();
-      if (!binding || !voice?.joined) return;
+      if (!binding)
+        return note(
+          "no-binding " +
+            pressed +
+            " in [" +
+            config.bindings.map((b) => id(b)).join(",") +
+            "]",
+        );
+      if (!voice?.joined) return note("not-in-voice");
+      note(binding.action);
       e.preventDefault();
       if (binding.action === "pushToTalk") {
         if (held) return;
