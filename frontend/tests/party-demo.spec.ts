@@ -232,3 +232,81 @@ test("mesas e controles dos novos jogos cabem no celular", async ({ page }) => {
       .evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
   ).toBe(true);
 });
+
+test("Beat Club salva teclas, aplica dificuldade, anima julgamentos e encerra", async ({
+  page,
+}) => {
+  await enter(page);
+  const first = page.getByLabel("Tecla da pista 1", { exact: true });
+  await first.press("a");
+  await expect(first).toHaveValue("A");
+  await page.getByLabel("Tecla da pista 2", { exact: true }).press("a");
+  await expect(
+    page.getByLabel("Tecla da pista 2", { exact: true }),
+  ).toHaveValue("F");
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("beat-club-keys")!),
+    ),
+  ).toEqual(["A", "F", "J", "K"]);
+  await page.getByLabel("Dificuldade", { exact: true }).selectOption("easy");
+  await page
+    .getByRole("button", { name: "Abrir sala de voz", exact: false })
+    .click();
+  await page
+    .getByRole("button", { name: "Entrar na voz", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Jogos", exact: true }).click();
+  await page
+    .getByLabel("Música para o jogo de ritmo", { exact: true })
+    .fill("Teste");
+  await page
+    .getByRole("button", { name: "Buscar música", exact: true })
+    .click();
+  await page
+    .getByRole("region", { name: "Músicas para jogar" })
+    .getByRole("button")
+    .first()
+    .click();
+  await page
+    .getByRole("button", { name: "Criar sala de ritmo", exact: false })
+    .click();
+  const room = page.getByRole("region", { name: "Sala de Ritmo" });
+  await expect(room.locator(".beat-track-title")).toContainText("Fácil");
+  await room
+    .getByRole("button", { name: "Estou pronto!", exact: true })
+    .click();
+  await room
+    .getByRole("button", { name: "Preparar música e começar", exact: false })
+    .click();
+  await expect(first).toBeDisabled();
+  const state = await page.evaluate(() =>
+    fetch("/api/party").then((r) => r.json()),
+  );
+  expect(state.room.notes).toHaveLength(12);
+  await page.waitForTimeout(
+    Math.max(
+      0,
+      state.room.startsAt + state.room.notes[0].at + 150 - Date.now(),
+    ),
+  );
+  await page.keyboard.press("a");
+  await expect(room.locator(".beat-judgment.hit")).toBeVisible();
+  await page.keyboard.press("k");
+  await expect(room.locator(".beat-judgment.miss")).toContainText(
+    "FORA DO TEMPO",
+  );
+  await room
+    .getByRole("button", { name: "Encerrar jogo para todos", exact: true })
+    .click();
+  await expect(
+    room.getByText("Jogo encerrado antes do fim.", { exact: false }),
+  ).toBeVisible();
+  await expect(room.locator(".beat-game")).toHaveCount(0);
+  await expect(first).toBeEnabled();
+  const final = await page.evaluate(() =>
+    fetch("/api/party").then((r) => r.json()),
+  );
+  expect(final.room.status).toBe("cancelled");
+  expect(final.room.players[0].reward).toBe(0);
+});

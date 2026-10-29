@@ -2,14 +2,14 @@ package com.chatfriends;
 
 import static org.springframework.http.HttpStatus.*;
 
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 import java.security.SecureRandom;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class PartyGames {
@@ -89,7 +89,13 @@ public class PartyGames {
   }
 
   public UUID create(String name, UUID clientId, String kind, String videoId) {
+    return create(name, clientId, kind, videoId, "normal");
+  }
+
+  public UUID create(String name, UUID clientId, String kind, String videoId, String difficulty) {
     UUID u = user(name);
+    String level = difficulty == null ? "normal" : difficulty;
+    require(Set.of("easy", "normal", "hard").contains(level), "Dificuldade inválida.");
     require(Set.of("blackjack", "rhythm").contains(kind), "Jogo inválido.");
     if (kind.equals("rhythm"))
       require(
@@ -123,7 +129,10 @@ public class PartyGames {
               clientId,
               kind,
               now(),
-              encode(kind.equals("rhythm") ? Map.of("videoId", videoId) : Map.of()));
+              encode(
+                  kind.equals("rhythm")
+                      ? Map.of("videoId", videoId, "difficulty", level)
+                      : Map.of()));
           db.update(
               "insert into party_players(room_id,account_id,joined_at,seen_at,ready)"
                   + " values(?,?,?,?,?)",
@@ -210,6 +219,7 @@ public class PartyGames {
         !r.get("status").equals("finished") && dealer.size() > 1 ? dealer.subList(0, 1) : dealer);
     out.put("dealerHidden", !r.get("status").equals("finished") && dealer.size() > 1);
     out.put("dealerTotal", r.get("status").equals("finished") ? total(dealer) : 0);
+    out.put("difficulty", state.getOrDefault("difficulty", "normal"));
     out.put("notes", state.getOrDefault("notes", List.of()));
     out.put("title", state.getOrDefault("title", "Música escolhida"));
     out.put("videoId", state.getOrDefault("videoId", ""));
@@ -430,6 +440,17 @@ public class PartyGames {
                     now(),
                     id);
               }
+              case "stop" -> {
+                require(
+                    !blackjack && u.equals(r.get("host_id")),
+                    "Só o anfitrião pode encerrar o Beat Club.");
+                require(
+                    Set.of("waiting", "preparing", "running").contains(status),
+                    "A partida já terminou.");
+                // Cancellation never distributes completion rewards or changes another room.
+                db.update(
+                    "update party_rooms set status='cancelled',ends_at=? where id=?", now(), id);
+              }
               case "leave" -> {
                 if (blackjack && status.equals("waiting")) refundEntry(id, u);
                 db.update(
@@ -511,6 +532,14 @@ public class PartyGames {
           db.update("insert into party_actions values(?,?,?,?)", id, u, clientId, action);
           return null;
         });
+    if (action.equals("stop")) {
+      try {
+        bot.releaseRhythm(id.toString());
+        db.update("update party_rooms set bot_released=true where id=?", id);
+      } catch (RuntimeException ignored) {
+        // Reconciliation retries release; cancellation is already committed.
+      }
+    }
   }
 
   void transfer(UUID id) {
@@ -592,7 +621,9 @@ public class PartyGames {
             var s = state(r);
             s.put(
                 "notes",
-                json.convertValue(notes, new TypeReference<List<Map<String, Integer>>>() {}));
+                rhythmChart(
+                    json.convertValue(notes, new TypeReference<List<Map<String, Integer>>>() {}),
+                    (String) s.getOrDefault("difficulty", "normal")));
             s.put("title", prepared.path("title").asString("Música"));
             save(id, s);
             db.update(
@@ -618,6 +649,28 @@ public class PartyGames {
       }
       throw e;
     }
+  }
+
+  static List<Map<String, Integer>> rhythmChart(
+      List<Map<String, Integer>> notes, String difficulty) {
+    int gap =
+        switch (difficulty) {
+          case "easy" -> 420;
+          case "hard" -> 110;
+          default -> 210;
+        };
+    var ranked = new ArrayList<>(notes);
+    ranked.sort(
+        Comparator.<Map<String, Integer>>comparingInt(n -> -n.getOrDefault("strength", 0))
+            .thenComparingInt(n -> n.get("at")));
+    var selected = new TreeMap<Integer, Map<String, Integer>>();
+    for (var note : ranked) {
+      int at = note.get("at");
+      Integer before = selected.floorKey(at), after = selected.ceilingKey(at);
+      if ((before == null || at - before >= gap) && (after == null || after - at >= gap))
+        selected.put(at, Map.of("at", at, "lane", note.get("lane")));
+    }
+    return new ArrayList<>(selected.values());
   }
 
   public int note(String name, UUID id, int index, int lane) {

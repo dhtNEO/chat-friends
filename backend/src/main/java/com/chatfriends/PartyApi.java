@@ -18,7 +18,8 @@ public class PartyApi {
     this.music = music;
   }
 
-  public record Create(@NotNull UUID clientId, @NotNull String kind, String videoId) {}
+  public record Create(
+      @NotNull UUID clientId, @NotNull String kind, String videoId, String difficulty) {}
 
   public record Action(@NotNull UUID clientId, String identity, UUID roundId) {}
 
@@ -40,7 +41,8 @@ public class PartyApi {
 
   @PostMapping
   public Map<String, UUID> create(Principal p, @Valid @RequestBody Create r) {
-    return Map.of("id", games.create(p.getName(), r.clientId(), r.kind(), r.videoId()));
+    return Map.of(
+        "id", games.create(p.getName(), r.clientId(), r.kind(), r.videoId(), r.difficulty()));
   }
 
   @PostMapping("/{id}/start")

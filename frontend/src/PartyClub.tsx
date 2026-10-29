@@ -41,6 +41,7 @@ export type PartyRoom = {
   hostId: string;
   kind: "blackjack" | "rhythm";
   status: string;
+  difficulty?: "easy" | "normal" | "hard";
   startsAt: number;
   endsAt: number;
   players: PartyPlayer[];
@@ -58,7 +59,7 @@ export type PartyState = {
   rooms: { id: string; kind: string; host: string; players: number }[];
 };
 type Song = { videoId: string; title: string; duration: number | null };
-const KEYS = ["D", "F", "J", "K"],
+const DEFAULT_KEYS = ["D", "F", "J", "K"],
   SUITS = ["♠", "♥", "♦", "♣"],
   RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 function Card({ card, hidden = false }: { card?: number; hidden?: boolean }) {
@@ -94,6 +95,46 @@ export function PartyClub({
   onActiveChange: (active: boolean) => void;
   blocked: boolean;
 }) {
+  const [keys, setKeys] = useState<string[]>(() => {
+    try {
+      const saved: unknown = JSON.parse(
+        localStorage.getItem("beat-club-keys") ?? "null",
+      );
+      if (
+        Array.isArray(saved) &&
+        saved.length === 4 &&
+        new Set(saved).size === 4 &&
+        saved.every((k) => typeof k === "string" && /^[A-Z0-9]$/.test(k))
+      )
+        return saved;
+    } catch {
+      /* Storage can be unavailable. Defaults remain usable. */
+    }
+    return [...DEFAULT_KEYS];
+  });
+  const [difficulty, setDifficulty] = useState<"easy" | "normal" | "hard">(
+    "normal",
+  );
+  const [judgment, setJudgment] = useState<{
+    lane: number;
+    text: string;
+    kind: string;
+    id: number;
+  } | null>(null);
+  const missed = useRef(new Set<number>());
+  const judgmentId = useRef(0);
+  function showJudgment(lane: number, text: string, kind: string) {
+    setFeedback(text);
+    setJudgment({ lane, text, kind, id: ++judgmentId.current });
+  }
+  function saveKeys(next: string[]) {
+    setKeys(next);
+    try {
+      localStorage.setItem("beat-club-keys", JSON.stringify(next));
+    } catch {
+      /* Session-only fallback. */
+    }
+  }
   const [data, setData] = useState<PartyState | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -115,6 +156,7 @@ export function PartyClub({
       clientId: string;
       kind: string;
       videoId?: string;
+      difficulty?: string;
     } | null>(null),
     actionRequest = useRef<{
       room: string;
@@ -177,7 +219,9 @@ export function PartyClub({
   useEffect(() => {
     inFlight.current.clear();
     locallyJudged.current.clear();
-    setFeedback("D · F · J · K");
+    missed.current.clear();
+    setJudgment(null);
+    setFeedback("Siga as batidas");
   }, [room?.id]);
   useEffect(() => {
     if (!room || room.status !== "running") return;
@@ -213,12 +257,13 @@ export function PartyClub({
       if (
         !createRequest.current ||
         createRequest.current.kind !== kind ||
-        createRequest.current.videoId !== song?.videoId
+        createRequest.current.videoId !== song?.videoId ||
+        createRequest.current.difficulty !== difficulty
       )
         createRequest.current = {
           clientId: crypto.randomUUID(),
           kind,
-          ...(kind === "rhythm" ? { videoId: song!.videoId } : {}),
+          ...(kind === "rhythm" ? { videoId: song!.videoId, difficulty } : {}),
         };
       await api("/party", "POST", createRequest.current);
       createRequest.current = null;
@@ -272,7 +317,7 @@ export function PartyClub({
       new Set([...judged, ...inFlight.current]),
     );
     if (!note) {
-      setFeedback("Fora do tempo");
+      showJudgment(lane, "FORA DO TEMPO", "miss");
       return;
     }
     inFlight.current.add(note.i);
@@ -283,7 +328,8 @@ export function PartyClub({
       .then((result) => {
         locallyJudged.current.add(note.i);
         if (alive.current) {
-          setFeedback(
+          showJudgment(
+            lane,
             result.points === 100
               ? "PERFEITO +100"
               : result.points === 70
@@ -291,12 +337,13 @@ export function PartyClub({
                 : result.points === 40
                   ? "ACERTOU +40"
                   : "ERROU",
+            result.points > 0 ? "hit" : "miss",
           );
           void refresh();
         }
       })
       .catch(() => {
-        if (alive.current) setFeedback("Fora do tempo");
+        if (alive.current) showJudgment(lane, "NÃO CONFIRMADO", "miss");
       })
       .finally(() => inFlight.current.delete(note.i));
   }
@@ -313,7 +360,7 @@ export function PartyClub({
         target.closest("input,textarea,select,[contenteditable=true]")
       )
         return;
-      const lane = KEYS.indexOf(e.key.toUpperCase());
+      const lane = keys.indexOf(e.key.toUpperCase());
       if (lane >= 0 && room?.kind === "rhythm" && room.status === "running") {
         e.preventDefault();
         latestHit.current(lane);
@@ -321,7 +368,24 @@ export function PartyClub({
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [room?.kind, room?.status]);
+  }, [room?.kind, room?.status, keys]);
+  useEffect(() => {
+    if (room?.kind !== "rhythm" || room.status !== "running") return;
+    let last: { lane: number; i: number } | undefined;
+    room.notes.forEach((n, i) => {
+      if (
+        clock > room.startsAt + n.at + 150 + adjust + 400 &&
+        !missed.current.has(i) &&
+        !locallyJudged.current.has(i) &&
+        !inFlight.current.has(i) &&
+        !(room.judged ?? []).some((j) => j.note === i)
+      ) {
+        missed.current.add(i);
+        last = { lane: n.lane, i };
+      }
+    });
+    if (last) showJudgment(last.lane, "PASSOU!", "miss");
+  }, [clock, room, adjust]);
   function search(e: React.FormEvent) {
     e.preventDefault();
     if (!voiceIdentity) return;
@@ -414,9 +478,8 @@ export function PartyClub({
           )}
           {room.status === "cancelled" && (
             <div className="club-alert" role="status">
-              Partida cancelada: o bot não concluiu o trecho ou a preparação
-              perdeu participantes. Não houve premiação. Você pode sair e criar
-              outra sala.
+              Jogo encerrado antes do fim. Sem premiação de conclusão. Você pode
+              sair e criar outra sala.
             </div>
           )}
           {room.status === "preparing" && (
@@ -532,10 +595,23 @@ export function PartyClub({
           )}
           {room.kind === "rhythm" && (
             <>
+              {host &&
+                ["waiting", "preparing", "running"].includes(room.status) && (
+                  <button disabled={busy} onClick={() => action("stop")}>
+                    Encerrar jogo para todos
+                  </button>
+                )}
               <div className="beat-track-title">
                 <span>♫</span>
                 <div>
-                  <strong>{room.title}</strong>
+                  <strong>
+                    {room.title} ·{" "}
+                    {
+                      { easy: "Fácil", normal: "Normal", hard: "Difícil" }[
+                        room.difficulty ?? "normal"
+                      ]
+                    }
+                  </strong>
                   <small>
                     {room.status === "waiting"
                       ? "A faixa será analisada antes de começar"
@@ -579,7 +655,7 @@ export function PartyClub({
                       />
                     </Suspense>
                     <div className="beat-highway">
-                      {KEYS.map((key, lane) => (
+                      {keys.map((key, lane) => (
                         <div
                           className={`beat-lane lane-${lane} ${flash === lane ? "pressed" : ""}`}
                           key={key}
@@ -600,13 +676,29 @@ export function PartyClub({
                             ) : null;
                           })}
                           <span className="beat-hit-line" />
+                          {judgment?.lane === lane && (
+                            <span
+                              key={judgment.id}
+                              className={`beat-burst ${judgment.kind}`}
+                            />
+                          )}
                           <b>{key}</b>
                         </div>
                       ))}
                     </div>
                   </div>
+                  {judgment && (
+                    <div
+                      key={judgment.id}
+                      className={`beat-judgment ${judgment.kind}`}
+                      role="status"
+                    >
+                      <strong>{judgment.text}</strong>
+                      <small>Pista {keys[judgment.lane]}</small>
+                    </div>
+                  )}
                   <div className="beat-keys">
-                    {KEYS.map((key, lane) => (
+                    {keys.map((key, lane) => (
                       <button
                         className={`lane-${lane} ${flash === lane ? "pressed" : ""}`}
                         key={key}
@@ -638,8 +730,9 @@ export function PartyClub({
                     />
                   </label>
                   <p>
-                    Use D, F, J, K ou toque nas pistas. Ajuste a sincronia ao
-                    que você ouve. Pelo menos 3 acertos para ganhar Coins.
+                    Use {keys.join(", ")} ou toque nas pistas. Ajuste a
+                    sincronia ao que você ouve. Pelo menos 3 acertos para ganhar
+                    Coins.
                   </p>
                 </div>
               )}
@@ -790,8 +883,67 @@ export function PartyClub({
             Escolha até 5 minutos de uma música do bot, siga as batidas com Riff
             e dispute a melhor apresentação.
           </p>
+          <label className="beat-settings">
+            Dificuldade
+            <select
+              aria-label="Dificuldade"
+              value={difficulty}
+              disabled={busy || playing}
+              onChange={(e) =>
+                setDifficulty(e.target.value as typeof difficulty)
+              }
+            >
+              <option value="easy">Fácil · notas mais espaçadas</option>
+              <option value="normal">Normal · ritmo intermediário</option>
+              <option value="hard">Difícil · passagens rápidas</option>
+            </select>
+          </label>
+          <fieldset
+            className="beat-settings"
+            disabled={room?.status === "running"}
+          >
+            <legend>Teclas das trilhas</legend>
+            <div className="beat-key-settings">
+              {keys.map((key, lane) => (
+                <label key={lane}>
+                  Pista {lane + 1}
+                  <input
+                    aria-label={`Tecla da pista ${lane + 1}`}
+                    value={key}
+                    maxLength={1}
+                    readOnly
+                    onKeyDown={(e) => {
+                      if (
+                        e.ctrlKey ||
+                        e.metaKey ||
+                        e.altKey ||
+                        !/^[a-z0-9]$/i.test(e.key)
+                      )
+                        return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const value = e.key.toUpperCase();
+                      if (keys.some((k, i) => i !== lane && k === value)) {
+                        setError("Cada pista precisa de uma tecla diferente.");
+                        return;
+                      }
+                      saveKeys(keys.map((k, i) => (i === lane ? value : k)));
+                      setError("");
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            <small>
+              Selecione um campo e pressione uma letra ou número. Preferências
+              salvas neste navegador.
+            </small>
+            <button type="button" onClick={() => saveKeys([...DEFAULT_KEYS])}>
+              Restaurar D · F · J · K
+            </button>
+          </fieldset>
           <div className="beat-card-art" aria-hidden="true">
-            {KEYS.map((k, i) => (
+            {keys.map((k, i) => (
               <span key={k} className={`lane-${i}`}>
                 {k}
                 <i />

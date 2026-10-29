@@ -30,7 +30,7 @@ O blackjack natural da banca vence 21 feito com mais cartas. Duas mãos naturais
 2. Selecione o resultado e crie a sala. Convide os amigos; todos devem estar na voz e confirmar prontidão.
 3. O anfitrião prepara a partida. O bot precisa estar livre, sem música ou fila normal. Ele reserva seu controle para a sessão e prepara **até os primeiros 5 minutos** da faixa; preparação pode levar até dois minutos.
 4. O bot decodifica esse trecho em PCM, analisa mudanças no espectro do áudio em quatro faixas de frequência e gera notas de quatro pistas. O mesmo PCM analisado é publicado na chamada: não é uma sequência aleatória gerada apenas a partir de um BPM. Trechos com menos de quinze segundos ou poucas batidas identificáveis são rejeitados; escolha outra música.
-5. Após a contagem, pressione **D, F, J, K**, ou toque nos quatro botões do celular. Ajuste a sincronia visual conforme o que você ouve. Todos recebem os mesmos tempos e pistas.
+5. Após a contagem, pressione **D, F, J, K** (ou as teclas configuradas no cartão), ou toque nos quatro botões do celular. Ajuste a sincronia visual conforme o que você ouve. Todos recebem os mesmos tempos e pistas.
 6. Ao terminar a reprodução confirmada pelo bot, o servidor publica os resultados e entrega as Coins.
 
 O trecho é limitado a 57,6 MB de PCM em memória (48 kHz, estéreo, 16 bits), sem arquivo ou cache persistente. Há uma única sessão de jogo no bot. Buffers de leitura são liberados antes da análise; a análise acessa o PCM como inteiros little-endian e calcula FFT em lotes de até 128 janelas, sem criar um espectrograma da faixa inteira. O limite do container permanece 512 MB. A detecção roda fora do event loop e gera até 1.200 notas distribuídas pelo trecho inteiro; o prazo da reserva acompanha a duração, com margem de 45 segundos. Músicas maiores usam apenas os primeiros cinco minutos; menores usam sua duração disponível. A análise usa NumPy 2.5.4, agora fixado como dependência direta; ele já era dependência do SDK LiveKit. URLs de mídia resolvidas, token LiveKit e segredo interno não vão para o navegador. O bot usa a publicação privada de áudio já existente.
@@ -39,7 +39,15 @@ O trecho é limitado a 57,6 MB de PCM em memória (48 kHz, estéreo, 16 bits), s
 
 O detector compara o espectro entre janelas de 2.048 amostras, com avanço de **10 ms**. Combina potência dos dois canais para preservar áudio estéreo, comprime diferenças de intensidade e calcula fluxo espectral positivo em quatro bandas (35–200 Hz, 200–1.000 Hz, 1–4 kHz e 4–16 kHz). O limiar considera a média e a dispersão locais de cada banda; mudanças de volume entre trechos não precisam de um limiar absoluto para a faixa inteira. Energia mínima, suavização e picos locais reduzem notas em silêncio, ruído estacionário ou instrumentos sustentados sem ataques.
 
-Ataques separados por menos de **210 ms** disputam a mesma região: o mais claro prevalece, inclusive quando existe um ataque fraco um pouco antes. A pista corresponde à banda com maior energia espectral nova, em vez de um ciclo fixo de teclas. Se a sequência passar de 1.200 notas, a seleção é distribuída pelo trecho completo, preservando o final. Os dois primeiros e últimos segundos ficam livres para entrada/saída. Não é uma transcrição instrumental nem um metrônomo artificial; músicas com ataques pouco definidos ainda podem gerar desafios fracos ou ser rejeitadas.
+A comparação com frequências vizinhas reduz detecções causadas por pequenas variações de afinação; os graves preservam o fluxo original para não perder bumbos. A análise admite ataques separados por **110 ms** e envia sua intensidade ao servidor. Ataques próximos disputam a mesma região conforme a dificuldade: **420 ms no fácil**, **210 ms no normal** e **110 ms no difícil**; o mais claro prevalece, inclusive quando existe um ataque fraco um pouco antes. A pista corresponde à banda com maior energia espectral nova, em vez de um ciclo fixo de teclas. Se a sequência passar de 1.200 notas, a seleção é distribuída pelo trecho completo, preservando o final. Os dois primeiros e últimos segundos ficam livres para entrada/saída. Não é uma transcrição instrumental nem um metrônomo artificial; músicas com ataques pouco definidos ainda podem gerar desafios fracos ou ser rejeitadas.
+
+### Controles, dificuldade e encerramento
+
+Antes de criar a sala, escolha Fácil, Normal ou Difícil. O servidor seleciona primeiro os ataques mais fortes, preserva seus tempos reais e entrega o mesmo mapa a todos. A dificuldade altera a densidade das notas, não as janelas de pontuação. Salas antigas usam Normal.
+
+Em **Teclas das trilhas**, selecione cada campo e pressione uma letra ou número. Teclas repetidas são recusadas; as preferências ficam no navegador e podem ser restauradas para D/F/J/K. A configuração fica bloqueada durante a execução da música. Acertos confirmados pelo servidor, erros e notas que passaram recebem feedback textual e animação; a preferência de movimento reduzido é respeitada.
+
+O anfitrião pode usar **Encerrar jogo para todos**: a sala é cancelada, novos acertos são recusados e o áudio é liberado. Se a liberação falhar, o reconciliador tenta novamente. Encerramento antecipado não distribui Coins. Os demais participantes mantêm a opção de sair individualmente.
 
 ### Pontuação, latência e moedas
 
@@ -72,7 +80,7 @@ O job de partidas usa um scheduler separado para que consultas ao worker musical
 | Rota | Uso |
 |---|---|
 | GET `/api/party` | Sala atual e salas abertas |
-| POST `/api/party` | `{clientId, kind: "blackjack" ou "rhythm", videoId?}` |
+| POST `/api/party` | `{clientId, kind: "blackjack" ou "rhythm", videoId?, difficulty?: "easy" ou "normal" ou "hard"}` |
 | GET `/api/party/music/search?identity=...&q=...` | Busca no bot; exige voz da própria sessão |
 | POST `/api/party/{id}/join` | `{clientId}` |
 | POST `/api/party/{id}/ready` | `{clientId, roundId?, identity?}`; blackjack exige roundId e debita 10 Coins; identidade de voz obrigatória no ritmo |
@@ -80,6 +88,7 @@ O job de partidas usa um scheduler separado para que consultas ao worker musical
 | POST `/api/party/{id}/hit` ou `/stand` | `{clientId, roundId}`; ação de blackjack |
 | POST `/api/party/{id}/next` | `{clientId, roundId}`; anfitrião reabre o blackjack após o resultado, sem cobrar os participantes |
 | POST `/api/party/{id}/note` | `{note, lane}`; índices baseados em zero |
+| POST `/api/party/{id}/stop` | `{clientId}`; exclusivo do anfitrião do ritmo, idempotente, sem premiação |
 | POST `/api/party/{id}/presence` ou `/leave` | `{clientId}` |
 
 Todas as rotas exigem sessão; POST exige CSRF e o orçamento de requisições existente. As rotas privadas `/rhythm/prepare`, `/rhythm/start`, `/rhythm/release` do worker exigem o segredo servidor-servidor e não são publicadas pelo Caddy.

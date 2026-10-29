@@ -754,3 +754,113 @@
     animation: none;
   }
 }
+
+.beat-game {
+  position: relative;
+}
+.beat-settings {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1rem 0;
+  padding: 0.8rem;
+  border: 1px solid #ffffff25;
+  border-radius: 12px;
+}
+.beat-settings select {
+  padding: 0.65rem;
+  background: #1d1835;
+  color: #fff;
+  border-radius: 8px;
+}
+.beat-key-settings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.beat-key-settings label {
+  display: grid;
+  gap: 0.4rem;
+}
+.beat-key-settings input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  font-weight: bold;
+}
+.beat-judgment {
+  position: absolute;
+  z-index: 5;
+  top: 35%;
+  left: 50%;
+  pointer-events: none;
+  text-align: center;
+  display: grid;
+  white-space: nowrap;
+  animation: beat-verdict 0.8s forwards;
+}
+.beat-judgment.hit {
+  color: #81ffc4;
+  text-shadow: 0 0 18px #37fb99;
+}
+.beat-judgment.miss {
+  color: #ff8f9e;
+  text-shadow: 0 0 18px #ff3c66;
+}
+.beat-judgment strong {
+  font-size: clamp(1.2rem, 3vw, 2rem);
+}
+.beat-burst {
+  position: absolute;
+  z-index: 4;
+  left: 10%;
+  right: 10%;
+  top: 76%;
+  height: 12%;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: beat-ring 0.65s forwards;
+}
+.beat-burst.hit {
+  color: #81ffc4;
+  box-shadow: 0 0 24px #37fb99;
+}
+.beat-burst.miss {
+  color: #ff647e;
+  border-radius: 6px;
+}
+@keyframes beat-verdict {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 8px) scale(0.8);
+  }
+  20%,
+  65% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -15px);
+  }
+}
+@keyframes beat-ring {
+  from {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .beat-judgment {
+    animation: none;
+    transform: translateX(-50%);
+  }
+  .beat-burst {
+    animation: none;
+    box-shadow: none;
+  }
+}

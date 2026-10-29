@@ -387,7 +387,7 @@ class Player:
                     pcm = b"".join(chunks)
                     chunks.clear()  # Do not retain a second full PCM buffer during analysis.
                     pcm = pcm[:len(pcm)//3840*3840]
-                    notes = await asyncio.to_thread(detect_notes, pcm)
+                    notes = await asyncio.to_thread(detect_notes, pcm, 110, True)
                     if len(pcm) < 15*192000 or len(notes) < 8:
                         raise ValueError("Não foi possível identificar batidas suficientes. Escolha outra música.")
             if self.rhythm_id != session:

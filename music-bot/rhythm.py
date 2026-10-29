@@ -31,7 +31,15 @@ def _features(pcm):
         # Combine channel powers: averaging L/R before the FFT cancels anti-phase percussion.
         magnitude = np.sqrt(np.mean(np.abs(spectrum) ** 2, axis=1)) / window.sum()
         compressed = np.log1p(1000 * magnitude)
-        difference = np.maximum(0, np.diff(compressed, axis=0, prepend=previous[None, :]))
+        # Compare against a frequency neighbourhood in the previous frame.
+        # Small pitch/vibrato movements must not masquerade as fresh attacks.
+        raw_reference = np.concatenate((previous[None, :], compressed[:-1]))
+        reference = raw_reference
+        padded = np.pad(reference, ((0, 0), (1, 1)), mode="edge")
+        reference = np.maximum.reduce((padded[:, :-2], padded[:, 1:-1], padded[:, 2:]))
+        # Bass bins are too wide for a neighbourhood filter: preserve kick sensitivity.
+        reference[:, frequencies < 200] = raw_reference[:, frequencies < 200]
+        difference = np.maximum(0, compressed - reference)
         for band, mask in enumerate(masks):
             flux[first:first + size, band] = difference[:, mask].mean(axis=1)
         previous = compressed[-1]
@@ -42,7 +50,9 @@ def _moving_mean(values, width):
     return np.convolve(np.pad(values, (width // 2, width // 2), mode="edge"), np.ones(width) / width, mode="valid")
 
 
-def detect_notes(pcm):
+def detect_notes(pcm, min_gap_ms=MIN_GAP_MS, include_strength=False):
+    if min_gap_ms not in (110, 210, 420):
+        raise ValueError("Espaçamento de notas inválido")
     if not pcm or len(pcm) % 4:
         return []
     flux, rms = _features(pcm)
@@ -72,12 +82,13 @@ def detect_notes(pcm):
     selected = []
     occupied = {}
     for note in sorted(candidates, key=lambda note: (-note[2], note[0])):
-        bucket = note[0] // MIN_GAP_MS
-        if all(abs(note[0] - occupied.get(key, float("inf"))) >= MIN_GAP_MS for key in (bucket - 1, bucket, bucket + 1)):
+        bucket = note[0] // min_gap_ms
+        if all(abs(note[0] - occupied.get(key, float("inf"))) >= min_gap_ms for key in (bucket - 1, bucket, bucket + 1)):
             selected.append(note)
             occupied[bucket] = note[0]
     selected.sort()
     # Spread an oversized chart across the full song instead of cutting off its ending.
     if len(selected) > MAX_NOTES:
         selected = [max(selected[i * len(selected) // MAX_NOTES:(i + 1) * len(selected) // MAX_NOTES], key=lambda note: note[2]) for i in range(MAX_NOTES)]
-    return [{"at": at, "lane": lane} for at, lane, _ in selected]
+    return [{"at": at, "lane": lane, **({"strength": max(1, round(strength * 1000))} if include_strength else {})}
+            for at, lane, strength in selected]
