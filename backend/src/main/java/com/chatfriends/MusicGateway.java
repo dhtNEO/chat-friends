@@ -2,8 +2,8 @@ package com.chatfriends;
 
 import static org.springframework.http.HttpStatus.*;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.*;
@@ -11,13 +11,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Server-to-server only: neither the control key nor the bot JWT reaches a browser. */
 @Component
 public class MusicGateway {
+  static final Logger log = LoggerFactory.getLogger(MusicGateway.class);
   final ObjectMapper json;
   final String url, secretFile;
   final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
@@ -31,10 +36,26 @@ public class MusicGateway {
     this.secretFile = secretFile;
   }
 
+  ResponseStatusException unavailable(String operation, String reason, int status) {
+    // Only fixed categories and status codes: no keys, URLs, queries or response bodies.
+    log.warn("music_control operation={} reason={} status={}", operation, reason, status);
+    return new ResponseStatusException(
+        SERVICE_UNAVAILABLE, "Bot de música indisponível; tente novamente");
+  }
+
   JsonNode call(String method, String path, Object body) {
+    String operation =
+        path.startsWith("/search")
+            ? "search"
+            : path.startsWith("/rhythm/") ? "rhythm" : path.equals("/state") ? "state" : "control";
+    String secret;
     try {
-      String secret = Files.readString(Path.of(secretFile)).strip();
-      if (secret.length() < 32) throw new IllegalStateException();
+      secret = Files.readString(Path.of(secretFile)).strip();
+    } catch (IOException | RuntimeException e) {
+      throw unavailable(operation, "key_read", 0);
+    }
+    if (secret.length() < 32) throw unavailable(operation, "key_invalid", 0);
+    try {
       var request =
           HttpRequest.newBuilder(URI.create(url + path))
               .timeout(
@@ -59,17 +80,28 @@ public class MusicGateway {
             path.equals("/rhythm/prepare")
                 ? "Deixe o bot livre e escolha uma música com batidas e pelo menos 15 segundos."
                 : "Confira a música e tente novamente");
-      if (response.statusCode() != 200 || response.body().length() > 65536)
-        throw new IllegalStateException();
+      if (response.statusCode() != 200)
+        throw unavailable(
+            operation,
+            response.statusCode() == 401 || response.statusCode() == 403
+                ? "authentication"
+                : "http",
+            response.statusCode());
+      if (response.body().length() > 65536) throw unavailable(operation, "response_size", 200);
       return json.readTree(response.body());
     } catch (ResponseStatusException e) {
       throw e;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new ResponseStatusException(SERVICE_UNAVAILABLE, "Bot de música indisponível");
+      throw unavailable(operation, "interrupted", 0);
+    } catch (HttpTimeoutException e) {
+      throw unavailable(operation, "timeout", 0);
+    } catch (ConnectException e) {
+      throw unavailable(operation, "connection", 0);
+    } catch (IOException e) {
+      throw unavailable(operation, "transport", 0);
     } catch (Exception e) {
-      throw new ResponseStatusException(
-          SERVICE_UNAVAILABLE, "Bot de música indisponível; tente novamente");
+      throw unavailable(operation, "response", 0);
     }
   }
 

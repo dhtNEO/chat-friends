@@ -466,13 +466,26 @@ class Player:
             return self.snapshot()
 
 
+def control_key(path):
+    value = Path(path).read_text().strip()
+    if len(value) < 32:
+        raise ValueError("Segredo interno do bot ausente")
+    return value
+
+
 def create_app(secret, player=None):
     player = player or Player()
 
     @web.middleware
     async def auth(request, handler):
         supplied = request.headers.get("Authorization", "")
-        if not hmac.compare_digest(supplied.encode(), ("Bearer " + secret).encode()):
+        try:
+            current = secret() if callable(secret) else secret
+            if not isinstance(current, str) or len(current) < 32:
+                raise ValueError("Chave inválida")
+        except (OSError, ValueError):
+            raise web.HTTPServiceUnavailable(text="Controle de música indisponível")
+        if not hmac.compare_digest(supplied.encode(), ("Bearer " + current).encode()):
             raise web.HTTPUnauthorized()
         try:
             return await handler(request)
@@ -540,7 +553,6 @@ def create_app(secret, player=None):
 
 
 if __name__ == "__main__":
-    key = Path(os.getenv("MUSIC_SECRET_FILE", "/run/secrets/music")).read_text().strip()
-    if len(key) < 32:
-        raise RuntimeError("Segredo interno do bot ausente")
-    web.run_app(create_app(key), host="0.0.0.0", port=8090, access_log=None, print=None)
+    key_file = os.getenv("MUSIC_SECRET_FILE", "/run/secrets/music")
+    control_key(key_file)  # Fail at startup if the scoped credential is missing.
+    web.run_app(create_app(lambda: control_key(key_file)), host="0.0.0.0", port=8090, access_log=None, print=None)

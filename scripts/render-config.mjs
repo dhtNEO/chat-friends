@@ -164,9 +164,10 @@ if (process.env.CHAT_TURN === "true") {
   external_tls: false
 `;
 }
-function writePrivate(file, data) {
+function writePrivate(file, data, mode = 0o600) {
   const temp = file + "." + crypto.randomUUID() + ".tmp";
-  fs.writeFileSync(temp, data, { mode: 0o600, flag: "wx" });
+  fs.writeFileSync(temp, data, { mode, flag: "wx" });
+  fs.chmodSync(temp, mode);
   fs.renameSync(temp, file);
 }
 writePrivate("infra/compose/generated/network/livekit.yaml", mediaYaml);
@@ -175,15 +176,18 @@ if (process.env.CHAT_HELPER !== "true") {
   writePrivate("infra/compose/generated/mode", mode + "\n");
   // A scoped control key; the worker never receives the LiveKit signing secret.
   fs.chmodSync("infra/compose/generated", 0o700);
+  // A scoped directory mount follows atomic replacements; file bind mounts retain old inodes.
+  fs.mkdirSync("infra/compose/generated/music", { recursive: true, mode: 0o755 });
+  fs.chmodSync("infra/compose/generated/music", 0o755);
   writePrivate(
-    "infra/compose/generated/music-secret",
+    "infra/compose/generated/music/control.key",
     crypto
       .createHmac("sha256", values.LIVEKIT_API_SECRET)
       .update("chat-friends:music-control:v1")
       .digest("hex"),
+    0o644,
   );
-  // The private 0700 parent protects the host path; the nonroot container reads only this bind.
-  fs.chmodSync("infra/compose/generated/music-secret", 0o644);
+  // generated remains 0700 on the host; containers see only the dedicated music directory.
   fs.chmodSync(".env", 0o600);
 }
 console.log("Configuração validada e gerada; segredos não exibidos.");
