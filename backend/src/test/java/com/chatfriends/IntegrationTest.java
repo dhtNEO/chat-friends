@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import livekit.LivekitModels.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
@@ -28,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 class IntegrationTest {
   @Autowired Accounts accounts;
   @Autowired Chat chat;
+  @Autowired Games games;
   @Autowired Media media;
   @Autowired MockMvc mvc;
   @MockitoBean LiveKitGateway live;
@@ -48,8 +49,12 @@ class IntegrationTest {
               org.springframework.test.util.ReflectionTestUtils.getField(requestBudget, "buckets"))
           .clear();
     }
-    accounts.db.execute(
-        "TRUNCATE messages,media_connections,accounts,rate_limits,spring_session CASCADE");
+    // Coordinate destructive fixtures with game jobs that join accounts.
+    games.locked(() -> {
+      accounts.db.execute(
+          "TRUNCATE messages,media_connections,accounts,rate_limits,spring_session CASCADE");
+      return null;
+    });
     accounts.db.execute("UPDATE screen_lease SET identity=NULL,lease_id=NULL,expires_at=NULL");
     accounts.create("ana", "Ana", "test-only-password-ana", false);
     accounts.create("bia", "Bia", "test-only-password-bia", false);
@@ -84,7 +89,7 @@ class IntegrationTest {
     assertEquals(400, assertThrows(ResponseStatusException.class,
         () -> music.control(() -> "ana", request, new Music.Control(identity, "exec"))).getStatusCode().value());
     verifyNoInteractions(musicBot);
-    var expected = new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"status\":\"playing\"}");
+    var expected = new tools.jackson.databind.ObjectMapper().readTree("{\"status\":\"playing\"}");
     when(musicBot.enqueue(eq("aqz-KE-bpKQ"), eq("Ana"), any())).thenReturn(expected);
     assertEquals(expected, music.enqueue(() -> "ana", request, new Music.Enqueue(identity, "aqz-KE-bpKQ")));
     accounts.db.update("update spring_session set expiry_time=0 where session_id=?", request.getSession().getId());
@@ -489,10 +494,10 @@ class IntegrationTest {
   jakarta.servlet.http.Cookie loginCookie(String user, String password) throws Exception {
     var csrf = mvc.perform(get("/api/csrf")).andExpect(status().isOk()).andReturn().getResponse();
     String token =
-        new com.fasterxml.jackson.databind.ObjectMapper()
+        new tools.jackson.databind.ObjectMapper()
             .readTree(csrf.getContentAsString())
             .get("token")
-            .asText();
+            .asString();
     var login =
         mvc.perform(
                 post("/api/login")
@@ -605,10 +610,10 @@ class IntegrationTest {
     mvc.perform(get("/api/messages").cookie(cookie)).andExpect(status().isForbidden());
     var csrf = mvc.perform(get("/api/csrf").cookie(cookie)).andReturn().getResponse();
     String token =
-        new com.fasterxml.jackson.databind.ObjectMapper()
+        new tools.jackson.databind.ObjectMapper()
             .readTree(csrf.getContentAsString())
             .get("token")
-            .asText();
+            .asString();
     var verified =
         mvc.perform(
                 post("/api/security/mfa/verify")
@@ -637,7 +642,6 @@ class IntegrationTest {
     when(live.participants()).thenReturn(List.of());
     media.reconcile();
     assertFalse(media.validConnection("left"));
-    var q = connection("ana", "fast-left");
     media.departed("fast-left");
     assertFalse(media.validConnection("fast-left"));
   }
@@ -671,8 +675,8 @@ class IntegrationTest {
   void enrollmentSecretIsEncryptedEvenWhilePendingAndConfirmationRotatesSession() throws Exception {
     var cookie = loginCookie("ana", "test-only-password-ana");
     var csrf = mvc.perform(get("/api/csrf").cookie(cookie)).andReturn().getResponse();
-    var json = new com.fasterxml.jackson.databind.ObjectMapper();
-    String token = json.readTree(csrf.getContentAsString()).get("token").asText();
+    var json = new tools.jackson.databind.ObjectMapper();
+    String token = json.readTree(csrf.getContentAsString()).get("token").asString();
     var setup =
         mvc.perform(
                 post("/api/security/mfa/setup")
@@ -683,7 +687,7 @@ class IntegrationTest {
             .andExpect(status().isOk())
             .andReturn()
             .getResponse();
-    String secret = json.readTree(setup.getContentAsString()).get("secret").asText();
+    String secret = json.readTree(setup.getContentAsString()).get("secret").asString();
     var stored =
         accounts.db.queryForObject(
             "select attribute_bytes from spring_session_attributes where"
@@ -719,10 +723,10 @@ class IntegrationTest {
             .andReturn()
             .getResponse();
     String token =
-        new com.fasterxml.jackson.databind.ObjectMapper()
+        new tools.jackson.databind.ObjectMapper()
             .readTree(response.getContentAsString())
             .get("token")
-            .asText();
+            .asString();
     org.springframework.test.web.servlet.request.RequestPostProcessor authenticated =
         request -> {
           request.setCookies(cookie);

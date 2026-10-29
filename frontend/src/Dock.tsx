@@ -17,8 +17,12 @@ export type PanelKind =
   | "chat"
   | "members"
   | "account"
-  | "admin";
+  | "admin"
+  | "games"
+  | "outlook";
 export const TITLES: Record<PanelKind, string> = {
+  games: "Clube da Sorte",
+  outlook: "Outlook",
   nav: "Canais",
   voice: "Sala de estar",
   chat: "# geral",

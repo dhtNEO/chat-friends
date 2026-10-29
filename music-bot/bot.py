@@ -12,10 +12,12 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from aiohttp import web
+from rhythm import detect_notes, MAX_NOTES as RHYTHM_MAX_NOTES
 
 IDENTITY = "music-bot"
 MAX_SECONDS = 20 * 60
 MAX_QUEUE = 30
+RHYTHM_SECONDS = 5 * 60
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 YTDLP = ["yt-dlp", "--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist",
          "--no-warnings", "--socket-timeout", "15", "--retries", "1",
@@ -118,10 +120,20 @@ class Player:
         self.elapsed = 0.0
         self.last_listeners = time.monotonic()
         self.catalog = {}
+        self.rhythm_id = None
+        self.rhythm_phase = "idle"
+        self.rhythm_data = None
+        self.rhythm_pcm = b""
+        self.rhythm_task = None
+        self.rhythm_expires = 0.0
+        self.rhythm_starts = 0
+
 
     def snapshot(self):
         return {"status": self.status, "current": self.current,
-                "queue": list(self.queue), "error": self.error, "elapsed": int(self.elapsed)}
+                "queue": list(self.queue), "error": self.error, "elapsed": int(self.elapsed),
+                "rhythm": None if not self.rhythm_id else {"id": self.rhythm_id, "phase": self.rhythm_phase,
+                  "startsAt": self.rhythm_starts, "durationMs": (self.rhythm_data or {}).get("durationMs", 0)}}
 
     async def search(self, query):
         target = query_target(query)
@@ -156,6 +168,8 @@ class Player:
         if not isinstance(video, str) or not VIDEO_ID.fullmatch(video):
             raise ValueError("Vídeo inválido.")
         async with self.lock:
+            if self.rhythm_id:
+                raise ValueError("O bot está reservado para uma partida de ritmo.")
             if len(self.queue) >= MAX_QUEUE:
                 raise ValueError("A fila está cheia (30 músicas).")
             # Metadata is resolved by the playback task; enqueue never leaves stale pending work
@@ -274,6 +288,8 @@ class Player:
 
     async def control(self, action):
         async with self.lock:
+            if self.rhythm_id:
+                raise ValueError("O bot está reservado para uma partida de ritmo.")
             if action in ("pause", "resume"):
                 if not self.current or self.status == "loading":
                     raise ValueError("Aguarde uma música começar a tocar.")
@@ -308,11 +324,153 @@ class Player:
             return self.snapshot()
 
     async def check_idle(self):
+        if self.rhythm_id:
+            if time.monotonic() > self.rhythm_expires:
+                await self.release_rhythm(self.rhythm_id)
+            return
         if self.room:
             if self.room.remote_participants:
                 self.last_listeners = time.monotonic()
             elif time.monotonic() - self.last_listeners > 30:
                 await self.control("stop")
+
+
+    async def prepare_rhythm(self, session, video, who, token):
+        try:
+            uuid.UUID(session)
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError("Sessão inválida.")
+        if not isinstance(video, str) or not VIDEO_ID.fullmatch(video):
+            raise ValueError("Vídeo inválido.")
+        async with self.lock:
+            if self.rhythm_id == session and self.rhythm_data:
+                return self.rhythm_data
+            if self.rhythm_id or self.current or self.queue or (self.task and not self.task.done()):
+                raise ValueError("O bot precisa estar livre para a partida de ritmo.")
+            self.rhythm_id = session
+            self.rhythm_phase = "preparing"
+            self.rhythm_expires = time.monotonic() + 180
+            self.token = token
+            self.error = None
+            self.elapsed = 0.0
+        extractor = decoder = None
+        read_fd = write_fd = None
+        try:
+            async with self.resolvers:
+                async with asyncio.timeout(100):
+                    info = await metadata(query_target(video))
+                    item = song(info, who)
+                    if item["duration"] is None or item["duration"] < 15:
+                        raise ValueError("Escolha uma música com pelo menos 15 segundos.")
+                    if self.rhythm_id != session:
+                        raise ValueError("Preparação cancelada.")
+                    self.current = item
+                    self.status = "loading"
+                    read_fd, write_fd = os.pipe()
+                    extractor = await asyncio.create_subprocess_exec(
+                        *YTDLP, "-f", "bestaudio", "-o", "-", "--", item["url"],
+                        stdout=write_fd, stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
+                    decoder = await asyncio.create_subprocess_exec(
+                        "ffmpeg", "-nostdin", "-loglevel", "error", "-protocol_whitelist", "pipe",
+                        "-i", "pipe:0", "-t", str(RHYTHM_SECONDS), "-vn", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+                        stdin=read_fd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
+                    os.close(read_fd); read_fd = None
+                    os.close(write_fd); write_fd = None
+                    chunks = []
+                    count = 0
+                    maximum = RHYTHM_SECONDS * 48000 * 2 * 2
+                    while count < maximum:
+                        chunk = await decoder.stdout.read(min(65536, maximum-count))
+                        if not chunk:
+                            break
+                        chunks.append(chunk); count += len(chunk)
+                    pcm = b"".join(chunks)
+                    chunks.clear()  # Do not retain a second full PCM buffer during analysis.
+                    pcm = pcm[:len(pcm)//3840*3840]
+                    notes = await asyncio.to_thread(detect_notes, pcm, 110, True)
+                    if len(pcm) < 15*192000 or len(notes) < 8:
+                        raise ValueError("Não foi possível identificar batidas suficientes. Escolha outra música.")
+            if self.rhythm_id != session:
+                raise ValueError("Preparação cancelada.")
+            self.rhythm_pcm = pcm
+            self.rhythm_data = {"id": session, "title": item["title"], "videoId": video,
+                                "durationMs": len(pcm)//192, "notes": notes}
+            await self.connect()
+            self.rhythm_phase = "ready"
+            return self.rhythm_data
+        except BaseException:
+            if self.rhythm_id == session:
+                await self.release_rhythm(session)
+            raise
+        finally:
+            for fd in (read_fd, write_fd):
+                if fd is not None:
+                    os.close(fd)
+            await terminate(decoder)
+            await terminate(extractor)
+
+    async def start_rhythm(self, session, starts):
+        async with self.lock:
+            if self.rhythm_id != session or not self.rhythm_data:
+                raise ValueError("Partida não preparada.")
+            if self.rhythm_phase in ("playing", "scheduled", "finished"):
+                return self.snapshot()
+            if not isinstance(starts, int) or not 500 <= starts-time.time()*1000 <= 15000:
+                raise ValueError("Horário de início inválido.")
+            self.rhythm_starts = starts
+            self.rhythm_phase = "scheduled"
+            self.rhythm_expires = time.monotonic() + self.rhythm_data["durationMs"] / 1000 + 45
+            self.rhythm_task = asyncio.create_task(self.play_rhythm(session, starts))
+            return self.snapshot()
+
+    async def play_rhythm(self, session, starts):
+        from livekit import rtc
+        try:
+            await asyncio.sleep(max(0, starts/1000-time.time()))
+            self.elapsed = 0.0
+            self.rhythm_phase = "playing"
+            self.status = "playing"
+            for offset in range(0, len(self.rhythm_pcm), 3840):
+                if self.rhythm_id != session:
+                    return
+                data = self.rhythm_pcm[offset:offset+3840]
+                await self.source.capture_frame(rtc.AudioFrame(data, 48000, 2, 960))
+                self.elapsed += .02
+            await self.source.wait_for_playout()
+            self.rhythm_phase = "finished"
+            self.status = "idle"
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self.rhythm_phase = "failed"
+            self.error = "A reprodução da partida foi interrompida."
+            self.status = "idle"
+
+    async def release_rhythm(self, session):
+        async with self.lock:
+            if not self.rhythm_id or self.rhythm_id != session:
+                return self.snapshot()
+            if self.rhythm_task and not self.rhythm_task.done():
+                self.rhythm_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self.rhythm_task
+            self.rhythm_task = None
+            self.rhythm_id = None
+            self.rhythm_phase = "idle"
+            self.rhythm_data = None
+            self.rhythm_pcm = b""
+            self.current = None
+            self.status = "idle"
+            self.elapsed = 0
+            await self.disconnect()
+            return self.snapshot()
+
+
+def control_key(path):
+    value = Path(path).read_text().strip()
+    if len(value) < 32:
+        raise ValueError("Segredo interno do bot ausente")
+    return value
 
 
 def create_app(secret, player=None):
@@ -321,7 +479,13 @@ def create_app(secret, player=None):
     @web.middleware
     async def auth(request, handler):
         supplied = request.headers.get("Authorization", "")
-        if not hmac.compare_digest(supplied.encode(), ("Bearer " + secret).encode()):
+        try:
+            current = secret() if callable(secret) else secret
+            if not isinstance(current, str) or len(current) < 32:
+                raise ValueError("Chave inválida")
+        except (OSError, ValueError):
+            raise web.HTTPServiceUnavailable(text="Controle de música indisponível")
+        if not hmac.compare_digest(supplied.encode(), ("Bearer " + current).encode()):
             raise web.HTTPUnauthorized()
         try:
             return await handler(request)
@@ -360,8 +524,24 @@ def create_app(secret, player=None):
         app[monitor_key].cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await app[monitor_key]
+        if player.rhythm_id:
+            await player.release_rhythm(player.rhythm_id)
         await player.control("stop")
 
+    async def rhythm_prepare(request):
+        data = await request.json()
+        return web.json_response(await player.prepare_rhythm(data.get("id"), data.get("videoId"), data.get("requestedBy", ""), data.get("token", "")))
+
+    async def rhythm_start(request):
+        data = await request.json()
+        return web.json_response(await player.start_rhythm(data.get("id"), data.get("startsAt")))
+
+    async def rhythm_release(request):
+        return web.json_response(await player.release_rhythm((await request.json()).get("id")))
+
+    app.router.add_post("/rhythm/prepare", rhythm_prepare)
+    app.router.add_post("/rhythm/start", rhythm_start)
+    app.router.add_post("/rhythm/release", rhythm_release)
     app.router.add_get("/state", state)
     app.router.add_get("/search", search)
     app.router.add_post("/queue", enqueue)
@@ -373,7 +553,6 @@ def create_app(secret, player=None):
 
 
 if __name__ == "__main__":
-    key = Path(os.getenv("MUSIC_SECRET_FILE", "/run/secrets/music")).read_text().strip()
-    if len(key) < 32:
-        raise RuntimeError("Segredo interno do bot ausente")
-    web.run_app(create_app(key), host="0.0.0.0", port=8090, access_log=None, print=None)
+    key_file = os.getenv("MUSIC_SECRET_FILE", "/run/secrets/music")
+    control_key(key_file)  # Fail at startup if the scoped credential is missing.
+    web.run_app(create_app(lambda: control_key(key_file)), host="0.0.0.0", port=8090, access_log=None, print=None)

@@ -16,6 +16,7 @@ type State = {
   queue: Song[];
   error: string | null;
   elapsed: number;
+  rhythm?: { id: string; phase: string } | null;
 };
 function duration(seconds: number | null) {
   if (seconds === null) return "";
@@ -69,7 +70,7 @@ export function Music({
       clearInterval(timer);
     };
   }, []);
-  const disabled = !identity || busy;
+  const disabled = !identity || busy || !!state.rhythm;
   async function search() {
     if (!identity || !query.trim() || busy) return;
     setBusy(true);
@@ -124,6 +125,12 @@ export function Music({
                   : "Fila vazia"}
         </span>
       </header>
+      {state.rhythm && (
+        <p className="music-hint">
+          Bot reservado para uma partida do Beat Club. Volume individual
+          continua disponível.
+        </p>
+      )}
       {!identity && (
         <p className="music-hint">
           Entre na voz para buscar músicas e controlar a fila.

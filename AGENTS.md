@@ -2,7 +2,7 @@
 
 - Use the existing checkout. Cloud tasks are already isolated; do not create a worktree unless requested.
 - App/UI and documentation are in Portuguese. Keep source, API docs and operational instructions consistent.
-- Stack: Java 25 / Spring Boot 3.5.16 / Maven Wrapper 3.9.11; PostgreSQL/Flyway; React/TypeScript/Vite; LiveKit/Caddy/Compose. No Redis, Kubernetes, webcam, recording or AI features in the MVP.
+- Stack: Java 25 / Spring Boot 4.1.2 / Maven Wrapper 3.9.11; PostgreSQL/Flyway; React/TypeScript 6.0.3/Vite; LiveKit/Caddy/Compose. No Redis, Kubernetes, webcam, recording or AI features in the MVP.
 - Modes: only CHAT_MODE=dev (default, loopback) and CHAT_MODE=prd (internet). Persisted legacy markers migrate internally; old mode inputs are rejected. Prefix production admin/compose/backup/restore/diagnose commands with CHAT_MODE=prd.
 - Standard dev workflow: `./scripts/up.sh`, `./scripts/admin.sh admin`, `./scripts/diagnose.sh`. Host needs Docker Compose >=2.24.4 and Bash; runtimes run in containers.
 - `./scripts/check.sh` creates a separate friends_test database and runs backend tests plus frontend lint/build. Never point the integration suite at the friends application database; its fixtures truncate tables.

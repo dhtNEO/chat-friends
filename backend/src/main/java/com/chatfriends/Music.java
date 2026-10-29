@@ -2,7 +2,7 @@ package com.chatfriends;
 
 import static org.springframework.http.HttpStatus.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.Set;

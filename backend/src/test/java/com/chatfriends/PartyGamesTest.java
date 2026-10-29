@@ -1,0 +1,596 @@
+package com.chatfriends;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.util.*;
+import java.util.concurrent.*;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
+
+@SpringBootTest(properties = { "app.reconcile-initial-delay=600000" })
+@AutoConfigureMockMvc
+class PartyGamesTest {
+  @Autowired
+  PartyGames party;
+  @Autowired
+  Games games;
+  @Autowired
+  Accounts accounts;
+  @Autowired
+  MockMvc mvc;
+  @MockitoBean
+  LiveKitGateway live;
+  @MockitoBean
+  MusicGateway bot;
+  UUID ana, bia;
+
+  @BeforeEach
+  void setup() {
+    games.locked(
+        () -> {
+          games.db.execute("truncate accounts cascade");
+          return null;
+        });
+    ana = accounts.create("ana", "Ana", "test-only-password-ana", false).id();
+    bia = accounts.create("bia", "Bia", "test-only-password-bia", false).id();
+    when(live.musicToken()).thenReturn("private-test-token");
+  }
+
+  @AfterEach
+  void cleanupRooms() {
+    games.locked(
+        () -> {
+          games.db.execute("truncate party_rooms cascade");
+          return null;
+        });
+  }
+
+  UUID create(String kind) {
+    if (kind.equals("blackjack"))
+      games.locked(
+          () -> {
+            games.roulette.entry(ana, UUID.randomUUID(), 100, "grant", "Teste");
+            games.roulette.entry(bia, UUID.randomUUID(), 100, "grant", "Teste");
+            return null;
+          });
+    return party.create(
+        "ana", UUID.randomUUID(), kind, kind.equals("rhythm") ? "aqz-KE-bpKQ" : null);
+  }
+
+  void action(String user, UUID id, String action) {
+    party.action(user, id, UUID.randomUUID(), action, null);
+  }
+
+  UUID blackjack() {
+    UUID id = create("blackjack");
+    action("bia", id, "join");
+    action("bia", id, "ready");
+    action("ana", id, "ready");
+    action("ana", id, "start");
+    return id;
+  }
+
+  void expire(UUID id) {
+    games.db.update(
+        "update party_rooms set ends_at=? where id=?", System.currentTimeMillis() - 1, id);
+    party.advance();
+  }
+
+  String voice(UUID account, String username) {
+    String session = UUID.randomUUID().toString(), identity = account + ":party";
+    long now = System.currentTimeMillis();
+    games.db.update(
+        "insert into spring_session values(?,?,?, ?,7200,?,?)",
+        UUID.randomUUID().toString(),
+        session,
+        now,
+        now,
+        now + 7200000,
+        username);
+    games.db.update(
+        "insert into media_connections(identity,account_id,session_id,expires_at)"
+            + " values(?,?,?,now()+interval '1 hour')",
+        identity,
+        account,
+        session);
+    return identity;
+  }
+
+  UUID rhythm() throws Exception {
+    UUID id = create("rhythm");
+    action("bia", id, "join");
+    party.action("ana", id, UUID.randomUUID(), "ready", voice(ana, "ana"));
+    party.action("bia", id, UUID.randomUUID(), "ready", voice(bia, "bia"));
+    var notes = new ArrayList<Map<String, Integer>>();
+    for (int i = 0; i < 600; i++)
+      notes.add(Map.of("at", 2000 + i * 490, "lane", i % 4));
+    when(bot.prepareRhythm(eq(id.toString()), anyString(), anyString(), anyString()))
+        .thenReturn(
+            party.json.valueToTree(
+                Map.of("title", "Batidas", "durationMs", 300000, "notes", notes)));
+    when(bot.state())
+        .thenReturn(
+            party.json.valueToTree(
+                Map.of("rhythm", Map.of("id", id.toString(), "phase", "playing"))));
+    party.rhythmStart("ana", id);
+    return id;
+  }
+
+  @Test
+  void acesAndFacesAndNatural() {
+    assertEquals(21, PartyGames.total(List.of(0, 12)));
+    assertEquals(12, PartyGames.total(List.of(0, 13)));
+    assertEquals(21, PartyGames.total(List.of(0, 13, 8)));
+    assertTrue(PartyGames.natural(List.of(0, 9)));
+    assertFalse(PartyGames.natural(List.of(0, 4, 4)));
+  }
+
+  @Test
+  void multiplayerLobbyRequiresReadyAndHost() {
+    UUID id = create("blackjack");
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "start"));
+    action("bia", id, "join");
+    assertThrows(ResponseStatusException.class, () -> action("bia", id, "start"));
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "start"));
+    action("bia", id, "ready");
+    action("ana", id, "ready");
+    action("ana", id, "start");
+    assertEquals("running", party.row(id).get("status"));
+  }
+
+  @Test
+  void holeCardAndDeckAreNeverPublishedBeforeFinish() {
+    UUID id = blackjack();
+    var view = party.view(id, ana);
+    assertEquals(1, ((List<?>) view.get("dealer")).size());
+    assertEquals(true, view.get("dealerHidden"));
+    assertFalse(view.containsKey("deck"));
+    assertFalse(view.containsKey("cursor"));
+    expire(id);
+    assertEquals(false, party.view(id, ana).get("dealerHidden"));
+  }
+
+  @Test
+  void opponentsCardsAndTotalsStayPrivateUntilTheResult() {
+    UUID id = blackjack();
+
+    var anaView = players(id, ana);
+
+    var own = anaView.stream()
+        .filter(p -> ana.equals(p.get("id")))
+        .findFirst()
+        .orElseThrow();
+
+    var other = anaView.stream()
+        .filter(p -> bia.equals(p.get("id")))
+        .findFirst()
+        .orElseThrow();
+
+    assertEquals(2, ((List<?>) own.get("hand")).size());
+    assertEquals(List.of(), other.get("hand"));
+    assertNull(other.get("total"));
+    assertNull(other.get("outcome"));
+    assertEquals(0, other.get("score"));
+    assertEquals(0, other.get("reward"));
+    assertEquals(true, other.get("handHidden"));
+    assertEquals(2, other.get("cardCount"));
+
+    var biaView = players(id, bia);
+
+    assertEquals(
+        List.of(),
+        biaView.stream()
+            .filter(p -> ana.equals(p.get("id")))
+            .findFirst()
+            .orElseThrow()
+            .get("hand"));
+
+    expire(id);
+
+    for (var player : players(id, ana)) {
+      assertFalse(((List<?>) player.get("hand")).isEmpty());
+      assertNotNull(player.get("total"));
+      assertNotNull(player.get("outcome"));
+      assertEquals(false, player.get("handHidden"));
+    }
+  }
+
+  @Test
+  void blackjackResultsDistinguishNaturalAndDealerNatural() {
+    assertEquals("blackjack", PartyGames.blackjackOutcome(List.of(0, 9), List.of(9, 6)));
+    assertEquals("loss", PartyGames.blackjackOutcome(List.of(4, 5, 9), List.of(0, 9)));
+    assertEquals("tie", PartyGames.blackjackOutcome(List.of(0, 9), List.of(0, 9)));
+    assertEquals("win", PartyGames.blackjackOutcome(List.of(9, 8), List.of(9, 6)));
+    assertEquals("bust", PartyGames.blackjackOutcome(List.of(9, 9, 9), List.of(9, 6)));
+  }
+
+  @Test
+  void repeatedHitOnlyDrawsOneCardAndStandingBlocksChanges() {
+    UUID id = blackjack(), key = UUID.randomUUID();
+    games.db.update(
+        "update party_players set hand='[2,3]',standing=false where room_id=? and account_id=?",
+        id,
+        ana);
+    party.action("ana", id, key, "hit", null);
+    party.action("ana", id, key, "hit", null);
+    assertEquals(
+        3,
+        party
+            .hand(
+                games.db.queryForObject(
+                    "select hand from party_players where room_id=? and account_id=?",
+                    String.class,
+                    id,
+                    ana))
+            .size());
+    action("ana", id, "stand");
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "hit"));
+  }
+
+  @Test
+  void deterministicBlackjackRewardsArePaidExactlyOnce() {
+    UUID id = blackjack();
+    games.db.update(
+        "update party_players set hand='[0,9]',standing=true where room_id=? and account_id=?",
+        id,
+        ana);
+    games.db.update(
+        "update party_players set hand='[9,8]',standing=true where room_id=? and account_id=?",
+        id,
+        bia);
+    var s = party.state(party.row(id));
+    s.put("dealer", List.of(9, 6));
+    party.save(id, s);
+    party.advance();
+    party.advance();
+    assertEquals(120, games.roulette.balance(ana));
+    assertEquals(110, games.roulette.balance(bia));
+    assertEquals("finished", party.row(id).get("status"));
+  }
+
+  @Test
+  void paidAdmissionRequiresBalanceAndRetriesNeverChargeTwice() {
+    UUID id = party.create("ana", UUID.randomUUID(), "blackjack", null);
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "ready"));
+    assertEquals(0, games.roulette.balance(ana));
+    games.locked(
+        () -> {
+          games.roulette.entry(ana, UUID.randomUUID(), 10, "grant", "Teste");
+          return null;
+        });
+    UUID request = UUID.randomUUID();
+    party.action("ana", id, request, "ready", null);
+    party.action("ana", id, request, "ready", null);
+    action("ana", id, "ready");
+    assertEquals(0, games.roulette.balance(ana));
+    assertEquals(
+        1,
+        games.db.queryForObject(
+            "select count(*) from coin_ledger where kind='stake'", Integer.class));
+    UUID leave = UUID.randomUUID();
+    party.action("ana", id, leave, "leave", null);
+    party.action("ana", id, leave, "leave", null);
+    assertEquals(10, games.roulette.balance(ana));
+  }
+
+  @Test
+  void leavingOrExpiringBeforeCardsRefundsAndRejoiningCanPayAgain() {
+    UUID id = create("blackjack");
+    action("bia", id, "join");
+    action("ana", id, "ready");
+    action("ana", id, "leave");
+    assertEquals(100, games.roulette.balance(ana));
+    action("ana", id, "join");
+    action("ana", id, "ready");
+    assertEquals(90, games.roulette.balance(ana));
+    games.db.update("update party_players set seen_at=0 where room_id=? and account_id=?", id, ana);
+    party.advance();
+    party.advance();
+    assertEquals(100, games.roulette.balance(ana));
+  }
+
+  @Test
+  void nextRoundsPreserveRoomAndRequireNewEntryAndPayNewRewards() {
+    UUID id = blackjack();
+    UUID firstRound = (UUID) party.row(id).get("round_id");
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "next"));
+    expire(id);
+    long before = games.roulette.balance(ana);
+    assertThrows(ResponseStatusException.class, () -> action("bia", id, "next"));
+    UUID next = UUID.randomUUID();
+    party.action("ana", id, next, "next", null);
+    UUID secondRound = (UUID) party.row(id).get("round_id");
+    party.action("ana", id, next, "next", null);
+    assertEquals(secondRound, party.row(id).get("round_id"));
+    assertNotEquals(firstRound, secondRound);
+    assertEquals("waiting", party.row(id).get("status"));
+    assertEquals(before, games.roulette.balance(ana));
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "start"));
+    assertThrows(
+        ResponseStatusException.class,
+        () -> party.action("ana", id, UUID.randomUUID(), "ready", null, firstRound));
+    action("ana", id, "ready");
+    action("bia", id, "ready");
+    assertEquals(before - 10, games.roulette.balance(ana));
+    action("ana", id, "start");
+    games.db.update(
+        "update party_players set hand='[0,9]' where room_id=? and account_id=?", id, ana);
+    var state = party.state(party.row(id));
+    state.put("dealer", List.of(9, 6));
+    party.save(id, state);
+    expire(id);
+    party.advance();
+    assertEquals(before - 10 + 30, games.roulette.balance(ana));
+    assertEquals(
+        2,
+        games.db.queryForObject(
+            "select count(*) from coin_ledger where account_id=? and reason='Blackjack · rodada'",
+            Integer.class,
+            ana));
+  }
+
+  @Test
+  void leavingAfterDealDoesNotRefund() {
+    UUID id = blackjack();
+    action("ana", id, "leave");
+    assertEquals(90, games.roulette.balance(ana));
+    expire(id);
+    assertEquals(90, games.roulette.balance(ana));
+  }
+
+  @Test
+  void concurrentAdmissionsWithDifferentKeysChargeOnlyOnce() throws Exception {
+    UUID id = create("blackjack");
+    try (var pool = Executors.newFixedThreadPool(5)) {
+      var tasks = new ArrayList<Callable<Void>>();
+      for (int n = 0; n < 5; n++)
+        tasks.add(
+            () -> {
+              action("ana", id, "ready");
+              return null;
+            });
+      for (var result : pool.invokeAll(tasks))
+        result.get();
+    }
+    assertEquals(90, games.roulette.balance(ana));
+  }
+
+  @Test
+  void pendingEntryReservesCapacityForRefund() {
+    UUID id = create("blackjack");
+    action("ana", id, "ready");
+    games.locked(
+        () -> {
+          games.roulette.entry(ana, UUID.randomUUID(), Long.MAX_VALUE - 100, "payout", "Teste");
+          assertEquals(0, games.roulette.freeCapacity(ana));
+          return null;
+        });
+    action("ana", id, "leave");
+    assertEquals(Long.MAX_VALUE, games.roulette.balance(ana));
+  }
+
+  @Test
+  void nextRoundDoesNotPullPlayersFromAnotherActiveTable() {
+    UUID id = blackjack();
+    expire(id);
+    UUID other = party.create("bia", UUID.randomUUID(), "rhythm", "aqz-KE-bpKQ");
+    action("ana", id, "next");
+    assertTrue(
+        games.db.queryForObject(
+            "select departed from party_players where room_id=? and account_id=?",
+            Boolean.class,
+            id,
+            bia));
+    assertEquals(other, ((Map<?, ?>) party.overview("bia").get("room")).get("id"));
+  }
+
+  @Test
+  void roomsAreMutuallyExclusiveWithRouletteAndHostTransfers() {
+    UUID id = create("blackjack");
+    assertThrows(
+        ResponseStatusException.class, () -> games.create("ana", UUID.randomUUID(), false));
+    action("bia", id, "join");
+    action("ana", id, "leave");
+    assertEquals(bia, party.row(id).get("host_id"));
+  }
+
+  @Test
+  void missingVoiceOrBusyBotDoesNotMintRewards() {
+    UUID id = create("rhythm");
+    action("bia", id, "join");
+    party.action("ana", id, UUID.randomUUID(), "ready", "invalid");
+    party.action("bia", id, UUID.randomUUID(), "ready", "invalid");
+    assertThrows(ResponseStatusException.class, () -> party.rhythmStart("ana", id));
+    assertEquals(0, games.roulette.balance(ana));
+  }
+
+  @Test
+  void serverJudgesRhythmAndDuplicateNotesCannotFarmCoins() throws Exception {
+    UUID id = rhythm();
+    assertEquals(
+        300600L, (Long) party.row(id).get("ends_at") - (Long) party.row(id).get("starts_at"));
+    assertThrows(ResponseStatusException.class, () -> party.note("ana", id, 0, 0));
+    for (int n = 0; n < 3; n++) {
+      games.db.update(
+          "update party_rooms set starts_at=? where id=?",
+          System.currentTimeMillis() - (2000 + n * 490) - 150,
+          id);
+      int score = party.note("ana", id, n, n % 4);
+      assertEquals(100, score);
+      assertEquals(100, party.note("ana", id, n, n % 4));
+    }
+    assertEquals(
+        300,
+        games.db.queryForObject(
+            "select score from party_players where room_id=? and account_id=?",
+            Integer.class,
+            id,
+            ana));
+    when(bot.state())
+        .thenReturn(
+            party.json.valueToTree(
+                Map.of("rhythm", Map.of("id", id.toString(), "phase", "finished"))));
+    expire(id);
+    party.advance();
+    assertTrue(games.roulette.balance(ana) > 0);
+    assertEquals(0, games.roulette.balance(bia));
+    assertEquals(
+        1,
+        games.db.queryForObject(
+            "select count(*) from coin_ledger where account_id=?", Integer.class, ana));
+  }
+
+  @Test
+  void botFailureCancelsInsteadOfPayingAFakeShow() throws Exception {
+    UUID id = rhythm();
+    when(bot.state())
+        .thenReturn(
+            party.json.valueToTree(
+                Map.of("rhythm", Map.of("id", id.toString(), "phase", "failed"))));
+    party.advance();
+    assertEquals("cancelled", party.row(id).get("status"));
+    assertEquals(0, games.roulette.balance(ana));
+    verify(bot).releaseRhythm(id.toString());
+  }
+
+  @Test
+  void concurrentHitRetriesUseSingleTransaction() throws Exception {
+    UUID id = blackjack(), key = UUID.randomUUID();
+    games.db.update(
+        "update party_players set hand='[2,3]',standing=false where room_id=? and account_id=?",
+        id,
+        ana);
+    try (var pool = Executors.newFixedThreadPool(5)) {
+      var tasks = new ArrayList<Callable<Void>>();
+      for (int n = 0; n < 5; n++)
+        tasks.add(
+            () -> {
+              party.action("ana", id, key, "hit", null);
+              return null;
+            });
+      for (var r : pool.invokeAll(tasks))
+        r.get();
+    }
+    assertEquals(
+        3,
+        party
+            .hand(
+                games.db.queryForObject(
+                    "select hand from party_players where room_id=? and account_id=?",
+                    String.class,
+                    id,
+                    ana))
+            .size());
+  }
+
+  @Test
+  void rhythmReadyCannotUseAnotherPersonsVoiceIdentity() throws Exception {
+    UUID room = create("rhythm");
+    String other = voice(bia, "bia");
+    var json = party.json;
+    var csrf = mvc.perform(get("/api/csrf")).andReturn().getResponse();
+    var cookie = mvc.perform(
+        post("/api/login")
+            .cookie(csrf.getCookie("SESSION"))
+            .header(
+                "X-CSRF-TOKEN",
+                json.readTree(csrf.getContentAsString()).get("token").asString())
+            .param("username", "ana")
+            .param("password", "test-only-password-ana"))
+        .andExpect(status().isNoContent())
+        .andReturn()
+        .getResponse()
+        .getCookie("SESSION");
+    var token = json.readTree(
+        mvc.perform(get("/api/csrf").cookie(cookie))
+            .andReturn()
+            .getResponse()
+            .getContentAsString())
+        .get("token")
+        .asString();
+    mvc.perform(
+        post("/api/party/" + room + "/ready")
+            .cookie(cookie)
+            .header("X-CSRF-TOKEN", token)
+            .contentType("application/json")
+            .content(
+                json.writeValueAsString(
+                    Map.of("clientId", UUID.randomUUID(), "identity", other))))
+        .andExpect(status().isForbidden());
+    assertFalse(
+        games.db.queryForObject(
+            "select ready from party_players where room_id=? and account_id=?",
+            Boolean.class,
+            room,
+            ana));
+  }
+
+  @Test
+  void apiRequiresAuthenticationAndCsrf() throws Exception {
+    mvc.perform(get("/api/party")).andExpect(status().isUnauthorized());
+    mvc.perform(
+        post("/api/party")
+            .contentType("application/json")
+            .content("{\"clientId\":\"" + UUID.randomUUID() + "\",\"kind\":\"blackjack\"}"))
+        .andExpect(status().isForbidden());
+  }
+
+  private List<Map<String, Object>> players(UUID gameId, UUID viewerId) {
+    Object value = party.view(gameId, viewerId).get("players");
+
+    if (!(value instanceof List<?> list)) {
+      throw new AssertionError("Expected players to be a List");
+    }
+
+    List<Map<String, Object>> result = new ArrayList<>();
+
+    for (Object item : list) {
+      if (!(item instanceof Map<?, ?> map)) {
+        throw new AssertionError("Expected player to be a Map");
+      }
+
+      Map<String, Object> player = new HashMap<>();
+
+      for (var entry : map.entrySet()) {
+        if (!(entry.getKey() instanceof String key)) {
+          throw new AssertionError("Expected player key to be a String");
+        }
+
+        player.put(key, entry.getValue());
+      }
+
+      result.add(player);
+    }
+
+    return result;
+  }
+
+  @Test
+  void onlyHostCanStopRhythmWithoutRewardsAndRetriesAreSafe() throws Exception {
+    UUID id = rhythm();
+    assertThrows(ResponseStatusException.class, () -> action("bia", id, "stop"));
+    UUID request = UUID.randomUUID();
+    party.action("ana", id, request, "stop", null);
+    party.action("ana", id, request, "stop", null);
+    assertEquals("cancelled", party.row(id).get("status"));
+    assertEquals(0, games.db.queryForObject("select sum(reward) from party_players where room_id=?", Integer.class, id));
+    assertThrows(ResponseStatusException.class, () -> party.note("ana", id, 0, 0));
+    verify(bot, atLeastOnce()).releaseRhythm(id.toString());
+  }
+
+  @Test
+  void difficultyIsValidatedAndReturnedToEveryPlayer() {
+    assertThrows(ResponseStatusException.class, () -> party.create("ana", UUID.randomUUID(), "rhythm", "aqz-KE-bpKQ", "invalid"));
+    UUID id = party.create("ana", UUID.randomUUID(), "rhythm", "aqz-KE-bpKQ", "hard");
+    assertEquals("hard", party.state(party.row(id)).get("difficulty"));
+  }
+}

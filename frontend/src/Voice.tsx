@@ -56,6 +56,7 @@ export function Voice({
   maximized,
   onOpen,
   onStreaming,
+  onIdentityChange,
   onMaximize,
   onError,
 }: {
@@ -70,6 +71,7 @@ export function Voice({
   maximized: boolean;
   onOpen: () => void;
   onStreaming: (active: boolean) => void;
+  onIdentityChange?: (identity: string | undefined) => void;
   onMaximize: () => void;
   onError: (s: string) => void;
 }) {
@@ -115,6 +117,9 @@ export function Voice({
     lease: { identity: null, leaseId: null, expiresAt: null },
     participants: [],
   });
+  useEffect(() => {
+    onIdentityChange?.(joined ? connection.current?.identity : undefined);
+  }, [joined, onIdentityChange]);
   const noiseSupported =
     navigator.mediaDevices?.getSupportedConstraints().noiseSuppression === true;
   const bump = () => setVersion((x) => x + 1);
