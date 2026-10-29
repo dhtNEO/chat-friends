@@ -12,6 +12,7 @@ export function DetachedMedia({
   onSeparate,
   onReturn,
   onError,
+  onDetachedChange,
   children,
 }: {
   kind: MediaPanel;
@@ -20,6 +21,7 @@ export function DetachedMedia({
   onSeparate: () => void;
   onReturn: () => void;
   onError: (message: string) => void;
+  onDetachedChange: (detached: boolean) => void;
   children: ReactNode;
 }) {
   const popup = usePopout(onError, kind);
@@ -43,6 +45,9 @@ export function DetachedMedia({
     }
   }, [host, home, dock, popup.host]);
   useLayoutEffect(() => () => host.remove(), [host]);
+  useLayoutEffect(() => {
+    onDetachedChange(external);
+  }, [external, onDetachedChange]);
   const bringHome = () => {
     popup.close();
     onReturn();
@@ -65,7 +70,6 @@ export function DetachedMedia({
   return (
     <>
       <div hidden ref={parking} />
-      {home && external && createPortal(placeholder, home)}
       {dock && popup.host && createPortal(placeholder, dock)}
       {createPortal(
         <section className="detached-media" aria-label={`Área de ${label}`}>

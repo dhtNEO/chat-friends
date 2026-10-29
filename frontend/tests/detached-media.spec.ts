@@ -38,13 +38,50 @@ async function snapshot(page: Page) {
   });
 }
 
+const roomBlock = (page: Page, id: string) => page.locator(`.room-block[data-reorder-id="${id}"]`);
+async function absentFromRoom(page: Page, ids: string[], peopleFirst = true) {
+  for (const id of ids) {
+    const block = roomBlock(page, id);
+    await expect(block).toBeHidden();
+    expect(await block.evaluate(el => el.getClientRects().length)).toBe(0);
+  }
+  await expect(page.locator(".room-workspace .media-away")).toHaveCount(0);
+  const people = roomBlock(page, "people");
+  await expect(people).toBeVisible();
+  if (peopleFirst) {
+    const workspace = page.locator(".room-workspace");
+    await workspace.evaluate(el => { el.scrollTop = 0; });
+    const outer = (await workspace.boundingBox())!;
+    const inner = (await people.boundingBox())!;
+    expect(inner.y).toBeGreaterThanOrEqual(outer.y);
+    expect(inner.y - outer.y).toBeLessThan(10);
+  }
+}
+async function layoutStyles(page: Page) {
+  return page.locator(".room-block").evaluateAll(elements => elements.map(el => ({
+    id: (el as HTMLElement).dataset.reorderId,
+    order: (el as HTMLElement).style.order,
+    height: (el as HTMLElement).style.height,
+    columns: (el as HTMLElement).style.gridColumn,
+  })));
+}
+
 test("painéis independentes preservam vídeo, busca, fila e volume ao separar e retornar", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
   await enter(page);
   const music = await prepareMusic(page);
   const state = await snapshot(page);
+  await page.getByRole("button", { name: /Organizar sala$/ }).click();
+  await page.getByLabel("Altura de Transmissão", { exact: true }).fill("420");
+  await page.getByLabel("Altura de Música", { exact: true }).fill("320");
+  await page.getByRole("button", { name: "Arrastar bloco Música", exact: true }).press("Home");
+  const savedStyles = await layoutStyles(page);
+  await page.getByRole("button", { name: "Focar Transmissão", exact: true }).click();
   await page.getByRole("button", { name: "Separar transmissão", exact: true }).click();
+  await absentFromRoom(page, ["screen"], false);
+  await expect(roomBlock(page, "music")).toBeVisible();
   await page.getByRole("button", { name: "Separar música", exact: true }).click();
+  await absentFromRoom(page, ["screen", "music"]);
   await expect(page.getByRole("region", { name: "Área de transmissão", exact: true }).getByRole("button", { name: "Trazer transmissão para a sala", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Área de música", exact: true }).getByRole("button", { name: "Trazer música para a sala", exact: true })).toBeVisible();
   await expect(music.getByLabel("Buscar música ou colar link do YouTube")).toHaveValue("trilha dos painéis");
@@ -54,11 +91,17 @@ test("painéis independentes preservam vídeo, busca, fila e volume ao separar e
   await page.screenshot({ path: test.info().outputPath("detached-desktop.png") });
   await page.getByRole("region", { name: "Área de transmissão", exact: true }).getByRole("button", { name: "Trazer transmissão para a sala", exact: true }).click();
   await page.getByRole("region", { name: "Área de música", exact: true }).getByRole("button", { name: "Trazer música para a sala", exact: true }).click();
+  // Returning the formerly focused screen restores its focus; revealing all
+  // blocks again must recover their saved order and dimensions.
+  await page.getByRole("button", { name: "Restaurar blocos", exact: true }).click();
   await expect.poll(() => state.evaluate(s => s.video.isConnected && s.video.srcObject === s.stream && s.video.currentTime > s.time)).toBeTruthy();
   expect(await state.evaluate(s => s.leaves)).toBe(0);
   expect(await state.evaluate(s => s.audio.every(el => el.isConnected))).toBe(true);
   await expect(page.locator("video")).toHaveCount(1);
   await expect(music.getByLabel("Volume da música")).toHaveValue("35");
+  expect(await layoutStyles(page)).toEqual(savedStyles);
+  await expect(roomBlock(page, "screen")).toBeVisible();
+  await expect(roomBlock(page, "music")).toBeVisible();
 });
 
 test("janelas separadas mantêm mídia e estado e retornam ao fechar; bloqueio permite recuperar", async ({ page }) => {
@@ -75,6 +118,7 @@ test("janelas separadas mantêm mídia e estado e retornam ao fechar; bloqueio p
   });
   await page.getByRole("button", { name: "Abrir transmissão em outra janela", exact: true }).click();
   await expect(page.locator("video")).toHaveCount(1);
+  await expect(roomBlock(page, "screen")).toBeVisible();
   expect(await state.evaluate(s => s.video.isConnected && s.leaves === 0)).toBe(true);
   await page.evaluate(() => (window as unknown as { restoreOpen: () => void }).restoreOpen());
   const screenEvent = page.waitForEvent("popup");
@@ -83,6 +127,8 @@ test("janelas separadas mantêm mídia e estado e retornam ao fechar; bloqueio p
   screen.on("pageerror", e => errors.push(e.name));
   await expect(screen.locator("video")).toHaveCount(1);
   await expect(page.locator("video")).toHaveCount(0);
+  await absentFromRoom(page, ["screen"]);
+  await expect(roomBlock(page, "music")).toBeVisible();
   await screen.getByRole("button", { name: "Tela cheia", exact: true }).click();
   await expect.poll(() => screen.evaluate(() => document.fullscreenElement?.classList.contains("screen") || false)).toBe(true);
   await screen.getByRole("button", { name: "Sair da tela cheia", exact: true }).click();
@@ -90,6 +136,7 @@ test("janelas separadas mantêm mídia e estado e retornam ao fechar; bloqueio p
   await page.getByRole("button", { name: "Abrir música em outra janela", exact: true }).click();
   const music = await musicEvent;
   music.on("pageerror", e => errors.push(e.name));
+  await absentFromRoom(page, ["screen", "music"]);
   const bot = music.getByRole("region", { name: "Bot de música" });
   await expect(bot.getByLabel("Buscar música ou colar link do YouTube")).toHaveValue("trilha dos painéis");
   await expect(bot.getByLabel("Volume da música")).toHaveValue("35");
@@ -97,7 +144,10 @@ test("janelas separadas mantêm mídia e estado e retornam ao fechar; bloqueio p
   await expect(bot.getByRole("button", { name: "Pausar música", exact: true })).toBeEnabled();
   await expect.poll(() => state.evaluate(s => s.video.isConnected && s.video.srcObject === s.stream && s.video.currentTime > s.time)).toBeTruthy();
   await music.close();
+  await expect(roomBlock(page, "music")).toBeVisible();
+  await expect(roomBlock(page, "screen")).toBeHidden();
   await screen.close();
+  await expect(roomBlock(page, "screen")).toBeVisible();
   await expect(page.locator("video")).toHaveCount(1);
   await expect(page.getByLabel("Volume da música")).toHaveValue("48");
   expect(await state.evaluate(s => s.video === document.querySelector("video") && s.video.srcObject === s.stream && s.leaves === 0)).toBe(true);
@@ -119,9 +169,18 @@ for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await enter(page);
     const state = await snapshot(page);
-    for (const [detach, back] of [["Separar transmissão", "Trazer transmissão para a sala"], ["Separar música", "Trazer música para a sala"]]) {
+    for (const detach of ["Separar transmissão", "Separar música"]) {
       await page.getByRole("button", { name: detach, exact: true }).click();
-      const returnButton = page.getByRole("region", { name: back.includes("música") ? "Área de música" : "Área de transmissão", exact: true }).getByRole("button", { name: back, exact: true });
+      await page.locator(".dv-tab", { hasText: "Sala de estar" }).click();
+    }
+    await absentFromRoom(page, ["screen", "music"]);
+    if (width === 390) await page.screenshot({ path: test.info().outputPath("detached-mobile.png") });
+    for (const [title, region, back] of [
+      ["Transmissão", "Área de transmissão", "Trazer transmissão para a sala"],
+      ["Bot de música", "Área de música", "Trazer música para a sala"],
+    ]) {
+      await page.locator(".dv-tab", { hasText: title }).click();
+      const returnButton = page.getByRole("region", { name: region, exact: true }).getByRole("button", { name: back, exact: true });
       await returnButton.scrollIntoViewIfNeeded();
       const box = await returnButton.boundingBox();
       expect(box).not.toBeNull();
@@ -130,7 +189,6 @@ for (const width of [320, 390]) {
       await returnButton.click();
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    if (width === 390) await page.screenshot({ path: test.info().outputPath("detached-mobile.png") });
     await expect.poll(() => state.evaluate(s => s.video.isConnected && s.video.srcObject === s.stream && s.video.currentTime > s.time && s.leaves === 0)).toBeTruthy();
   });
 }
@@ -141,6 +199,7 @@ for (const width of [1024, 1280]) {
     await enter(page);
     await page.getByRole("button", { name: "Separar transmissão", exact: true }).click();
     await page.getByRole("button", { name: "Separar música", exact: true }).click();
+    await absentFromRoom(page, ["screen", "music"]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     for (const [title, region, back] of [
       ["Transmissão", "Área de transmissão", "Trazer transmissão para a sala"],

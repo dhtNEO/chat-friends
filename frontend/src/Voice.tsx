@@ -104,6 +104,8 @@ export function Voice({
   const directory = usePeople();
   const [screenHome, setScreenHome] = useState<HTMLElement | null>(null);
   const [musicHome, setMusicHome] = useState<HTMLElement | null>(null);
+  const [streamDetached, setStreamDetached] = useState(false);
+  const [musicDetached, setMusicDetached] = useState(false);
   useEffect(() => {
     loadSounds(userId);
   }, [userId]);
@@ -936,6 +938,10 @@ export function Voice({
       </header>
       <RoomLayout
         controller={roomLayout}
+        hiddenSections={[
+          ...(streamDetached ? (["screen"] as const) : []),
+          ...(musicDetached ? (["music"] as const) : []),
+        ]}
         expanded={maximized}
         onRestoreExpanded={onMaximize}
         content={{
@@ -1234,6 +1240,7 @@ export function Voice({
       {hosts.stage && createPortal(stage, hosts.stage)}
       <DetachedMedia
         kind="stream"
+        onDetachedChange={setStreamDetached}
         home={screenHome}
         dock={hosts.stream}
         onSeparate={() => onSeparate("stream")}
@@ -1244,6 +1251,7 @@ export function Voice({
       </DetachedMedia>
       <DetachedMedia
         kind="music"
+        onDetachedChange={setMusicDetached}
         home={musicHome}
         dock={hosts.music}
         onSeparate={() => onSeparate("music")}

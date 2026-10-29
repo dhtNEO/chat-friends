@@ -324,11 +324,13 @@ export function usePointerOrder(
 export function RoomLayout({
   controller,
   content,
+  hiddenSections = [],
   expanded,
   onRestoreExpanded,
 }: {
   controller: RoomLayoutController;
   content: Record<Section, ReactNode>;
+  hiddenSections?: Section[];
   expanded: boolean;
   onRestoreExpanded: () => void;
 }) {
@@ -364,13 +366,18 @@ export function RoomLayout({
     controller.reorder(from as Section, to as Section);
     setNotice(`${titles[from as Section]} mudou de posição.`);
   };
+  const visibleOrder = layout.order.filter((id) => !hiddenSections.includes(id));
   const drag = usePointerOrder(
     ".room-block",
     ".room-workspace",
-    layout.order,
+    visibleOrder,
     reorder,
   );
-  const only = expanded ? "screen" : focused;
+  const requestedFocus = expanded ? "screen" : focused;
+  const only =
+    requestedFocus && !hiddenSections.includes(requestedFocus)
+      ? requestedFocus
+      : null;
   const restoreFocus = () => {
     setFocused(null);
     if (expanded) onRestoreExpanded();
@@ -396,7 +403,9 @@ export function RoomLayout({
             Restaurar sala
           </button>
         )}
-        {only && <button onClick={restoreFocus}>Restaurar blocos</button>}
+        {(focused || expanded) && (
+          <button onClick={restoreFocus}>Restaurar blocos</button>
+        )}
         <span>
           {editing
             ? "Arraste as alças. Use as setas para mover e redimensionar."
@@ -415,6 +424,7 @@ export function RoomLayout({
         {sections.map((id) => {
           const size = layout.sizes[id];
           const index = layout.order.indexOf(id);
+          const visibleIndex = visibleOrder.indexOf(id);
           return (
             <section
               key={id}
@@ -432,7 +442,12 @@ export function RoomLayout({
                 order: index,
                 height: only === id ? Math.max(160, height - 16) : size.height,
                 gridColumn: `span ${narrow || only ? 12 : size.columns}`,
-                display: only && only !== id ? "none" : undefined,
+                // Retain the home node and saved geometry without reserving
+                // grid space while its media lives in another panel/window.
+                display:
+                  hiddenSections.includes(id) || (only && only !== id)
+                    ? "none"
+                    : undefined,
               }}
             >
               <header className="room-block-header">
@@ -467,15 +482,15 @@ export function RoomLayout({
                   <div className="room-block-tools">
                     <button
                       aria-label={`Mover ${titles[id]} para cima`}
-                      disabled={index === 0}
-                      onClick={() => reorder(id, layout.order[index - 1])}
+                      disabled={visibleIndex <= 0}
+                      onClick={() => reorder(id, visibleOrder[visibleIndex - 1])}
                     >
                       ↑
                     </button>
                     <button
                       aria-label={`Mover ${titles[id]} para baixo`}
-                      disabled={index === sections.length - 1}
-                      onClick={() => reorder(id, layout.order[index + 1])}
+                      disabled={visibleIndex === visibleOrder.length - 1}
+                      onClick={() => reorder(id, visibleOrder[visibleIndex + 1])}
                     >
                       ↓
                     </button>
