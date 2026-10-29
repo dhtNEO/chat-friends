@@ -102,6 +102,11 @@ export function Voice({
   onError: (s: string) => void;
 }) {
   const [settings, setSettings] = useAudioSettings(userId);
+  const [gallery, setGallery] = useState(false);
+  // Independent multipliers for the streams in this call; output/stream remain master volumes.
+  const [streamVolumes, setStreamVolumes] = useState<Record<string, number>>(
+    {},
+  );
   const roomLayout = useRoomLayout(userId);
   const directory = usePeople();
   const [screenHome, setScreenHome] = useState<HTMLElement | null>(null);
@@ -676,6 +681,11 @@ export function Voice({
     notifyStreaming.current(streaming);
   }, [streaming]);
   const featured = live.find((t) => t.identity === focus) ?? live[0];
+  const visibleStreams = gallery ? live : featured ? [featured] : [];
+  const selectStream = (identity: string) => {
+    setFocus(identity);
+    setGallery(false);
+  };
   const voices = participants.flatMap((p) => {
     const track = p.getTrackPublication(Track.Source.Microphone)?.track
       ?.mediaStreamTrack;
@@ -777,7 +787,7 @@ export function Voice({
     sixty = (connection.current?.screen.fps ?? 60) >= 60;
   const screenContent = (
     <div className="stream-stage">
-      {live.length > 1 && (
+      {(live.length > 1 || (gallery && live.length > 0)) && (
         <div
           className="stream-selector"
           role="group"
@@ -786,29 +796,58 @@ export function Voice({
           {live.map((t) => (
             <button
               key={t.identity}
-              aria-pressed={featured?.identity === t.identity}
-              onClick={() => setFocus(t.identity)}
+              aria-pressed={!gallery && featured?.identity === t.identity}
+              onClick={() => selectStream(t.identity)}
             >
               Tela de {account(t.identity)?.displayName ?? t.name}
             </button>
           ))}
+          <button
+            aria-pressed={gallery}
+            onClick={() => setGallery((value) => !value)}
+          >
+            Assistir todas
+          </button>
         </div>
       )}
-      <div className="stage-main">
-        {featured ? (
-          <Screen
-            key={featured.track.sid || "local"}
-            track={featured.track}
-            name={account(featured.identity)?.displayName ?? featured.name}
-            avatar={avatarSrc(account(featured.identity))}
-            local={featured.identity === self}
-            viewers={Math.max(people.length - 1, 0)}
-            volume={settings.stream}
-            expanded={hosts.stream ? streamMaximized : maximized}
-            onExpand={onMaximizeStream}
-            onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
-            onError={onError}
-          />
+      <div
+        className={"stage-main" + (gallery ? " stream-gallery" : "")}
+        role={gallery ? "group" : undefined}
+        aria-label={gallery ? "Transmissões simultâneas" : undefined}
+      >
+        {visibleStreams.length ? (
+          visibleStreams.map((stream) => (
+            <div
+              className="stream-tile"
+              key={stream.identity}
+              role="group"
+              aria-label={`Tela de ${account(stream.identity)?.displayName ?? stream.name}`}
+            >
+              <Screen
+                track={stream.track}
+                name={account(stream.identity)?.displayName ?? stream.name}
+                avatar={avatarSrc(account(stream.identity))}
+                local={stream.identity === self}
+                viewers={Math.max(people.length - 1, 0)}
+                volume={
+                  gallery
+                    ? (streamVolumes[stream.identity] ?? 100)
+                    : settings.stream
+                }
+                expanded={hosts.stream ? streamMaximized : maximized}
+                onExpand={onMaximizeStream}
+                onVolume={(volume) =>
+                  gallery
+                    ? setStreamVolumes((old) => ({
+                        ...old,
+                        [stream.identity]: volume,
+                      }))
+                    : setSettings((old) => ({ ...old, stream: volume }))
+                }
+                onError={onError}
+              />
+            </div>
+          ))
         ) : (
           <div className="stage-empty">
             <span className="stage-empty-icon">
@@ -854,7 +893,7 @@ export function Voice({
             aria-setsize={cardIds.length}
             style={{ order: cardIds.indexOf(p.layoutKey) }}
             onClick={() => {
-              if (isLive(p.identity)) setFocus(p.identity);
+              if (isLive(p.identity)) selectStream(p.identity);
               // Touch screens have no hover: a tap reveals the volume.
               setAdjusting(adjusting === p.identity ? null : p.identity);
             }}
@@ -1304,11 +1343,12 @@ export function Voice({
               source !== Track.Source.ScreenShareAudio &&
               identity !== MUSIC_IDENTITY) ||
             (source === Track.Source.ScreenShareAudio &&
-              identity !== featured?.identity)
+              !visibleStreams.some((stream) => stream.identity === identity))
               ? 0
               : ((settings.output / 100) *
                   (source === Track.Source.ScreenShareAudio
-                    ? settings.stream
+                    ? settings.stream *
+                      (gallery ? (streamVolumes[identity] ?? 100) / 100 : 1)
                     : identity === MUSIC_IDENTITY
                       ? settings.music
                       : personVolume(identity))) /

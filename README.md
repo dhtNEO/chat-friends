@@ -1,6 +1,6 @@
 # Entre amigos
 
-Espaço privado para até 16 conexões: chat persistente, uma sala de voz e até 3 telas compartilhadas simultaneamente. Interface em português. Sem cadastro público, anúncios, IA, gravação ou serviços pagos obrigatórios.
+Espaço privado para até 16 conexões: chat persistente, uma sala de voz e até 3 telas compartilhadas simultaneamente, com opção de assistir todas em grade. Interface em português. Sem cadastro público, anúncios, IA, gravação ou serviços pagos obrigatórios.
 
 **Dois modos: dev (local) e prd (internet).** O proprietário confirmou o funcionamento em produção no Mac com DuckDNS. Leia [STATUS](docs/STATUS.md) para evidências e limites; capacidade para 16 pessoas precisa de medição.
 
