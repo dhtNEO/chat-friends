@@ -131,7 +131,7 @@ public class PartyGames {
               u,
               now(),
               now(),
-              kind.equals("blackjack"));
+              false);
           return id;
         });
   }
@@ -164,6 +164,7 @@ public class PartyGames {
     var out = new LinkedHashMap<String, Object>();
     out.put("id", id);
     out.put("hostId", r.get("host_id"));
+    out.put("roundId", r.get("round_id"));
     out.put("kind", r.get("kind"));
     out.put("status", r.get("status"));
     out.put("startsAt", r.get("starts_at"));
@@ -249,7 +250,33 @@ public class PartyGames {
         "Todos precisam estar presentes e prontos.");
   }
 
+  void refundEntry(UUID id, UUID u) {
+    UUID entry =
+        db.queryForObject(
+            "select entry_id from party_players where room_id=? and account_id=?",
+            UUID.class,
+            id,
+            u);
+    if (entry != null) {
+      wallet.entry(
+          u,
+          Roulette.ref("blackjack-refund", entry),
+          10,
+          "refund",
+          "Blackjack · entrada devolvida");
+      db.update(
+          "update party_players set entry_id=null,ready=false where room_id=? and account_id=?",
+          id,
+          u);
+    }
+  }
+
   public void action(String name, UUID id, UUID clientId, String action, String voice) {
+    action(name, id, clientId, action, voice, (UUID) row(id).get("round_id"));
+  }
+
+  public void action(
+      String name, UUID id, UUID clientId, String action, String voice, UUID roundId) {
     UUID u = user(name);
     games.locked(
         () -> {
@@ -267,6 +294,9 @@ public class PartyGames {
           }
           var r = row(id);
           String status = (String) r.get("status");
+          boolean blackjack = r.get("kind").equals("blackjack");
+          if (blackjack && Set.of("ready", "start", "hit", "stand", "next").contains(action))
+            require(Objects.equals(roundId, r.get("round_id")), "A rodada mudou. Atualize a sala.");
           if (action.equals("join")) {
             require(status.equals("waiting"), "A partida já começou.");
             if (db.queryForObject(
@@ -305,6 +335,28 @@ public class PartyGames {
               }
               case "ready" -> {
                 require(status.equals("waiting"), "A partida já começou.");
+                if (blackjack) {
+                  UUID entry =
+                      db.queryForObject(
+                          "select entry_id from party_players where room_id=? and account_id=?",
+                          UUID.class,
+                          id,
+                          u);
+                  if (entry == null) {
+                    require(
+                        wallet.balance(u) >= 10,
+                        "Você precisa de 10 Coins para entrar nesta rodada.");
+                    entry = UUID.randomUUID();
+                    wallet.entry(u, entry, -10, "stake", "Blackjack · entrada da rodada");
+                    db.update(
+                        "update party_players set entry_id=?,ready=true where room_id=? and"
+                            + " account_id=?",
+                        entry,
+                        id,
+                        u);
+                  }
+                  break;
+                }
                 db.update(
                     "update party_players set ready=not ready,voice_identity=? where room_id=? and"
                         + " account_id=?",
@@ -312,7 +364,42 @@ public class PartyGames {
                     id,
                     u);
               }
+              case "next" -> {
+                require(
+                    blackjack && status.equals("finished") && u.equals(r.get("host_id")),
+                    "O anfitrião abre a próxima rodada após o resultado.");
+                // A finished room does not reserve a seat: omit players who joined another table.
+                for (UUID player :
+                    db.queryForList(
+                        "select account_id from party_players where room_id=? and not departed",
+                        UUID.class,
+                        id)) {
+                  try {
+                    wallet.available(player);
+                  } catch (ResponseStatusException e) {
+                    require(
+                        !player.equals(u), "Saia da sua mesa atual antes de abrir outra rodada.");
+                    db.update(
+                        "update party_players set departed=true where room_id=? and account_id=?",
+                        id,
+                        player);
+                  }
+                }
+                db.update(
+                    "update party_players set"
+                        + " ready=false,entry_id=null,standing=false,hand='[]',score=0,reward=0"
+                        + " where room_id=?",
+                    id);
+                db.update(
+                    "update party_rooms set"
+                        + " status='waiting',round_id=?,state='{}',starts_at=0,ends_at=0,created_at=?"
+                        + " where id=?",
+                    UUID.randomUUID(),
+                    now(),
+                    id);
+              }
               case "leave" -> {
+                if (blackjack && status.equals("waiting")) refundEntry(id, u);
                 db.update(
                     "update party_players set departed=true,standing=true where room_id=? and"
                         + " account_id=?",
@@ -325,6 +412,14 @@ public class PartyGames {
                     r.get("kind").equals("blackjack"),
                     "Use a preparação de música para iniciar o ritmo.");
                 checkStart(r, u);
+                require(
+                    db.queryForObject(
+                            "select count(*) from party_players where room_id=? and not departed"
+                                + " and entry_id is null",
+                            Integer.class,
+                            id)
+                        == 0,
+                    "Todos precisam confirmar a entrada de 10 Coins.");
                 var s = state(r);
                 var deck = new ArrayList<Integer>();
                 for (int n = 0; n < 312; n++) deck.add(n % 52);
@@ -573,7 +668,7 @@ public class PartyGames {
       int reward =
           games.credit(
               (UUID) p.get("account_id"),
-              Roulette.ref("blackjack", id),
+              Roulette.ref("blackjack", (UUID) r.get("round_id")),
               desired,
               "Blackjack · rodada");
       db.update(
@@ -626,11 +721,20 @@ public class PartyGames {
   public void advance() {
     games.locked(
         () -> {
+          long sweepTime = now();
+          for (var stale :
+              db.queryForList(
+                  "select p.room_id,p.account_id from party_players p join party_rooms r on"
+                      + " r.id=p.room_id where r.kind='blackjack' and r.status='waiting' and"
+                      + " p.entry_id is not null and (p.seen_at<? or r.created_at<?)",
+                  sweepTime - 30000,
+                  sweepTime - 600000))
+            refundEntry((UUID) stale.get("room_id"), (UUID) stale.get("account_id"));
           db.update(
               "update party_players p set departed=true,standing=true from party_rooms r where"
                   + " r.id=p.room_id and r.status='waiting' and (p.seen_at<? or r.created_at<?)",
-              now() - 30000,
-              now() - 600000);
+              sweepTime - 30000,
+              sweepTime - 600000);
           for (UUID id :
               db.queryForList("select id from party_rooms where status='waiting'", UUID.class))
             transfer(id);

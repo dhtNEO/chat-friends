@@ -41,6 +41,11 @@ function clearBets() {
       p.refunded = false;
     });
 }
+export function demoEntry(amount: number, reason: string) {
+  if (balance + amount < 0)
+    throw new Error("Você precisa de 10 Coins para entrar nesta rodada.");
+  add(amount, reason);
+}
 export function demoGrant(amount: number, reason: string) {
   const reward = Math.max(0, Math.min(amount, 500 - granted));
   granted += reward;

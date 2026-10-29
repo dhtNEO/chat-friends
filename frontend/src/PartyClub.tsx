@@ -17,6 +17,7 @@ export type PartyPlayer = {
 };
 export type PartyRoom = {
   id: string;
+  roundId: string;
   hostId: string;
   kind: "blackjack" | "rhythm";
   status: string;
@@ -98,6 +99,7 @@ export function PartyClub({
     actionRequest = useRef<{
       room: string;
       action: string;
+      roundId: string;
       clientId: string;
     } | null>(null);
   const refresh = useCallback(async () => {
@@ -206,15 +208,18 @@ export function PartyClub({
       if (
         !actionRequest.current ||
         actionRequest.current.room !== room.id ||
-        actionRequest.current.action !== action
+        actionRequest.current.action !== action ||
+        actionRequest.current.roundId !== room.roundId
       )
         actionRequest.current = {
           room: room.id,
           action,
+          roundId: room.roundId,
           clientId: crypto.randomUUID(),
         };
       await api(`/party/${room.id}/${action}`, "POST", {
         clientId: actionRequest.current.clientId,
+        roundId: actionRequest.current.roundId,
         identity: voiceIdentity,
       });
       actionRequest.current = null;
@@ -604,14 +609,31 @@ export function PartyClub({
               </div>
             ))}
           </div>
+          {room.kind === "blackjack" && room.status === "waiting" && (
+            <p>
+              Entrada de 10 Coins por pessoa a cada rodada. Ao confirmar, as
+              moedas são debitadas. Se sair antes das cartas, você recebe a
+              entrada de volta.
+            </p>
+          )}
           {room.status === "waiting" && (
             <div className="club-actions">
               <button
                 className="club-primary"
-                disabled={busy || (room.kind === "rhythm" && !voiceIdentity)}
+                disabled={
+                  busy ||
+                  (room.kind === "blackjack" && own?.ready) ||
+                  (room.kind === "rhythm" && !voiceIdentity)
+                }
                 onClick={() => action("ready")}
               >
-                {own?.ready ? "Ainda não estou pronto" : "Estou pronto!"}
+                {room.kind === "blackjack"
+                  ? own?.ready
+                    ? "Entrada confirmada ✓"
+                    : "Confirmar entrada · 10 Coins"
+                  : own?.ready
+                    ? "Ainda não estou pronto"
+                    : "Estou pronto!"}
               </button>
               {host && (
                 <button
@@ -640,26 +662,39 @@ export function PartyClub({
               </strong>
               <p>
                 {room.kind === "blackjack"
-                  ? "Vitória: 20 C · blackjack natural: 30 C · empate: 8 C. Rodada gratuita, sem aposta."
+                  ? "Vitória: 20 C · blackjack natural: 30 C · empate: 8 C. Entrada: 10 Coins por rodada. Os prêmios são brutos e respeitam o limite diário."
                   : "Pontuação e precisão premiadas pelo servidor. Empates compartilham o bônus de primeiro lugar."}
               </p>
-              <button
-                disabled={busy || blocked}
-                onClick={() => {
-                  void run(async () => {
-                    await api(`/party/${room.id}/leave`, "POST", {
-                      clientId: crypto.randomUUID(),
+              {room.kind === "blackjack" ? (
+                host ? (
+                  <button
+                    disabled={busy || blocked}
+                    onClick={() => action("next")}
+                  >
+                    Abrir próxima rodada ↻
+                  </button>
+                ) : (
+                  <p>Aguardando o anfitrião abrir a próxima rodada.</p>
+                )
+              ) : (
+                <button
+                  disabled={busy || blocked}
+                  onClick={() => {
+                    void run(async () => {
+                      await api(`/party/${room.id}/leave`, "POST", {
+                        clientId: crypto.randomUUID(),
+                      });
+                      await api("/party", "POST", {
+                        clientId: crypto.randomUUID(),
+                        kind: room.kind,
+                        videoId: room.videoId || undefined,
+                      });
                     });
-                    await api("/party", "POST", {
-                      clientId: crypto.randomUUID(),
-                      kind: room.kind,
-                      videoId: room.videoId || undefined,
-                    });
-                  });
-                }}
-              >
-                Criar revanche ↻
-              </button>
+                  }}
+                >
+                  Criar revanche ↻
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -677,7 +712,9 @@ export function PartyClub({
             <Card card={22} />
             <span>21</span>
           </div>
-          <small>2–8 pessoas · entrada grátis · até 30 Coins por mão</small>
+          <small>
+            2–8 pessoas · 10 Coins por rodada · até 30 Coins por mão
+          </small>
           <button
             className="club-gold"
             disabled={busy || playing || blocked}

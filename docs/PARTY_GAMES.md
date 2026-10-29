@@ -4,11 +4,15 @@ Abra **Jogos** e encontre os dois novos cartões abaixo da roleta e do caça-ní
 
 ## Blackjack Social
 
-Entrada gratuita, com ações **pedir carta** e **parar**. Todos jogam contra a mesma banca, com mãos independentes e decisões simultâneas. Cada rodada usa seis baralhos embaralhados por SecureRandom. Ás vale 11 ou 1; figuras valem 10. A banca mantém uma carta oculta até o fim e para em 17, incluindo ás suave.
+Cada rodada custa **10 Coins por pessoa**, debitadas ao clicar em **Confirmar entrada · 10 Coins**. Criar ou entrar no lobby não cobra: cada participante confirma sua própria entrada antes de o anfitrião distribuir as cartas. Saldo insuficiente impede a confirmação. Sair do lobby ou perder presença antes da distribuição devolve as 10 Coins, sem consumir o limite diário de prêmios. Depois das cartas, a entrada não é devolvida.
+
+A mesma sala permite jogar várias rodadas: após o resultado, o anfitrião clica em **Abrir próxima rodada**. Código, convite e participantes permanecem; mãos e confirmações são limpas, e cada pessoa decide se paga a próxima entrada. Ninguém é cobrado automaticamente. Participantes que já entraram em outra sala ativa deixam a mesa anterior ao reabrir.
+
+O jogo tem ações **pedir carta** e **parar**. Todos jogam contra a mesma banca, com mãos independentes e decisões simultâneas. Cada rodada usa seis baralhos embaralhados por SecureRandom. Ás vale 11 ou 1; figuras valem 10. A banca mantém uma carta oculta até o fim e para em 17, incluindo ás suave.
 
 A rodada termina quando todos pararam/estouraram ou após 45 segundos. No prazo final, as mãos restantes param automaticamente e a banca completa a sua. O navegador nunca recebe o baralho, sua ordem ou a carta oculta. Jogadores podem acompanhar as mãos abertas dos amigos.
 
-| Resultado da mão | Coins |
+| Resultado da mão | Prêmio bruto em Coins |
 |---|---:|
 | Blackjack natural (21 com duas cartas), sem natural da banca | 30 |
 | Vitória contra a banca | 20 |
@@ -16,7 +20,9 @@ A rodada termina quando todos pararam/estouraram ou após 45 segundos. No prazo 
 | Derrota | 3 |
 | Estouro | 2 |
 
-O blackjack natural da banca vence 21 feito com mais cartas. Duas mãos naturais empatam. Sair explicitamente antes da conclusão exclui o jogador da premiação; recarregar a página recupera a mão da conta. As ações possuem clientId: repetir uma requisição não compra outra carta. O pagamento acontece uma vez, em transação, e usa o limite compartilhado de 500 Coins gratuitas por dia UTC.
+Os prêmios acima não incluem devolução da entrada: por exemplo, vitória de 20 Coins após entrada de 10 resulta em ganho líquido de 10. O limite diário pode reduzir a premiação.
+
+O blackjack natural da banca vence 21 feito com mais cartas. Duas mãos naturais empatam. Sair explicitamente antes da conclusão exclui o jogador da premiação; recarregar a página recupera a mão da conta. As ações possuem clientId: repetir uma requisição não compra outra carta. Cada rodada tem seu próprio UUID; cobrança, devolução e premiação são idempotentes. Ações de cartas, confirmação de entrada e abertura da próxima rodada exigem o roundId atual; requisições atrasadas de outra rodada são rejeitadas. O pagamento acontece uma vez por pessoa e rodada, em transação, e usa o limite compartilhado de 500 Coins gratuitas por dia UTC.
 
 ## Beat Club: música escolhida, notas extraídas do áudio
 
@@ -47,7 +53,7 @@ O backend verifica presença e conexão de voz antes e depois da preparação. N
 
 ## Implementação e operação
 
-Migração incremental **V9__blackjack_and_rhythm.sql**, mantendo V1–V8 intactas. `party_rooms` guarda tipo, fase, prazos e estado privado; `party_players` guarda prontidão, mão/placar e recompensa; `party_actions` e `rhythm_hits` garantem idempotência. Mutações e Coins usam o mesmo advisory lock dos jogos. O extrato e a classificação existentes incluem as novas recompensas.
+Migrações incrementais **V9__blackjack_and_rhythm.sql** e **V10__blackjack_rounds.sql**, mantendo as migrações anteriores intactas. V10 adiciona a identidade da rodada e a referência da entrada; lobbies antigos precisam confirmar a entrada antes de começar. `party_rooms` guarda tipo, fase, prazos e estado privado; `party_players` guarda prontidão, mão/placar e recompensa; `party_actions` e `rhythm_hits` garantem idempotência. Mutações e Coins usam o mesmo advisory lock dos jogos. O extrato e a classificação existentes incluem as novas recompensas.
 
 O job de partidas usa um scheduler separado para que consultas ao worker musical não bloqueiem os timers de voz e leases do espaço. Preparação de áudio ocorre fora da transação/lock do banco. Reiniciar o backend conclui mãos de blackjack vencidas; ritmo só premia quando o worker confirma a conclusão da mesma sessão.
 
@@ -57,14 +63,15 @@ O job de partidas usa um scheduler separado para que consultas ao worker musical
 | POST `/api/party` | `{clientId, kind: "blackjack" ou "rhythm", videoId?}` |
 | GET `/api/party/music/search?identity=...&q=...` | Busca no bot; exige voz da própria sessão |
 | POST `/api/party/{id}/join` | `{clientId}` |
-| POST `/api/party/{id}/ready` | `{clientId, identity?}`; identidade de voz obrigatória no ritmo |
-| POST `/api/party/{id}/start` | `{clientId, identity?}`; exclusivo do anfitrião |
-| POST `/api/party/{id}/hit` ou `/stand` | `{clientId}`; ação de blackjack |
+| POST `/api/party/{id}/ready` | `{clientId, roundId?, identity?}`; blackjack exige roundId e debita 10 Coins; identidade de voz obrigatória no ritmo |
+| POST `/api/party/{id}/start` | `{clientId, roundId?, identity?}`; blackjack exige roundId; exclusivo do anfitrião |
+| POST `/api/party/{id}/hit` ou `/stand` | `{clientId, roundId}`; ação de blackjack |
+| POST `/api/party/{id}/next` | `{clientId, roundId}`; anfitrião reabre o blackjack após o resultado, sem cobrar os participantes |
 | POST `/api/party/{id}/note` | `{note, lane}`; índices baseados em zero |
 | POST `/api/party/{id}/presence` ou `/leave` | `{clientId}` |
 
 Todas as rotas exigem sessão; POST exige CSRF e o orçamento de requisições existente. As rotas privadas `/rhythm/prepare`, `/rhythm/start`, `/rhythm/release` do worker exigem o segredo servidor-servidor e não são publicadas pelo Caddy.
 
-Atualize com o fluxo habitual `./scripts/up.sh` em dev ou `CHAT_MODE=prd ./scripts/up.sh` em produção. É necessário reconstruir **backend, frontend e music-bot**. Não habilite Flyway no runtime: o migrador de manutenção aplica V9 e os privilégios usuais.
+Atualize com o fluxo habitual `./scripts/up.sh` em dev ou `CHAT_MODE=prd ./scripts/up.sh` em produção. É necessário reconstruir **backend, frontend e music-bot**. Não habilite Flyway no runtime: o migrador de manutenção aplica V9/V10 e os privilégios usuais.
 
 O modo demo simula participantes, notas e resultados; não baixa nem toca o trecho real. Testes usam PostgreSQL separado, worker mockado, áudio PCM sintético e navegador. Acesso real ao YouTube, qualidade da detecção em cada faixa e latência WebRTC da instalação exigem teste com ouvintes reais; não foram alegados como validados pelos mocks.

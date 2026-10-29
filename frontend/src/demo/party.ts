@@ -1,5 +1,5 @@
 import type { PartyRoom, PartyState, PartyPlayer } from "../PartyClub";
-import { demoGrant } from "./games";
+import { demoGrant, demoEntry } from "./games";
 let room: PartyRoom | null = null;
 const requests = new Map<string, unknown>();
 const total = (cards: number[]) => {
@@ -31,6 +31,7 @@ export function demoParty(
   body:
     | {
         clientId?: string;
+        roundId?: string;
         kind?: "blackjack" | "rhythm";
         videoId?: string;
         note?: number;
@@ -124,13 +125,14 @@ export function demoParty(
     if (requests.has(key)) return requests.get(key);
     room = {
       id: crypto.randomUUID(),
+      roundId: crypto.randomUUID(),
       hostId: user.id,
       kind: body?.kind ?? "blackjack",
       status: "waiting",
       startsAt: 0,
       endsAt: 0,
       players: [
-        player(user.id, user.displayName, body?.kind === "blackjack"),
+        player(user.id, user.displayName, false),
         player("party-bia", "Bia (simulada)", true),
       ],
       dealer: [],
@@ -150,10 +152,34 @@ export function demoParty(
     key = `${action}:${body?.clientId}`;
   if (action !== "presence" && body?.clientId && requests.has(key))
     return requests.get(key);
+  if (
+    room.kind === "blackjack" &&
+    ["ready", "start", "hit", "stand", "next"].includes(action ?? "") &&
+    body?.roundId !== room.roundId
+  )
+    throw new Error("A rodada mudou. Atualize a sala.");
+  if (action === "next") {
+    if (room.kind !== "blackjack" || room.status !== "finished")
+      throw new Error("Aguarde o resultado.");
+    room.roundId = crypto.randomUUID();
+    room.status = "waiting";
+    room.startsAt = room.endsAt = 0;
+    room.dealer = [];
+    room.dealerTotal = 0;
+    room.players = [
+      player(user.id, user.displayName, false),
+      player("party-bia", "Bia (simulada)", true),
+    ];
+  }
   if (action === "ready") {
     if (room.kind === "rhythm" && !inCall)
       throw new Error("Entre na voz primeiro.");
-    room.players[0].ready = !room.players[0].ready;
+    if (room.status !== "waiting") throw new Error("A partida já começou.");
+    if (room.kind === "blackjack") {
+      if (!room.players[0].ready)
+        demoEntry(-10, "Blackjack · entrada da rodada");
+      room.players[0].ready = true;
+    } else room.players[0].ready = !room.players[0].ready;
   }
   if (action === "start") {
     if (room.players.some((p) => !p.ready))
@@ -207,7 +233,15 @@ export function demoParty(
     room.players[0].combo = points ? room.players[0].combo + 1 : 0;
     return { points };
   }
-  if (action === "leave") room = null;
+  if (action === "leave") {
+    if (
+      room.kind === "blackjack" &&
+      room.status === "waiting" &&
+      room.players[0].ready
+    )
+      demoEntry(10, "Blackjack · entrada devolvida");
+    room = null;
+  }
   if (body?.clientId) requests.set(key, {});
   return {};
 }

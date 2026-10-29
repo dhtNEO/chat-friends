@@ -20,7 +20,7 @@ public class PartyApi {
 
   public record Create(@NotNull UUID clientId, @NotNull String kind, String videoId) {}
 
-  public record Action(@NotNull UUID clientId, String identity) {}
+  public record Action(@NotNull UUID clientId, String identity, UUID roundId) {}
 
   public record Note(@NotNull @Min(0) Integer note, @NotNull @Min(0) @Max(3) Integer lane) {}
 
@@ -50,7 +50,7 @@ public class PartyApi {
     if (room.get("kind").equals("rhythm")) {
       music.listener(p, q, r.identity());
       games.rhythmStart(p.getName(), id);
-    } else games.action(p.getName(), id, r.clientId(), "start", null);
+    } else games.action(p.getName(), id, r.clientId(), "start", null, r.roundId());
   }
 
   @PostMapping("/{id}/note")
@@ -67,6 +67,6 @@ public class PartyApi {
       @Valid @RequestBody Action r) {
     if (action.equals("ready") && games.row(id).get("kind").equals("rhythm"))
       music.listener(p, q, r.identity());
-    games.action(p.getName(), id, r.clientId(), action, r.identity());
+    games.action(p.getName(), id, r.clientId(), action, r.identity(), r.roundId());
   }
 }

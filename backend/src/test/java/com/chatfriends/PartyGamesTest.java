@@ -49,6 +49,13 @@ class PartyGamesTest {
   }
 
   UUID create(String kind) {
+    if (kind.equals("blackjack"))
+      games.locked(
+          () -> {
+            games.roulette.entry(ana, UUID.randomUUID(), 100, "grant", "Teste");
+            games.roulette.entry(bia, UUID.randomUUID(), 100, "grant", "Teste");
+            return null;
+          });
     return party.create(
         "ana", UUID.randomUUID(), kind, kind.equals("rhythm") ? "aqz-KE-bpKQ" : null);
   }
@@ -61,6 +68,7 @@ class PartyGamesTest {
     UUID id = create("blackjack");
     action("bia", id, "join");
     action("bia", id, "ready");
+    action("ana", id, "ready");
     action("ana", id, "start");
     return id;
   }
@@ -127,6 +135,7 @@ class PartyGamesTest {
     assertThrows(ResponseStatusException.class, () -> action("bia", id, "start"));
     assertThrows(ResponseStatusException.class, () -> action("ana", id, "start"));
     action("bia", id, "ready");
+    action("ana", id, "ready");
     action("ana", id, "start");
     assertEquals("running", party.row(id).get("status"));
   }
@@ -182,9 +191,144 @@ class PartyGamesTest {
     party.save(id, s);
     party.advance();
     party.advance();
-    assertEquals(30, games.roulette.balance(ana));
-    assertEquals(20, games.roulette.balance(bia));
+    assertEquals(120, games.roulette.balance(ana));
+    assertEquals(110, games.roulette.balance(bia));
     assertEquals("finished", party.row(id).get("status"));
+  }
+
+  @Test
+  void paidAdmissionRequiresBalanceAndRetriesNeverChargeTwice() {
+    UUID id = party.create("ana", UUID.randomUUID(), "blackjack", null);
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "ready"));
+    assertEquals(0, games.roulette.balance(ana));
+    games.locked(
+        () -> {
+          games.roulette.entry(ana, UUID.randomUUID(), 10, "grant", "Teste");
+          return null;
+        });
+    UUID request = UUID.randomUUID();
+    party.action("ana", id, request, "ready", null);
+    party.action("ana", id, request, "ready", null);
+    action("ana", id, "ready");
+    assertEquals(0, games.roulette.balance(ana));
+    assertEquals(
+        1,
+        games.db.queryForObject(
+            "select count(*) from coin_ledger where kind='stake'", Integer.class));
+    UUID leave = UUID.randomUUID();
+    party.action("ana", id, leave, "leave", null);
+    party.action("ana", id, leave, "leave", null);
+    assertEquals(10, games.roulette.balance(ana));
+  }
+
+  @Test
+  void leavingOrExpiringBeforeCardsRefundsAndRejoiningCanPayAgain() {
+    UUID id = create("blackjack");
+    action("bia", id, "join");
+    action("ana", id, "ready");
+    action("ana", id, "leave");
+    assertEquals(100, games.roulette.balance(ana));
+    action("ana", id, "join");
+    action("ana", id, "ready");
+    assertEquals(90, games.roulette.balance(ana));
+    games.db.update("update party_players set seen_at=0 where room_id=? and account_id=?", id, ana);
+    party.advance();
+    party.advance();
+    assertEquals(100, games.roulette.balance(ana));
+  }
+
+  @Test
+  void nextRoundsPreserveRoomAndRequireNewEntryAndPayNewRewards() {
+    UUID id = blackjack();
+    UUID firstRound = (UUID) party.row(id).get("round_id");
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "next"));
+    expire(id);
+    long before = games.roulette.balance(ana);
+    assertThrows(ResponseStatusException.class, () -> action("bia", id, "next"));
+    UUID next = UUID.randomUUID();
+    party.action("ana", id, next, "next", null);
+    UUID secondRound = (UUID) party.row(id).get("round_id");
+    party.action("ana", id, next, "next", null);
+    assertEquals(secondRound, party.row(id).get("round_id"));
+    assertNotEquals(firstRound, secondRound);
+    assertEquals("waiting", party.row(id).get("status"));
+    assertEquals(before, games.roulette.balance(ana));
+    assertThrows(ResponseStatusException.class, () -> action("ana", id, "start"));
+    assertThrows(
+        ResponseStatusException.class,
+        () -> party.action("ana", id, UUID.randomUUID(), "ready", null, firstRound));
+    action("ana", id, "ready");
+    action("bia", id, "ready");
+    assertEquals(before - 10, games.roulette.balance(ana));
+    action("ana", id, "start");
+    games.db.update(
+        "update party_players set hand='[0,9]' where room_id=? and account_id=?", id, ana);
+    var state = party.state(party.row(id));
+    state.put("dealer", List.of(9, 6));
+    party.save(id, state);
+    expire(id);
+    party.advance();
+    assertEquals(before - 10 + 30, games.roulette.balance(ana));
+    assertEquals(
+        2,
+        games.db.queryForObject(
+            "select count(*) from coin_ledger where account_id=? and reason='Blackjack · rodada'",
+            Integer.class,
+            ana));
+  }
+
+  @Test
+  void leavingAfterDealDoesNotRefund() {
+    UUID id = blackjack();
+    action("ana", id, "leave");
+    assertEquals(90, games.roulette.balance(ana));
+    expire(id);
+    assertEquals(90, games.roulette.balance(ana));
+  }
+
+  @Test
+  void concurrentAdmissionsWithDifferentKeysChargeOnlyOnce() throws Exception {
+    UUID id = create("blackjack");
+    try (var pool = Executors.newFixedThreadPool(5)) {
+      var tasks = new ArrayList<Callable<Void>>();
+      for (int n = 0; n < 5; n++)
+        tasks.add(
+            () -> {
+              action("ana", id, "ready");
+              return null;
+            });
+      for (var result : pool.invokeAll(tasks)) result.get();
+    }
+    assertEquals(90, games.roulette.balance(ana));
+  }
+
+  @Test
+  void pendingEntryReservesCapacityForRefund() {
+    UUID id = create("blackjack");
+    action("ana", id, "ready");
+    games.locked(
+        () -> {
+          games.roulette.entry(ana, UUID.randomUUID(), Long.MAX_VALUE - 100, "payout", "Teste");
+          assertEquals(0, games.roulette.freeCapacity(ana));
+          return null;
+        });
+    action("ana", id, "leave");
+    assertEquals(Long.MAX_VALUE, games.roulette.balance(ana));
+  }
+
+  @Test
+  void nextRoundDoesNotPullPlayersFromAnotherActiveTable() {
+    UUID id = blackjack();
+    expire(id);
+    UUID other = party.create("bia", UUID.randomUUID(), "rhythm", "aqz-KE-bpKQ");
+    action("ana", id, "next");
+    assertTrue(
+        games.db.queryForObject(
+            "select departed from party_players where room_id=? and account_id=?",
+            Boolean.class,
+            id,
+            bia));
+    assertEquals(other, ((Map<?, ?>) party.overview("bia").get("room")).get("id"));
   }
 
   @Test

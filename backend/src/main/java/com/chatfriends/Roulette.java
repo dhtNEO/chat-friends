@@ -65,7 +65,15 @@ public class Roulette {
                 + " roulette_rounds q on q.id=b.round_id where b.account_id=? and not b.refunded"
                 + " and not q.settled",
             BigDecimal.class, user)
-        .toBigIntegerExact();
+        .toBigIntegerExact()
+        .add(
+            BigInteger.valueOf(
+                db.queryForObject(
+                    "select count(*) * 10 from party_players p join party_rooms r on r.id=p.room_id"
+                        + " where p.account_id=? and r.kind='blackjack' and r.status='waiting' and"
+                        + " p.entry_id is not null",
+                    Long.class,
+                    user)));
   }
 
   int freeCapacity(UUID user) {

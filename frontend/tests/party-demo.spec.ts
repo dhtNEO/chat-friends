@@ -51,6 +51,9 @@ test("blackjack multiplayer, carta oculta, pedir, parar e Coins", async ({
   const room = page.getByRole("region", { name: "Sala de Blackjack" });
   await expect(room.getByText("Bia (simulada)", { exact: true })).toBeVisible();
   await room
+    .getByRole("button", { name: "Confirmar entrada · 10 Coins", exact: true })
+    .click();
+  await room
     .getByRole("button", { name: "Distribuir cartas", exact: false })
     .click();
   await expect(room.getByLabel("Carta oculta", { exact: true })).toBeVisible();
@@ -62,6 +65,50 @@ test("blackjack multiplayer, carta oculta, pedir, parar e Coins", async ({
   });
   await expect(room.locator(".own-hand small").last()).toContainText("8 Coins");
   await expect(room.getByLabel("Carta oculta", { exact: true })).toHaveCount(0);
+  const first = await page.evaluate(() =>
+    fetch("/api/party").then((r) => r.json()),
+  );
+  const balance = await page.evaluate(() =>
+    fetch("/api/games")
+      .then((r) => r.json())
+      .then((s) => s.balance),
+  );
+  await expect(
+    room.getByRole("button", { name: "Criar revanche", exact: false }),
+  ).toHaveCount(0);
+  await room
+    .getByRole("button", { name: "Abrir próxima rodada", exact: false })
+    .click();
+  const next = await page.evaluate(() =>
+    fetch("/api/party").then((r) => r.json()),
+  );
+  expect(next.room.id).toBe(first.room.id);
+  expect(next.room.roundId).not.toBe(first.room.roundId);
+  await room
+    .getByRole("button", { name: "Confirmar entrada · 10 Coins", exact: true })
+    .click();
+  expect(
+    await page.evaluate(() =>
+      fetch("/api/games")
+        .then((r) => r.json())
+        .then((s) => s.balance),
+    ),
+  ).toBe(balance - 10);
+  await room
+    .getByRole("button", { name: "Distribuir cartas", exact: false })
+    .click();
+  await room.getByRole("button", { name: "Pedir carta", exact: false }).click();
+  await room.getByRole("button", { name: "Parar", exact: false }).click();
+  await expect(room.getByText("Resultado", { exact: true })).toBeVisible({
+    timeout: 10000,
+  });
+  expect(
+    await page.evaluate(() =>
+      fetch("/api/games")
+        .then((r) => r.json())
+        .then((s) => s.balance),
+    ),
+  ).toBe(balance - 10 + 8);
   expect(errors).toEqual([]);
 });
 test("ritmo usa seleção do bot e teclas; acertos rendem Coins", async ({
@@ -140,6 +187,9 @@ test("mesas e controles dos novos jogos cabem no celular", async ({ page }) => {
     .getByRole("button", { name: "Criar mesa de blackjack", exact: false })
     .click();
   const room = page.getByRole("region", { name: "Sala de Blackjack" });
+  await room
+    .getByRole("button", { name: "Confirmar entrada · 10 Coins", exact: true })
+    .click();
   await room
     .getByRole("button", { name: "Distribuir cartas", exact: false })
     .click();
