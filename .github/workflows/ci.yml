@@ -62,7 +62,7 @@ jobs:
           demo_pid=$!
           trap 'kill "$demo_pid"' EXIT
           for attempt in $(seq 1 30); do curl -fsS http://localhost:5173/ >/dev/null && break || sleep 1; done
-          MUSIC_DEMO_TEST=1 ROOM_LAYOUT_DEMO_TEST=1 APP_TEST_URL=http://localhost:5173 npx playwright test tests/music.spec.ts tests/room-layout.spec.ts
+          MUSIC_DEMO_TEST=1 ROOM_LAYOUT_DEMO_TEST=1 APP_TEST_URL=http://localhost:5173 npx playwright test tests/music.spec.ts tests/room-layout.spec.ts tests/detached-media.spec.ts
   music:
     runs-on: ubuntu-latest
     steps:

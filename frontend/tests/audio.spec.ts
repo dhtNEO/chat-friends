@@ -160,7 +160,7 @@ test("ganho de mic, volume por ouvinte, supressão e estado de mudo funcionam", 
     await expect.poll(() => level(b)).toBeLessThan(0.001);
     await expect(
       a.locator(".person").filter({ hasNotText: "(você)" }),
-    ).toContainText("Áudio silenciado", { timeout: 10000 });
+    ).toContainText("Vozes da chamada silenciadas", { timeout: 10000 });
     await b.getByRole("button", { name: "Ouvir áudio", exact: true }).click();
     await expect.poll(() => level(b)).toBeGreaterThan(0.01);
     await voiceSettings(a);
@@ -231,13 +231,68 @@ test("Full HD chega ao player; volume e mudo da transmissão controlam o som rea
       .getByRole("button", { name: "Ouvir transmissão", exact: true })
       .click();
     await expect.poll(() => level(b)).toBeGreaterThan(0.005);
+    await expect.poll(() => level(a)).toBeGreaterThan(0.01);
     await b
       .getByRole("button", { name: "Silenciar áudio", exact: true })
       .click();
+    // Deafen controls the call: B's microphone stops reaching A, while the
+    // independent screen mix remains audible to B.
+    await expect.poll(() => level(a)).toBeLessThan(0.001);
     await slider(b, "Volume da transmissão", 100);
-    await expect.poll(() => level(b)).toBeLessThan(0.001); // changing stream volume cannot undo deafen
-    await b.getByRole("button", { name: "Ouvir áudio", exact: true }).click();
     await expect.poll(() => level(b)).toBeGreaterThan(0.01);
+    await b.keyboard.press("Escape");
+    await b
+      .getByRole("button", { name: "Silenciar transmissão", exact: true })
+      .click();
+    await expect.poll(() => level(b)).toBeLessThan(0.001);
+    await b
+      .getByRole("button", { name: "Ouvir transmissão", exact: true })
+      .click();
+    await expect.poll(() => level(b)).toBeGreaterThan(0.01);
+    await expect.poll(() => level(a)).toBeLessThan(0.001);
+    // Master output remains global, including independent media.
+    await slider(b, "Volume de saída", 0);
+    await expect.poll(() => level(b)).toBeLessThan(0.001);
+    await slider(b, "Volume de saída", 100);
+    await expect.poll(() => level(b)).toBeGreaterThan(0.01);
+    await b.getByRole("button", { name: "Ouvir áudio", exact: true }).click();
+    await expect.poll(() => level(a)).toBeGreaterThan(0.01);
+    await expect.poll(() => level(b)).toBeGreaterThan(0.01);
+    await b.keyboard.press("Escape");
+    let layoutLeaves = 0;
+    b.on("request", request => {
+      if (new URL(request.url()).pathname === "/api/media/leave") layoutLeaves++;
+    });
+    const retainedVideo = await b.locator("video").evaluateHandle((video) => ({
+      video,
+      stream: (video as HTMLVideoElement).srcObject,
+      time: (video as HTMLVideoElement).currentTime,
+      audio: [...document.querySelectorAll("audio")],
+    }));
+    await b.getByRole("button", { name: "Separar transmissão", exact: true }).click();
+    await expect.poll(() => level(b)).toBeGreaterThan(0.01);
+    await b.getByRole("region", { name: "Área de transmissão", exact: true }).getByRole("button", { name: "Trazer transmissão para a sala", exact: true }).click();
+    const popupEvent = b.waitForEvent("popup");
+    await b.getByRole("button", { name: "Abrir transmissão em outra janela", exact: true }).click();
+    const popup = await popupEvent;
+    await expect(popup.locator("video")).toHaveCount(1);
+    await expect(b.locator("video")).toHaveCount(0);
+    await popup.getByRole("button", { name: "Silenciar transmissão", exact: true }).click();
+    await expect.poll(() => level(b)).toBeLessThan(0.001);
+    await popup.getByRole("button", { name: "Ouvir transmissão", exact: true }).click();
+    await expect.poll(() => level(b)).toBeGreaterThan(0.01);
+    await popup.close();
+    await expect(b.locator("video")).toHaveCount(1);
+    await expect.poll(() => retainedVideo.evaluate(({ video, stream, time }) =>
+      video === document.querySelector("video") &&
+      (video as HTMLVideoElement).srcObject === stream &&
+      (video as HTMLVideoElement).currentTime > time,
+    )).toBeTruthy();
+    expect(layoutLeaves).toBe(0);
+    expect(await retainedVideo.evaluate(({ audio }) => {
+      const current = [...document.querySelectorAll("audio")];
+      return current.length === audio.length && audio.every(el => current.includes(el));
+    })).toBe(true);
     await b.getByRole("button", { name: "Tela cheia", exact: true }).click();
     await expect
       .poll(() =>

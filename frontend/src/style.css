@@ -2252,3 +2252,125 @@ kbd {
     grid-column: 1 / -1;
   }
 }
+
+/* One stable host moves between the room, a dock panel and another window. */
+.media-home,
+.media-content-host,
+.media-popout-host {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.detached-media {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  container-type: inline-size;
+}
+.media-panel-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+.media-panel-tools strong {
+  flex: 1 1 6rem;
+  font-size: 0.8rem;
+}
+.media-panel-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.75rem;
+}
+.media-panel-content {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.media-panel-content > .stage-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 160px;
+}
+.media-panel-content > .music-panel {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+}
+.media-away {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  text-align: center;
+  color: var(--muted);
+}
+.media-away p {
+  margin: 0;
+}
+.media-popout-body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.media-popout-host {
+  position: fixed;
+  inset: 0;
+}
+.media-popout-host .screen {
+  border-radius: 0;
+}
+.detached-media .screen-heading,
+.detached-media .screen-toolbar {
+  flex-wrap: wrap;
+}
+.detached-media .screen-who {
+  min-width: 0;
+  flex: 1;
+}
+.detached-media .screen-who strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detached-media .screen-actions {
+  flex-shrink: 0;
+}
+.detached-media .stream-volume {
+  min-width: 0;
+  width: auto;
+  flex: 1;
+}
+.detached-media .stream-volume input {
+  min-width: 0;
+}
+@container (max-width: 20rem) {
+  .detached-media .screen-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+  .detached-media .screen-heading > .avatar {
+    display: none;
+  }
+}

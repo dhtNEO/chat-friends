@@ -593,7 +593,7 @@ for (const [width, height] of [
     await page
       .getByRole("button", { name: "Focar Transmissão", exact: true })
       .click();
-    for (const name of ["Expandir", "Abrir em outra janela", "Tela cheia"])
+    for (const name of ["Expandir", "Abrir transmissão em outra janela", "Tela cheia"])
       await inHorizontalBounds(
         page.getByRole("button", { name, exact: true }),
         page.locator(".screen"),
@@ -640,7 +640,7 @@ test("transmissão em um terço da largura mantém ações e volume acessíveis"
   const screen = page.locator(".screen");
   await screen.hover();
   expect((await screen.boundingBox())!.width).toBeLessThan(210);
-  for (const name of ["Expandir", "Abrir em outra janela", "Tela cheia"])
+  for (const name of ["Expandir", "Abrir transmissão em outra janela", "Tela cheia"])
     await inHorizontalBounds(
       page.getByRole("button", { name, exact: true }),
       screen,

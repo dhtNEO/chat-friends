@@ -257,7 +257,8 @@ function Workspace({
     [pending, setPending] = useState<{ clientId: string; body: string }[]>([]);
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({}),
     [dock, setDock] = useState<DockviewApi | null>(null),
-    [stageMaximized, setStageMaximized] = useState(false);
+    [stageMaximized, setStageMaximized] = useState(false),
+    [streamMaximized, setStreamMaximized] = useState(false);
   const initialized = useRef(false);
   const latest = useRef(0),
     queue = useRef(pending);
@@ -305,9 +306,10 @@ function Workspace({
   useEffect(() => {
     if (!dock) return;
     const saving = dock.onDidLayoutChange(() => saveLayout(dock));
-    const maximized = dock.onDidMaximizedGroupChange(() =>
-      setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized()),
-    );
+    const maximized = dock.onDidMaximizedGroupChange(() => {
+      setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized());
+      setStreamMaximized(!!dock.getPanel("stream")?.api.isMaximized());
+    });
     // Phone and desktop keep separate layouts; switch when crossing over.
     const media = matchMedia(compactQuery),
       switchLayout = () => {
@@ -585,6 +587,20 @@ function Workspace({
             onClick={() => open("voice")}
           />
           <ActivityButton
+            icon="screen"
+            label="Painel da transmissão"
+            title="Separar transmissão"
+            active={!!slots.stream}
+            onClick={() => open("stream")}
+          />
+          <ActivityButton
+            icon="music"
+            label="Painel do bot de música"
+            title="Separar música"
+            active={!!slots.music}
+            onClick={() => open("music")}
+          />
+          <ActivityButton
             icon="chat"
             label="Conversa"
             title="Conversa #geral"
@@ -686,12 +702,30 @@ function Workspace({
           key={me.user.id}
           userId={me.user.id}
           admin={me.user.admin}
-          hosts={{ stage: slots.voice ?? null, roster, quick }}
+          hosts={{
+            stage: slots.voice ?? null,
+            stream: slots.stream ?? null,
+            music: slots.music ?? null,
+            roster,
+            quick,
+          }}
           maximized={stageMaximized}
+          streamMaximized={streamMaximized}
+          onSeparate={(kind) => open(kind)}
+          onReturn={(kind) => {
+            close(kind);
+            open("voice");
+          }}
           onOpen={() => open("voice")}
           onStreaming={(active) => {
             streaming.current = active;
-            if (active) open("voice");
+            if (active) open(dock?.getPanel("stream") ? "stream" : "voice");
+          }}
+          onMaximizeStream={() => {
+            const panel = dock?.getPanel(slots.stream ? "stream" : "voice");
+            if (!panel) return;
+            if (panel.api.isMaximized()) panel.api.exitMaximized();
+            else panel.api.maximize();
           }}
           onMaximize={() => {
             const panel = dock?.getPanel("voice");

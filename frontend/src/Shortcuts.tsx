@@ -12,7 +12,7 @@ export type Action =
   | "toggleStreamSound";
 export const ACTIONS: [Action, string][] = [
   ["toggleMic", "Ligar/desligar microfone"],
-  ["toggleDeaf", "Silenciar/ouvir áudio"],
+  ["toggleDeaf", "Silenciar/ouvir vozes da call (sem transmissão ou música)"],
   ["pushToTalk", "Apertar para falar (segure)"],
   ["toggleStreamSound", "Silenciar o som da transmissão"],
   ["leaveVoice", "Sair da voz"],

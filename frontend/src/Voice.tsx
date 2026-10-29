@@ -17,7 +17,7 @@ import { AudioTrack, Screen } from "./MediaPlayback";
 import { useAudioSettings } from "./useAudioSettings";
 import { Icon } from "./Icon";
 import { Avatar, Popover, avatarSrc, usePeople } from "./ui";
-import { PopoutStage, usePopout } from "./Popout";
+import { DetachedMedia, type MediaPanel } from "./DetachedMedia";
 import { loadSounds, playEffect, type Effect } from "./sounds";
 import { Music, MUSIC_IDENTITY } from "./Music";
 import {
@@ -70,9 +70,13 @@ export function Voice({
   userId,
   hosts,
   maximized,
+  streamMaximized,
+  onSeparate,
+  onReturn,
   onOpen,
   onStreaming,
   onMaximize,
+  onMaximizeStream,
   onError,
 }: {
   admin: boolean;
@@ -80,19 +84,26 @@ export function Voice({
   // Panels may be closed or moved; the call lives here and keeps playing.
   hosts: {
     stage: HTMLElement | null;
+    stream: HTMLElement | null;
+    music: HTMLElement | null;
     roster: HTMLElement | null;
     quick: HTMLElement | null;
   };
   maximized: boolean;
+  streamMaximized: boolean;
+  onSeparate: (kind: MediaPanel) => void;
+  onReturn: (kind: MediaPanel) => void;
   onOpen: () => void;
   onStreaming: (active: boolean) => void;
   onMaximize: () => void;
+  onMaximizeStream: () => void;
   onError: (s: string) => void;
 }) {
   const [settings, setSettings] = useAudioSettings(userId);
   const roomLayout = useRoomLayout(userId);
   const directory = usePeople();
-  const popout = usePopout(onError);
+  const [screenHome, setScreenHome] = useState<HTMLElement | null>(null);
+  const [musicHome, setMusicHome] = useState<HTMLElement | null>(null);
   useEffect(() => {
     loadSounds(userId);
   }, [userId]);
@@ -756,23 +767,9 @@ export function Voice({
   useEffect(() => () => publishVoice(null), []);
   const fullHd = (connection.current?.screen.height ?? 1080) >= 1080,
     sixty = (connection.current?.screen.fps ?? 60) >= 60;
-  const featuredName = featured
-    ? (account(featured.identity)?.displayName ?? featured.name)
-    : "";
   const screenContent = (
     <div className="stage-main">
-      {popout.win ? (
-        <div className="stage-empty">
-          <span className="stage-empty-icon">
-            <Icon name="popout" size={34} />
-          </span>
-          <h3>Transmissão em outra janela</h3>
-          <p>Arraste a janela para outro monitor. O som continua aqui.</p>
-          <button className="primary" onClick={popout.close}>
-            Trazer de volta
-          </button>
-        </div>
-      ) : featured ? (
+      {featured ? (
         <Screen
           key={featured.track.sid || "local"}
           track={featured.track}
@@ -781,10 +778,8 @@ export function Voice({
           local={featured.identity === self}
           viewers={Math.max(people.length - 1, 0)}
           volume={settings.stream}
-          deaf={deaf}
-          expanded={maximized}
-          onExpand={onMaximize}
-          onPopout={popout.open}
+          expanded={hosts.stream ? streamMaximized : maximized}
+          onExpand={onMaximizeStream}
           onVolume={(stream) => setSettings((old) => ({ ...old, stream }))}
           onError={onError}
         />
@@ -881,7 +876,7 @@ export function Voice({
               </strong>
               <span className="sr-only">
                 {p.micMuted ? "Mic desligado" : "Mic ligado"} ·{" "}
-                {p.deaf ? "Áudio silenciado" : "Ouvindo"}
+                {p.deaf ? "Vozes da chamada silenciadas" : "Ouvindo"}
                 {p.speaking && !p.micMuted ? " · falando" : ""}
               </span>
             </div>
@@ -944,9 +939,9 @@ export function Voice({
         expanded={maximized}
         onRestoreExpanded={onMaximize}
         content={{
-          screen: screenContent,
+          screen: <div className="media-home" ref={setScreenHome} />,
           people: peopleContent,
-          music: musicContent,
+          music: <div className="media-home" ref={setMusicHome} />,
         }}
       />
       <div className="control-bar">
@@ -1079,12 +1074,13 @@ export function Voice({
             <button
               className={"control" + (deaf ? " off" : "")}
               aria-label={deaf ? "Ouvir áudio" : "Silenciar áudio"}
+              title="Silencia as vozes e o microfone. Transmissão e música continuam."
               aria-pressed={deaf}
               disabled={audioBusy}
               onClick={() => void toggleDeaf()}
             >
               <Icon name={deaf ? "headphonesOff" : "headphones"} />
-              <span>Áudio</span>
+              <span>Áudio da call</span>
             </button>
             <div className="control-group">
               <button
@@ -1220,7 +1216,11 @@ export function Voice({
       <button
         className={"icon-button" + (deaf ? " off" : "")}
         aria-label="Alternar áudio"
-        title={deaf ? "Ouvir áudio" : "Silenciar áudio"}
+        title={
+          deaf
+            ? "Ouvir vozes da chamada"
+            : "Silenciar vozes e microfone; transmissão e música continuam"
+        }
         aria-pressed={deaf}
         disabled={!joined || audioBusy}
         onClick={() => void toggleDeaf()}
@@ -1232,14 +1232,26 @@ export function Voice({
   return (
     <>
       {hosts.stage && createPortal(stage, hosts.stage)}
-      {popout.win && (
-        <PopoutStage
-          win={popout.win}
-          track={featured?.track ?? null}
-          name={featuredName}
-          onClose={popout.close}
-        />
-      )}
+      <DetachedMedia
+        kind="stream"
+        home={screenHome}
+        dock={hosts.stream}
+        onSeparate={() => onSeparate("stream")}
+        onReturn={() => onReturn("stream")}
+        onError={onError}
+      >
+        {screenContent}
+      </DetachedMedia>
+      <DetachedMedia
+        kind="music"
+        home={musicHome}
+        dock={hosts.music}
+        onSeparate={() => onSeparate("music")}
+        onReturn={() => onReturn("music")}
+        onError={onError}
+      >
+        {musicContent}
+      </DetachedMedia>
       {hosts.roster && createPortal(roster, hosts.roster)}
       {hosts.quick && createPortal(quick, hosts.quick)}
       {audio.map(({ track, identity, source }) => (
@@ -1249,7 +1261,9 @@ export function Voice({
           identity={identity}
           source={source}
           volume={
-            deaf
+            deaf &&
+            source !== Track.Source.ScreenShareAudio &&
+            identity !== MUSIC_IDENTITY
               ? 0
               : ((settings.output / 100) *
                   (source === Track.Source.ScreenShareAudio
@@ -1284,7 +1298,7 @@ function StatusBadges({
         </span>
       )}
       {deaf && (
-        <span className="status-badge" title="Áudio silenciado">
+        <span className="status-badge" title="Vozes da chamada silenciadas">
           <Icon name="headphonesOff" size={12} />
         </span>
       )}

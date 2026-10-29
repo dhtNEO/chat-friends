@@ -104,6 +104,11 @@ export function VoiceSettings({ userId }: { userId: string }) {
 
       <div className="settings-card">
         <h3>O que você ouve</h3>
+        <p className="muted">
+          Silenciar a call corta as vozes e o microfone. A transmissão e o bot
+          de música continuam com seus próprios volumes. O volume geral controla
+          tudo.
+        </p>
         {slider("Volume geral de saída", settings.output, 100, (v) =>
           setSettings((old) => ({ ...old, output: v })),
         )}
