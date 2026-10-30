@@ -100,7 +100,7 @@
       "dias_pessoa": "2–4",
       "dependencias": "T02 T03",
       "evidencias": "E06",
-      "status": "in_review",
+      "status": "done",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
@@ -108,7 +108,8 @@
       "evidence": [
         "docs/refactor/executions/T04.md",
         "https://github.com/dhtNEO/chat-friends/commit/c6067c235bce6cf3941ce00b5b318766deb02445",
-        "https://github.com/dhtNEO/chat-friends/pull/33"
+        "https://github.com/dhtNEO/chat-friends/pull/33",
+        "https://github.com/dhtNEO/chat-friends/actions/runs/41069813047"
       ],
       "blocked_reason": null,
       "notes": [
@@ -117,7 +118,8 @@
         "2026-10-30: in_progress → in_review. Máquina de estados, UUID estável, retry explícito/Retry-After, rejeições sem reenvio, rascunho em memória por conta/canal e composer multiline/IME/UTF-16 implementados. Código c6067c2.",
         "17 casos T04 verificados, 8 streams demo e 117 backend passaram; npm ci/lint/build, validate.py e diff --check aprovados. Rodada T02/T03/T04 teve 60 passes e um timeout ao carregar login; o caso passou isoladamente sem alteração. Não declarar rodada inteira verde.",
         "check.sh interrompido por settings Maven vazio no ambiente; backend reexecutado com settings/proxy/CA explícitos em friends_test. Resultados/limites em executions/T04.md. Próximo passo: revisar PR T04 e conferir CI; aceite humano T04 pendente, não marcar done.",
-        "Entrega no PR #33 para refactor; revisão e CI pendentes. Sem merge/deploy."
+        "Entrega no PR #33 para refactor; revisão e CI pendentes. Sem merge/deploy.",
+        "2026-10-30: usuário informou “t04 mergeada” e solicitou T05 dependente. PR #33 integrado em 3b98683; CI Validate run 41069813047 concluído com success. Integração pelo mantenedor registrada como aceite para concluir in_review → done e liberar T05."
       ]
     },
     {
@@ -129,14 +131,19 @@
       "dias_pessoa": "2–4",
       "dependencias": "T03 T04",
       "evidencias": "E07",
-      "status": "planned",
-      "owner": null,
+      "status": "in_progress",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
+      "validation": "confirmed",
+      "validated_sha": "3b986830ece4ff31063c612f18413c658bbda64b",
+      "evidence": [
+        "docs/refactor/executions/T05.md"
+      ],
       "blocked_reason": null,
-      "notes": []
+      "notes": [
+        "2026-10-30: planned → in_progress; sem owner anterior. T03/T04 concluídas, branch codex/t05-chat-history derivada de refactor 3b98683; sem alterações locais rastreadas, work/ anterior preservado.",
+        "Revalidação: older() faz merge sem âncora/cursor visual, loading/error/end ou trava de duplicidade. ChatView renderiza messages inteira em role=log live; efeito por tamanho só usa browsingHistory, sem contador/Ir para recentes. Medir 10000 antes de escolher janela/virtualização."
+      ]
     },
     {
       "id": "T06",
