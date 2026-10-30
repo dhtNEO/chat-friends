@@ -180,7 +180,8 @@
       "notes": [
         "2026-10-30: planned → in_progress; sem owner anterior e sem dependências. Codex reservou antes de implementar, branch codex/t06-mobile-drawer derivada de refactor dce75a7; sem alterações rastreadas locais, work/ anterior preservado.",
         "Revalidação no SHA atual: drawer é div deslocada por transform e scrim; não há nome/modalidade, foco inicial, contenção, inert, Escape, botão Fechar menu ou retorno explícito de foco. open(kind) já fecha drawer ao navegar para outros painéis; preservar. Popover usa diálogo não modal e portal na app-shell; avaliar apenas propriedade de Escape/host em presença de modal.",
-        "Implementação 11899e2: diálogo nativo com fundo implicitamente inert, foco inicial/ciclo/retorno, Escape/botão/backdrop e fechamento por navegação/breakpoint; popovers permanecem não modais. 10 casos drawer e 117 backend aprovados, lint/build aprovados. in_progress → in_review; leitura auditiva real, zoom da interface do navegador, revisão e CI pendentes, sem done. Check padrão limitado por settings Maven vazio; equivalente com proxy/CA e friends_test aprovado. Detalhes em executions/T06.md."
+        "Implementação 11899e2: diálogo nativo com fundo implicitamente inert, foco inicial/ciclo/retorno, Escape/botão/backdrop e fechamento por navegação/breakpoint; popovers permanecem não modais. 10 casos drawer e 117 backend aprovados, lint/build aprovados. in_progress → in_review; leitura auditiva real, zoom da interface do navegador, revisão e CI pendentes, sem done. Check padrão limitado por settings Maven vazio; equivalente com proxy/CA e friends_test aprovado. Detalhes em executions/T06.md.",
+        "2026-10-30: usuário informou merge; PR #35 integrado em afb09ab confirmado. Pendências humanas de leitor/zoom não foram declaradas executadas; não concluir automaticamente. T07 não depende da T06."
       ]
     },
     {
@@ -192,14 +193,23 @@
       "dias_pessoa": "2–4",
       "dependencias": "—",
       "evidencias": "E08",
-      "status": "planned",
-      "owner": null,
+      "status": "in_review",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
+      "validation": "confirmed",
+      "validated_sha": "afb09abd6d46eb4eec1dee700b8e822ea1d4089d",
+      "evidence": [
+        "docs/refactor/executions/T07.md",
+        "https://github.com/dhtNEO/chat-friends/commit/875cbeeb2bd365c3415a516fea6ec73a233b295c",
+        "docs/refactor/measurements/T07-contrast.json",
+        "docs/refactor/DECISIONS.md#d007--contraste-derivado-sem-substituir-preferência-t07-30102026",
+        "https://github.com/dhtNEO/chat-friends/pull/36"
+      ],
       "blocked_reason": null,
-      "notes": []
+      "notes": [
+        "2026-10-30: planned → in_progress; sem dependências e sem owner anterior. Base refactor afb09ab, branch codex/t07-theme-contrast; nenhuma alteração rastreada local, work/ preservado. Revalidação: textOn ainda usa luminância >0,4; hover e gradiente reutilizam foreground da primária sem contrastar seus fundos; valores restaurados não são validados em applyTheme.",
+        "in_progress → in_review. Código 875cbee: tokens contrastados independentes para sólido/gradiente/hover/active/texto/indicador/foco, hex validado, preferência original preservada; preview/salvar/cancelar verificados. 3 testes matemáticos (156 pares), 46 regressões UI (15 T07, 31 drawer/demo/sala/streams) e 117 backend aprovados; npm ci/lint/build, validate e diff-check aprovados. Check padrão limitado por settings Maven local vazio; equivalente backend e frontend verificados. Revisão/CI pendentes, sem done; escopo e limites em executions/T07.md."
+      ]
     },
     {
       "id": "T08",

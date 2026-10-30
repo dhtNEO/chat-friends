@@ -23,6 +23,7 @@ import {
   applyScale,
   applyTheme,
   loadScale,
+  normalizeColor,
 } from "./theme";
 
 type Saved = { user: User; signedOut?: boolean };
@@ -95,9 +96,11 @@ export function Profile({
 }) {
   const [displayName, setDisplayName] = useState(me.displayName),
     [username, setUsername] = useState(me.username),
-    [primary, setPrimary] = useState(me.primaryColor || DEFAULT_PRIMARY),
+    [primary, setPrimary] = useState(
+      normalizeColor(me.primaryColor, DEFAULT_PRIMARY),
+    ),
     [secondary, setSecondary] = useState(
-      me.secondaryColor || DEFAULT_SECONDARY,
+      normalizeColor(me.secondaryColor, DEFAULT_SECONDARY),
     ),
     [busy, setBusy] = useState(""),
     [scale, setScale] = useState(loadScale),
@@ -319,7 +322,10 @@ export function Profile({
       {tab === "aparencia" && (
         <div className="settings-card">
           <h3>Aparência</h3>
-          <p className="muted">Só você vê as suas cores.</p>
+          <p className="muted">
+            Só você vê as suas cores. Sua escolha é preservada; texto, controles
+            e indicadores usam variações com contraste legível.
+          </p>
           <div className="swatches">
             {PRESETS.map(([name, p, s]) => (
               <button

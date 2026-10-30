@@ -32,6 +32,12 @@ O drawer mobile é navegação modal: usar dialog.showModal, título acessível,
 
 Escape pertence à camada ativa. Popovers existentes continuam não modais, sem aria-modal/fundo inert/contenção global. Seu Escape não pode consumir o fechamento de um modal que esteja na frente; caso um popover esteja dentro de dialog modal, o portal fica nesse diálogo para não se tornar inert fora dele. Não alterar semântica de menus, emoji ou controles de voz indiscriminadamente. Navegação pelo drawer fecha e devolve foco ao acionador; mudanças de breakpoint também encerram a modalidade. T06 não altera mídia, sessão, HTTP ou migrações. Validar teclado, fundo, resize, 320 px/paisagem/zoom e leitores por contrato acessível; confirmação NVDA/VoiceOver real deve permanecer pendente se não executada.
 
+## D007 — Contraste derivado sem substituir preferência T07 (30/10/2026)
+
+Manter cores originais válidas em --primary/--secondary e no contrato salvo; tokens de controle/texto/indicador são derivados por contraste WCAG sRGB. Foregrounds de preenchimentos e gradientes são independentes; estados hover/active são avaliados com seus próprios fundos. Gradientes funcionais usam interpolação sRGB explícita, verificando extremos e mínimo interior de luminância. Ajustar extremos somente nos tokens derivados até permitir um mesmo foreground seguro; degradar a um preenchimento legível se necessário, sem persistir o ajuste como preferência.
+
+Texto normal exige 4,5:1 (também usado conservadoramente onde há texto grande); gráficos/bordas relevantes e foco exigem 3:1. Separar gradiente de texto/indicadores do gradiente de preenchimento. Foco usa anel claro com separador escuro opaco para funcionar também sobre preenchimentos claros; não depender de mistura transparente ou brilho posterior. Validar hex restaurado, com fallback por campo sem escrita corretiva no armazenamento. Preview, salvar e cancelamento usam a mesma derivação. Validar matemática independentemente e estados renderizados (incluindo CSS de jogos), sem declarar auditoria completa de cores fixas sem evidência.
+
 ## Próximas decisões
 
 Registrar ID, data, contexto, opções, escolha, justificativa, specs afetadas e validação necessária. Alterações de marca, navegação, budgets, contratos, retenção e garantias de mídia exigem registro; não presumir aprovação por constarem como proposta no relatório.
