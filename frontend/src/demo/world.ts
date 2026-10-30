@@ -17,8 +17,8 @@ export const world = {
   me: null as User | null,
   myDeaf: false,
   inCall: false,
-  // Identity holding the transmission, like the server's screen lease.
-  lease: null as string | null,
+  // Identities holding independent screen reservations.
+  leases: [] as string[],
   friends: [
     {
       id: "galecalol",
@@ -48,7 +48,7 @@ export const world = {
 };
 export const identityOf = (id: string) => `${id}:demo`;
 export const myIdentity = "me:demo";
-world.lease = identityOf("galecalol");
+world.leases = [identityOf("galecalol"), identityOf("penumbra")];
 world.accounts = world.friends.map((f) => ({
   id: f.id,
   username: f.id,
@@ -134,12 +134,13 @@ setInterval(() => {
 
 // The transmission comes back a while after an admin stops it.
 let resume: ReturnType<typeof setTimeout> | undefined;
-export function setLease(identity: string | null) {
-  world.lease = identity;
+export function setLease(identity: string, active = true) {
+  world.leases = world.leases.filter((id) => id !== identity);
+  if (active) world.leases.push(identity);
   clearTimeout(resume);
-  if (!identity)
+  if (!world.leases.length)
     resume = setTimeout(() => {
-      if (!world.lease) setLease(identityOf("galecalol"));
+      if (!world.leases.length) setLease(identityOf("galecalol"));
     }, 45_000);
   changed();
 }

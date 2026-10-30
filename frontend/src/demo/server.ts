@@ -282,8 +282,7 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
     case "PUT /me/shortcuts": {
       const next = body as { platform: string; revision: number };
       const saved = shortcuts.get(next.platform) as
-        | { revision: number }
-        | undefined;
+        { revision: number } | undefined;
       if ((saved?.revision ?? 0) !== next.revision)
         return fail(409, "Atalhos alterados em outra sessão; recarregue");
       const stored = { ...next, revision: next.revision + 1 };
@@ -321,15 +320,15 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
       return empty();
     case "POST /media/leave":
       world.inCall = false;
-      if (world.lease === myIdentity) setLease(null);
+      setLease(myIdentity, false);
       return empty();
     case "GET /media/state":
       return json({
-        lease: {
-          identity: world.lease,
-          leaseId: world.lease ? "demo-lease" : null,
+        leases: world.leases.map((identity) => ({
+          identity,
+          leaseId: `demo-lease-${identity}`,
           expiresAt: null,
-        },
+        })),
         participants: [
           ...world.friends
             .filter((f) => f.inCall)
@@ -352,18 +351,25 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
         ],
       });
     case "POST /media/screen":
-      if (world.lease && world.lease !== myIdentity)
-        return fail(409, "Outra pessoa está transmitindo agora.");
+      if (!world.leases.includes(myIdentity) && world.leases.length >= 3)
+        return fail(409, "Sala cheia: máximo de 3 transmissões simultâneas");
       setLease(myIdentity);
       return json({
         identity: myIdentity,
-        leaseId: "demo-lease",
+        leaseId: `demo-lease-${myIdentity}`,
         expiresAt: null,
       });
     case "DELETE /media/screen":
-    case "POST /media/screen/force-stop":
-      setLease(null);
+      setLease(myIdentity, false);
       return empty();
+    case "POST /media/screen/force-stop": {
+      const { identity, leaseId } = body as {
+        identity: string;
+        leaseId: string;
+      };
+      if (leaseId === `demo-lease-${identity}`) setLease(identity, false);
+      return empty();
+    }
   }
   if (method === "PATCH" && path.startsWith("/admin/accounts/")) {
     const account = world.accounts.find(

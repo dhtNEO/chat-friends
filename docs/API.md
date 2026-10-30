@@ -28,11 +28,11 @@ Mesma origem do frontend. JSON UTF-8, exceto login (form), upload de avatar (bin
 | POST /api/media/heartbeat | `{identity}` a cada 10 s |
 | PUT /api/media/audio | `{identity,deaf:boolean}`; estado de recepção da própria conexão/sessão, sem mudar permissões |
 | POST /api/media/leave | `{identity}` |
-| GET /api/media/state | `{lease:{identity,leaseId,expiresAt},participants:[{identity,name,micMuted,deaf}]}` |
-| POST /api/media/screen | `{identity}`; reserva ou 409 |
+| GET /api/media/state | `{leases:[{identity,leaseId,expiresAt}],participants:[{identity,name,micMuted,deaf}]}` |
+| POST /api/media/screen | `{identity}`; retorna `{identity,leaseId,expiresAt}`; idempotente por conexão, até 3 reservas simultâneas ou 409 |
 | POST /api/media/screen/heartbeat | `{identity,leaseId}`; renovar antes de 30 s |
 | DELETE /api/media/screen | `{identity,leaseId}`; liberação idempotente |
-| POST /api/media/screen/force-stop | admin; revoga a tela atual |
+| POST /api/media/screen/force-stop | admin; `{identity,leaseId}`; revoga somente a reserva indicada, idempotente |
 | GET /api/livekit/admit | usado pelo Caddy; JWT no Authorization ou URI encaminhada; retorna X-Media-Authorization restrito, nunca concede fonte de tela |
 | POST /api/livekit/webhook | corpo bruto + Authorization assinado pelo LiveKit; única exceção CSRF |
 

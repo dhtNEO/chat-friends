@@ -50,12 +50,38 @@ class MigrationHistoryTest {
         })
       assertNotNull(db.queryForObject("select to_regclass(?)", String.class, schema + "." + table));
     assertEquals(
-        "12",
+        "13",
         db.queryForObject(
             "select version from "
                 + schema
                 + ".flyway_schema_history order by installed_rank desc limit 1",
             String.class));
+  }
+
+  @Test
+  void screenSlotsPreserveTheExistingReservationAndEnforceCapacity() {
+    var previous = config();
+    MigrationHistory.select(previous);
+    previous.target("12").load().migrate();
+    var leaseId = UUID.randomUUID();
+    db.update(
+        "update "
+            + schema
+            + ".screen_lease set identity='retained',lease_id=?,expires_at=now()+interval '30"
+            + " seconds' where id=1",
+        leaseId);
+    var retained = db.queryForMap("select * from " + schema + ".screen_lease where id=1");
+    upgrade();
+    assertComplete();
+    assertEquals(retained, db.queryForMap("select * from " + schema + ".screen_lease where id=1"));
+    assertEquals(
+        3, db.queryForObject("select count(*) from " + schema + ".screen_lease", Integer.class));
+    assertThrows(
+        org.springframework.dao.DataIntegrityViolationException.class,
+        () -> db.update("insert into " + schema + ".screen_lease(id) values(4)"));
+    assertThrows(
+        org.springframework.dao.DataIntegrityViolationException.class,
+        () -> db.update("update " + schema + ".screen_lease set identity='retained' where id=2"));
   }
 
   @Test
@@ -232,13 +258,16 @@ class MigrationHistoryTest {
         db.queryForList(
             "select version, script, checksum from "
                 + schema
-                + ".flyway_schema_history where version in ('6','7','8','9','10','11') order by installed_rank");
+                + ".flyway_schema_history where version in ('6','7','8','9','10','11') order by"
+                + " installed_rank");
     var id = retainedAccount();
     db.update(
         "insert into "
             + schema
-            + ".coin_ledger(account_id,reference,amount,reason,created_at) values(?,?,123,'test',42)",
-        id, UUID.randomUUID());
+            + ".coin_ledger(account_id,reference,amount,reason,created_at)"
+            + " values(?,?,123,'test',42)",
+        id,
+        UUID.randomUUID());
     db.update(
         "insert into "
             + schema
@@ -252,7 +281,8 @@ class MigrationHistoryTest {
         db.queryForList(
             "select version, script, checksum from "
                 + schema
-                + ".flyway_schema_history where version in ('6','7','8','9','10','11') order by installed_rank"));
+                + ".flyway_schema_history where version in ('6','7','8','9','10','11') order by"
+                + " installed_rank"));
     assertEquals(
         123L,
         db.queryForObject("select amount from " + schema + ".coin_ledger", Long.class));

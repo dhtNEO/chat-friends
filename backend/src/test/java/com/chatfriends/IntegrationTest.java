@@ -11,8 +11,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import livekit.LivekitModels.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -298,36 +298,55 @@ class IntegrationTest {
   }
 
   @Test
-  void simultaneousReservationsAuthorizeOneScreen() throws Exception {
-    var ana = connection("ana", "ana-tab");
-    var bia = connection("bia", "bia-tab");
-    when(live.participants())
-        .thenReturn(List.of(participant("ana-tab", false), participant("bia-tab", false)));
+  void simultaneousReservationsAuthorizeThreeScreens() throws Exception {
+    var requests =
+        List.of(
+            connection("ana", "a1"),
+            connection("ana", "a2"),
+            connection("bia", "b1"),
+            connection("bia", "b2"));
+    var ids = List.of("a1", "a2", "b1", "b2");
+    when(live.participants()).thenReturn(ids.stream().map(id -> participant(id, false)).toList());
     var successes = new AtomicInteger();
     var conflicts = new AtomicInteger();
     var gate = new CountDownLatch(1);
     try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
-      var a =
-          pool.submit(
-              () -> {
-                gate.await();
-                reserve("ana", ana, "ana-tab", successes, conflicts);
-                return null;
-              });
-      var b =
-          pool.submit(
-              () -> {
-                gate.await();
-                reserve("bia", bia, "bia-tab", successes, conflicts);
-                return null;
-              });
+      var tasks = new ArrayList<Future<?>>();
+      for (int i = 0; i < ids.size(); i++) {
+        final int index = i;
+        tasks.add(
+            pool.submit(
+                () -> {
+                  gate.await();
+                  reserve(
+                      index < 2 ? "ana" : "bia",
+                      requests.get(index),
+                      ids.get(index),
+                      successes,
+                      conflicts);
+                  return null;
+                }));
+      }
       gate.countDown();
-      a.get(10, TimeUnit.SECONDS);
-      b.get(10, TimeUnit.SECONDS);
+      for (var task : tasks) task.get(10, TimeUnit.SECONDS);
     }
-    assertEquals(1, successes.get());
+    assertEquals(3, successes.get());
     assertEquals(1, conflicts.get());
-    verify(live, times(1)).permission(anyString(), eq(true));
+    assertEquals(3, media.leases().size());
+    verify(live, times(3)).permission(anyString(), eq(true));
+    for (int i = 0; i < ids.size(); i++) {
+      final int index = i;
+      var existing =
+          media.leases().stream().filter(l -> l.identity().equals(ids.get(index))).findFirst();
+      if (existing.isPresent())
+        assertEquals(
+            existing.get(),
+            media.acquire(
+                () -> index < 2 ? "ana" : "bia",
+                requests.get(i),
+                new Media.Connection(ids.get(i))));
+    }
+    verify(live, times(3)).permission(anyString(), eq(true));
   }
 
   void reserve(
@@ -360,7 +379,7 @@ class IntegrationTest {
     order.verify(live, atLeastOnce()).permission("a", false);
     order.verify(live).permission("b", true);
     media.release(() -> "ana", a, new Media.Renew("a", old.leaseId()));
-    assertEquals("b", media.lease().identity());
+    assertEquals("b", media.leases().getFirst().identity());
   }
 
   @Test
@@ -380,6 +399,64 @@ class IntegrationTest {
   }
 
   @Test
+  void renewReleaseAndTargetedAdminStopPreserveOtherStreams() {
+    var a = connection("ana", "a");
+    var b = connection("bia", "b");
+    when(live.participants()).thenReturn(List.of(participant("a", false), participant("b", false)));
+    var first = media.acquire(() -> "ana", a, new Media.Connection("a"));
+    var second = media.acquire(() -> "bia", b, new Media.Connection("b"));
+    var renew = new Media.Renew("a", first.leaseId());
+    media.renew(() -> "ana", a, renew);
+    assertEquals(2, ((List<?>) media.state().get("leases")).size());
+    assertEquals(
+        403,
+        assertThrows(ResponseStatusException.class, () -> media.release(() -> "bia", b, renew))
+            .getStatusCode()
+            .value());
+    assertEquals(
+        403,
+        assertThrows(ResponseStatusException.class, () -> media.force(() -> "ana", renew))
+            .getStatusCode()
+            .value());
+    accounts.db.update("update accounts set admin=true where username='ana'");
+    media.force(() -> "ana", new Media.Renew("a", UUID.randomUUID()));
+    assertEquals(2, media.leases().size());
+    media.force(() -> "ana", renew);
+    assertEquals(List.of(second), media.leases());
+    media.release(() -> "ana", a, renew);
+    assertEquals(List.of(second), media.leases());
+    var restarted = media.acquire(() -> "ana", a, new Media.Connection("a"));
+    media.release(() -> "ana", a, renew);
+    assertTrue(media.leases().contains(restarted));
+    media.release(() -> "ana", a, new Media.Renew("a", restarted.leaseId()));
+    assertEquals(List.of(second), media.leases());
+    verify(live, never()).permission("b", false);
+  }
+
+  @Test
+  void expiringOneSlotPreservesTheOtherOwnersAndRevokesOutsiders() {
+    var a = connection("ana", "a");
+    var b = connection("bia", "b");
+    connection("bia", "outsider");
+    when(live.participants())
+        .thenReturn(
+            List.of(
+                participant("a", false), participant("b", false), participant("outsider", false)));
+    media.acquire(() -> "ana", a, new Media.Connection("a"));
+    var second = media.acquire(() -> "bia", b, new Media.Connection("b"));
+    accounts.db.update(
+        "update screen_lease set expires_at=now()-interval '1 second' where identity='a'");
+    when(live.participants())
+        .thenReturn(
+            List.of(participant("a", true), participant("b", true), participant("outsider", true)));
+    media.reconcile();
+    assertEquals(List.of(second), media.leases());
+    verify(live, atLeastOnce()).permission("a", false);
+    verify(live).permission("outsider", false);
+    verify(live, never()).permission("b", false);
+  }
+
+  @Test
   void disabledAccountAndMissingSessionAreRemoved() {
     connection("ana", "a");
     when(live.participants()).thenReturn(List.of(participant("a", false)));
@@ -396,7 +473,7 @@ class IntegrationTest {
     media.reconcile();
     media.reconcile();
     verify(live, times(2)).permission("a", false);
-    assertNull(media.lease().identity());
+    assertTrue(media.leases().isEmpty());
   }
 
   @Test
