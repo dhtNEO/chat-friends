@@ -165,18 +165,21 @@
       "dias_pessoa": "2–3",
       "dependencias": "—",
       "evidencias": "E01",
-      "status": "in_progress",
+      "status": "in_review",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
       "validated_sha": "dce75a7f20df620fd9c4e95013e69727784269e9",
       "evidence": [
-        "docs/refactor/executions/T06.md"
+        "docs/refactor/executions/T06.md",
+        "https://github.com/dhtNEO/chat-friends/commit/11899e2b15c1f86af4bc21ff099be63c6eaa3085",
+        "docs/refactor/DECISIONS.md#d006--drawer-mobile-com-modalidade-nativa"
       ],
       "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → in_progress; sem owner anterior e sem dependências. Codex reservou antes de implementar, branch codex/t06-mobile-drawer derivada de refactor dce75a7; sem alterações rastreadas locais, work/ anterior preservado.",
-        "Revalidação no SHA atual: drawer é div deslocada por transform e scrim; não há nome/modalidade, foco inicial, contenção, inert, Escape, botão Fechar menu ou retorno explícito de foco. open(kind) já fecha drawer ao navegar para outros painéis; preservar. Popover usa diálogo não modal e portal na app-shell; avaliar apenas propriedade de Escape/host em presença de modal."
+        "Revalidação no SHA atual: drawer é div deslocada por transform e scrim; não há nome/modalidade, foco inicial, contenção, inert, Escape, botão Fechar menu ou retorno explícito de foco. open(kind) já fecha drawer ao navegar para outros painéis; preservar. Popover usa diálogo não modal e portal na app-shell; avaliar apenas propriedade de Escape/host em presença de modal.",
+        "Implementação 11899e2: diálogo nativo com fundo implicitamente inert, foco inicial/ciclo/retorno, Escape/botão/backdrop e fechamento por navegação/breakpoint; popovers permanecem não modais. 10 casos drawer e 117 backend aprovados, lint/build aprovados. in_progress → in_review; leitura auditiva real, zoom da interface do navegador, revisão e CI pendentes, sem done. Check padrão limitado por settings Maven vazio; equivalente com proxy/CA e friends_test aprovado. Detalhes em executions/T06.md."
       ]
     },
     {
