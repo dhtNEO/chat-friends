@@ -202,7 +202,8 @@
         "docs/refactor/executions/T07.md",
         "https://github.com/dhtNEO/chat-friends/commit/875cbeeb2bd365c3415a516fea6ec73a233b295c",
         "docs/refactor/measurements/T07-contrast.json",
-        "docs/refactor/DECISIONS.md#d007--contraste-derivado-sem-substituir-preferência-t07-30102026"
+        "docs/refactor/DECISIONS.md#d007--contraste-derivado-sem-substituir-preferência-t07-30102026",
+        "https://github.com/dhtNEO/chat-friends/pull/36"
       ],
       "blocked_reason": null,
       "notes": [
