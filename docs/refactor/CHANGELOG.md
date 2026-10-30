@@ -27,3 +27,10 @@
 - Revalidação estática do cursor, catch-up e callbacks na base atual.
 - Impedimento pela dependência T02 aberta registrado no backlog, com owner e próximos testes em [execução T03](executions/T03.md).
 - Nenhuma mudança funcional; critérios de aceite pendentes.
+
+## 30/10/2026 — Recuperação T03 para revisão
+
+- Aceite explícito da T02 registrado, com correção da fixture de mídia que falhou no CI e 33 testes de sessão/transporte aprovados.
+- Cursor HTTP separado do maior ID observado; buffer/deduplicação, retry independente de WS e cancelamento após logout.
+- Indicador com quatro estados, envelopes validados e teste de ordem commit/ACK com PostgreSQL descartável.
+- 12 casos T03, 8 casos demo de três transmissões e 117 testes backend aprovados; [evidências e limites](executions/T03.md). T03 aguarda revisão/CI.

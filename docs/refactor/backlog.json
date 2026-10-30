@@ -69,20 +69,24 @@
       "dias_pessoa": "3–5",
       "dependencias": "T02",
       "evidencias": "E05",
-      "status": "in_progress",
+      "status": "in_review",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
       "validated_sha": "8599283d5f74a1e17af6e466aebc39d94b32f3f1",
       "evidence": [
-        "docs/refactor/executions/T03.md"
+        "docs/refactor/executions/T03.md",
+        "https://github.com/dhtNEO/chat-friends/commit/dd640b165b0d0c989925f3d5ab1447efc672c760",
+        "https://github.com/dhtNEO/chat-friends/pull/32"
       ],
       "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → blocked; Codex assume preparação independente, sem iniciar implementação dependente. T03 sem owner anterior; checkout inicial limpo.",
         "Revalidação estática no SHA registrado confirma latest avançado por WS, catch-up somente no onopen e callbacks sem guarda completa após cleanup. Traço 100/falha/201 documentado; não é reprodução dinâmica.",
         "Próximo passo: concluir T02 no fluxo canônico, revalidar base e transicionar blocked → in_progress antes de implementar e executar testes. Critérios essenciais permanecem pendentes.",
-        "2026-10-30: blocked → in_progress após aceite explícito da T02 pelo usuário e correção/verificação da fixture que falhou no CI. Revalidação no HEAD 8599283 confirma o mesmo fluxo de cursor/catch-up e callbacks; refactor remota permanece ef1893c. Owner Codex mantido; árvore inicial limpa."
+        "2026-10-30: blocked → in_progress após aceite explícito da T02 pelo usuário e correção/verificação da fixture que falhou no CI. Revalidação no HEAD 8599283 confirma o mesmo fluxo de cursor/catch-up e callbacks; refactor remota permanece ef1893c. Owner Codex mantido; árvore inicial limpa.",
+        "2026-10-30: in_progress → in_review; implementação dd640b1. Regressão 100/falha/201 reproduzida antes da correção e recuperada sem fechar socket após corrigir. 12 testes T03, 33 sessão/transporte, 8 streams demo e 117 backend aprovados; lint/build/validate.py/diff --check aprovados.",
+        "check.sh interrompido por DNS no download do Maven; backend completo reexecutado com proxy/CA e friends_test. Evidências e limites em executions/T03.md. Critérios técnicos preenchidos; CI/revisão da T03 pendentes. Próximo passo: revisar PR #32 e registrar aceite; não marcar done."
       ]
     },
     {
