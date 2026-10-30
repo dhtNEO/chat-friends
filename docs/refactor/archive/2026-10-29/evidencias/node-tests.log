@@ -1,0 +1,36 @@
+✔ backup autenticado: round trip, adulteração e senha errada sem confirmar plaintext (502.583758ms)
+✔ validação pública rejeita CGNAT, privados e reservas (5.304468ms)
+✔ DuckDNS exige dois nomes registrados distintos e email válido (0.542857ms)
+✔ bootstrap publica os dois nomes, preserva segredos e precisa de aplicação confirmada (118.459089ms)
+✔ mudança de IP e retry após falha não suprimem recriação (161.393099ms)
+✔ IP inválido, proxy divergente, KO, DNS atrasado ou AAAA não alteram env (2.115396ms)
+✔ timeout limita retries e mensagem de erro não inclui token/URL (0.928483ms)
+✔ render inválido preserva configuração anterior; commit recusa mutação concorrente (75.754338ms)
+✔ saúde administrativa usa JWT restrito e só confirma resposta da SFU (40.524634ms)
+✔ CLI não vaza token em stdout/stderr nem permite modo desconhecido (40.802772ms)
+✔ prd recusa IP privado, nomes iguais, email inválido e origem insegura (174.817243ms)
+✔ DNS distingue autoridade, cache atrasado e AAAA (0.555605ms)
+✔ token precisa de permissão privada (0.546782ms)
+✔ LaunchAgent escapa caminhos, usa binário absoluto e não contém token (29.547078ms)
+✔ DuckDNS gera HTTPS/WSS na porta 18443, sem mudar portas internas da SFU (45.065701ms)
+✔ migração de 443 exige startup completo; job não muda origem sozinho (82.156488ms)
+✔ porta personalizada é validada; 443 permanece compatível (0.43599ms)
+✔ dev padrão gera credenciais privadas e anuncia loopback (38.542043ms)
+✔ bot recebe chave própria estável e diretório privado; rotação acompanha LiveKit (104.442301ms)
+✔ gerador recusa entradas além de dev/prd antes de alterar configuração (163.379816ms)
+✔ migra marcador local sem alterar credenciais (83.760583ms)
+✔ migra marcador internet sem alterar credenciais (85.092954ms)
+✔ configure e check recusam mudar prd para dev sem tocar Docker (49.014783ms)
+✔ TURN em dev é recusado antes de gerar configuração (69.193442ms)
+✔ compose não inicia modo divergente e permite inspecionar/parar a stack (83.505032ms)
+✔ override de rede não pode importar credenciais nem expandir variáveis do operador (63.268229ms)
+✔ renderização privada rejeita override de rede de credenciais (86.802073ms)
+✔ upgrade retira snapshots completos e temporários do mount do helper sem perder backup (65.050194ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2373.637641

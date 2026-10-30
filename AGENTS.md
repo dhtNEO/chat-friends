@@ -22,3 +22,7 @@
 - Hardening: docs/SECURITY_UPGRADE.md. Backend runtime uses APP_DB_* only; do not restore DBA credentials or enable Flyway in runtime. Run migrations through the maintenance service. Preserve generated/runtime.env (MFA key) and generated/network overrides; helper mounts must not expose database/MFA keys or writable code.
 - Web build now uses repository context: docker build -f frontend/Dockerfile . . Custom Caddy/SFU/gosu use patched Go with verified sources/locks. Keep vulnerability exceptions package/version-specific and expiring; never suppress all HIGH/CRITICAL findings.
 - Administrator bootstrap reads the 0600 file as the host UID/GID, not root with capabilities disabled. Production administrators must complete TOTP enrollment. Do not weaken MFA/CSRF or browser media assertions to make tests pass.
+
+## Plano ativo de refatoração
+
+Antes de executar uma tarefa do plano, leia [docs/refactor/README.md](docs/refactor/README.md), [WORKFLOW](docs/refactor/WORKFLOW.md), decisões e spec. Consulte/reserve a tarefa em docs/refactor/backlog.json, revalide o achado no SHA atual e atualize estado, responsável e evidências no mesmo PR. O pacote em archive é histórico. Preserve as três transmissões simultâneas da main e a migração V13; referências históricas a uma única tela não são requisitos atuais. Não iniciar implementação apenas para publicar ou organizar a documentação.

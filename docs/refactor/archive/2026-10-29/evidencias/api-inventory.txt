@@ -1,0 +1,281 @@
+backend/src/main/java/com/chatfriends/Accounts.java:13:public class Accounts implements UserDetailsService {
+backend/src/main/java/com/chatfriends/Accounts.java:17:  public Accounts(JdbcTemplate db, PasswordEncoder encoder) {
+backend/src/main/java/com/chatfriends/Accounts.java:22:  public record Account(
+backend/src/main/java/com/chatfriends/Accounts.java:49:  public Account get(String name) {
+backend/src/main/java/com/chatfriends/Accounts.java:55:  public Account active(String name) {
+backend/src/main/java/com/chatfriends/Accounts.java:61:  public List<Account> all() {
+backend/src/main/java/com/chatfriends/Accounts.java:65:  public UserDetails loadUserByUsername(String name) {
+backend/src/main/java/com/chatfriends/Accounts.java:80:  public void passwordValid(String p) {
+backend/src/main/java/com/chatfriends/Accounts.java:95:  public Account create(String name, String display, String password, boolean admin) {
+backend/src/main/java/com/chatfriends/Accounts.java:111:  public void invalidate(String name) {
+backend/src/main/java/com/chatfriends/Accounts.java:115:  public void setPassword(String name, String password) {
+backend/src/main/java/com/chatfriends/Application.java:9:public class Application {
+backend/src/main/java/com/chatfriends/Application.java:15:  public static void main(String[] args) {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:19:          public int read() {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:23:          public int read(byte[] b, int off, int len) {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:27:          public boolean isFinished() {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:31:          public boolean isReady() {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:35:          public void setReadListener(ReadListener listener) {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:42:  public ServletInputStream getInputStream() {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:47:  public BufferedReader getReader() {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:52:  public int getContentLength() {
+backend/src/main/java/com/chatfriends/BoundedBodyRequest.java:57:  public long getContentLengthLong() {
+backend/src/main/java/com/chatfriends/Errors.java:9:public class Errors {
+backend/src/main/java/com/chatfriends/GameScheduling.java:9:public class GameScheduling {
+backend/src/main/java/com/chatfriends/GameScheduling.java:11:  public ThreadPoolTaskScheduler taskScheduler() {
+backend/src/main/java/com/chatfriends/GameScheduling.java:19:  public ThreadPoolTaskScheduler partyScheduler() {
+backend/src/main/java/com/chatfriends/GamesApi.java:14:@RequestMapping("/api/games")
+backend/src/main/java/com/chatfriends/GamesApi.java:15:public class GamesApi {
+backend/src/main/java/com/chatfriends/GamesApi.java:18:  public GamesApi(Games games) {
+backend/src/main/java/com/chatfriends/GamesApi.java:22:  public record SpinRequest(@NotNull UUID clientId) {}
+backend/src/main/java/com/chatfriends/GamesApi.java:24:  public record RoomRequest(@NotNull UUID clientId, @NotNull Boolean solo) {}
+backend/src/main/java/com/chatfriends/GamesApi.java:26:  @GetMapping
+backend/src/main/java/com/chatfriends/GamesApi.java:27:  public Map<String, Object> overview(Principal p) {
+backend/src/main/java/com/chatfriends/GamesApi.java:31:  @PostMapping("/spin")
+backend/src/main/java/com/chatfriends/GamesApi.java:32:  public Map<String, Object> spin(Principal p, @Valid @RequestBody SpinRequest r) {
+backend/src/main/java/com/chatfriends/GamesApi.java:36:  @PostMapping("/rooms")
+backend/src/main/java/com/chatfriends/GamesApi.java:37:  public Map<String, UUID> create(Principal p, @Valid @RequestBody RoomRequest r) {
+backend/src/main/java/com/chatfriends/GamesApi.java:41:  public record BetRequest(
+backend/src/main/java/com/chatfriends/GamesApi.java:51:  @PostMapping("/rooms/{id}/bet")
+backend/src/main/java/com/chatfriends/GamesApi.java:52:  public void bet(Principal p, @PathVariable UUID id, @Valid @RequestBody BetRequest r) {
+backend/src/main/java/com/chatfriends/GamesApi.java:57:  @PostMapping("/rooms/{id}/next")
+backend/src/main/java/com/chatfriends/GamesApi.java:58:  public void next(Principal p, @PathVariable UUID id, @Valid @RequestBody SpinRequest r) {
+backend/src/main/java/com/chatfriends/GamesApi.java:62:  @PostMapping("/rooms/{id}/{action}")
+backend/src/main/java/com/chatfriends/GamesApi.java:63:  public void action(Principal p, @PathVariable UUID id, @PathVariable String action) {
+backend/src/main/java/com/chatfriends/Media.java:17:@RequestMapping("/api/media")
+backend/src/main/java/com/chatfriends/Media.java:18:public class Media {
+backend/src/main/java/com/chatfriends/Media.java:40:  public Media(
+backend/src/main/java/com/chatfriends/Media.java:53:  public record Lease(String identity, UUID leaseId, Instant expiresAt) {}
+backend/src/main/java/com/chatfriends/Media.java:98:  @PostMapping("/join")
+backend/src/main/java/com/chatfriends/Media.java:99:  public Map<String, Object> join(Principal p, HttpServletRequest q) {
+backend/src/main/java/com/chatfriends/Media.java:129:              live.publicUrl,
+backend/src/main/java/com/chatfriends/Media.java:141:  public record Connection(String identity) {}
+backend/src/main/java/com/chatfriends/Media.java:143:  @PostMapping("/heartbeat")
+backend/src/main/java/com/chatfriends/Media.java:144:  public void heartbeat(Principal p, HttpServletRequest q, @RequestBody Connection b) {
+backend/src/main/java/com/chatfriends/Media.java:154:  public record AudioPreferences(String identity, boolean deaf) {}
+backend/src/main/java/com/chatfriends/Media.java:156:  @PutMapping("/audio")
+backend/src/main/java/com/chatfriends/Media.java:157:  public void audio(Principal p, HttpServletRequest q, @RequestBody AudioPreferences b) {
+backend/src/main/java/com/chatfriends/Media.java:165:  @PostMapping("/leave")
+backend/src/main/java/com/chatfriends/Media.java:166:  public void leave(Principal p, HttpServletRequest q, @RequestBody Connection b) {
+backend/src/main/java/com/chatfriends/Media.java:173:  @GetMapping("/state")
+backend/src/main/java/com/chatfriends/Media.java:174:  public synchronized Map<String, Object> state() {
+backend/src/main/java/com/chatfriends/Media.java:213:  @PostMapping("/screen")
+backend/src/main/java/com/chatfriends/Media.java:214:  public Lease acquire(Principal p, HttpServletRequest q, @RequestBody Connection b) {
+backend/src/main/java/com/chatfriends/Media.java:241:  public record Renew(String identity, UUID leaseId) {}
+backend/src/main/java/com/chatfriends/Media.java:243:  @PostMapping("/screen/heartbeat")
+backend/src/main/java/com/chatfriends/Media.java:244:  public void renew(Principal p, HttpServletRequest q, @RequestBody Renew b) {
+backend/src/main/java/com/chatfriends/Media.java:259:  @DeleteMapping("/screen")
+backend/src/main/java/com/chatfriends/Media.java:260:  public void release(Principal p, HttpServletRequest q, @RequestBody Renew b) {
+backend/src/main/java/com/chatfriends/Media.java:272:  @PostMapping("/screen/force-stop")
+backend/src/main/java/com/chatfriends/Media.java:273:  public void force(Principal p) {
+backend/src/main/java/com/chatfriends/Media.java:352:  public void departed(String identity) {
+backend/src/main/java/com/chatfriends/Media.java:364:  public void removeUser(UUID id) {
+backend/src/main/java/com/chatfriends/Media.java:370:  public void reconcile() {
+backend/src/main/java/com/chatfriends/Media.java:381:  public void tick() {
+backend/src/main/java/com/chatfriends/Mfa.java:18:public class Mfa {
+backend/src/main/java/com/chatfriends/Mfa.java:25:  public Mfa(
+backend/src/main/java/com/chatfriends/Music.java:13:@RequestMapping("/api/music")
+backend/src/main/java/com/chatfriends/Music.java:14:public class Music {
+backend/src/main/java/com/chatfriends/Music.java:36:  @GetMapping("/state")
+backend/src/main/java/com/chatfriends/Music.java:37:  public JsonNode state() { return bot.state(); }
+backend/src/main/java/com/chatfriends/Music.java:39:  @GetMapping("/search")
+backend/src/main/java/com/chatfriends/Music.java:40:  public JsonNode search(Principal p, HttpServletRequest q, @RequestParam String identity,
+backend/src/main/java/com/chatfriends/Music.java:49:  public record Enqueue(String identity, String videoId) {}
+backend/src/main/java/com/chatfriends/Music.java:51:  @PostMapping("/queue")
+backend/src/main/java/com/chatfriends/Music.java:52:  public JsonNode enqueue(Principal p, HttpServletRequest q, @RequestBody Enqueue b) {
+backend/src/main/java/com/chatfriends/Music.java:61:  public record Control(String identity, String action) {}
+backend/src/main/java/com/chatfriends/Music.java:63:  @PostMapping("/control")
+backend/src/main/java/com/chatfriends/Music.java:64:  public JsonNode control(Principal p, HttpServletRequest q, @RequestBody Control b) {
+backend/src/main/java/com/chatfriends/Music.java:72:  @DeleteMapping("/queue/{id}")
+backend/src/main/java/com/chatfriends/Music.java:73:  public JsonNode remove(Principal p, HttpServletRequest q, @PathVariable String id,
+backend/src/main/java/com/chatfriends/Outlook.java:17:public class Outlook {
+backend/src/main/java/com/chatfriends/Outlook.java:22:  public Outlook(JdbcTemplate db, TransactionTemplate tx, Accounts accounts) {
+backend/src/main/java/com/chatfriends/Outlook.java:28:  public record Details(
+backend/src/main/java/com/chatfriends/Outlook.java:36:  public record Attendee(UUID id, String name, String response) {}
+backend/src/main/java/com/chatfriends/Outlook.java:38:  public record CalendarEvent(
+backend/src/main/java/com/chatfriends/Outlook.java:124:  public List<CalendarEvent> list(String name, Instant from, Instant to) {
+backend/src/main/java/com/chatfriends/Outlook.java:163:  public UUID create(String name, UUID clientId, Details d) {
+backend/src/main/java/com/chatfriends/Outlook.java:219:  public void update(String name, UUID id, int version, Details d) {
+backend/src/main/java/com/chatfriends/Outlook.java:239:  public void cancel(String name, UUID id, int version) {
+backend/src/main/java/com/chatfriends/Outlook.java:253:  public void respond(String name, UUID id, String response) {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:12:@RequestMapping("/api/security")
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:13:public class AccountSecurityApi {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:18:  public AccountSecurityApi(Accounts accounts, Mfa mfa, Events events) {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:24:  public record Proof(String password, String code) {}
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:26:  @PostMapping("/mfa/setup")
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:27:  public Map<String, String> setup(Principal p, HttpServletRequest q, @RequestBody Proof b) {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:37:  @PostMapping("/mfa/confirm")
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:38:  public Map<String, Object> confirm(Principal p, HttpServletRequest q, @RequestBody Proof b) {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:62:  @PostMapping("/mfa/verify")
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:63:  public void verify(Principal p, HttpServletRequest q, @RequestBody Proof b) {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:70:  @PostMapping("/reauth")
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:71:  public void reauth(Principal p, HttpServletRequest q, @RequestBody Proof b) {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:77:  @GetMapping("/sessions")
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:78:  public List<Map<String, Object>> list(Principal p, HttpServletRequest q) {
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:99:  @DeleteMapping("/sessions/{id}")
+backend/src/main/java/com/chatfriends/AccountSecurityApi.java:100:  public void revoke(Principal p, HttpServletRequest q, @PathVariable String id) {
+backend/src/main/java/com/chatfriends/Api.java:14:@RequestMapping("/api")
+backend/src/main/java/com/chatfriends/Api.java:15:public class Api {
+backend/src/main/java/com/chatfriends/Api.java:26:  public Api(
+backend/src/main/java/com/chatfriends/Api.java:41:  @GetMapping("/health")
+backend/src/main/java/com/chatfriends/Api.java:42:  public Map<String, String> health() {
+backend/src/main/java/com/chatfriends/Api.java:47:  @GetMapping("/csrf")
+backend/src/main/java/com/chatfriends/Api.java:48:  public Map<String, String> csrf(CsrfToken token) {
+backend/src/main/java/com/chatfriends/Api.java:52:  @GetMapping("/me")
+backend/src/main/java/com/chatfriends/Api.java:53:  public Map<String, Object> me(Principal p, jakarta.servlet.http.HttpServletRequest q) {
+backend/src/main/java/com/chatfriends/Api.java:63:  @GetMapping("/messages")
+backend/src/main/java/com/chatfriends/Api.java:64:  public List<Chat.Message> history(
+backend/src/main/java/com/chatfriends/Api.java:69:  public record Send(UUID clientId, String body) {}
+backend/src/main/java/com/chatfriends/Api.java:71:  @PostMapping("/messages")
+backend/src/main/java/com/chatfriends/Api.java:72:  public Chat.Message send(Principal p, @RequestBody Send msg) {
+backend/src/main/java/com/chatfriends/Api.java:76:  public record Password(String currentPassword, String password) {}
+backend/src/main/java/com/chatfriends/Api.java:78:  @PostMapping("/password")
+backend/src/main/java/com/chatfriends/Api.java:79:  public void password(Principal p, @RequestBody Password b) {
+backend/src/main/java/com/chatfriends/Api.java:90:  @GetMapping("/admin/accounts")
+backend/src/main/java/com/chatfriends/Api.java:91:  public List<Accounts.Account> users() {
+backend/src/main/java/com/chatfriends/Api.java:95:  public record NewAccount(String username, String displayName, String password) {}
+backend/src/main/java/com/chatfriends/Api.java:97:  @PostMapping("/admin/accounts")
+backend/src/main/java/com/chatfriends/Api.java:98:  public Accounts.Account create(@RequestBody NewAccount b) {
+backend/src/main/java/com/chatfriends/Api.java:102:  public record ChangeAccount(Boolean enabled, String password) {}
+backend/src/main/java/com/chatfriends/Api.java:104:  @PatchMapping("/admin/accounts/{username}")
+backend/src/main/java/com/chatfriends/Api.java:105:  public void change(Principal p, @PathVariable String username, @RequestBody ChangeAccount b) {
+backend/src/main/java/com/chatfriends/Bootstrap.java:9:public class Bootstrap implements ApplicationRunner {
+backend/src/main/java/com/chatfriends/Bootstrap.java:13:  public Bootstrap(Accounts accounts, ConfigurableApplicationContext context) {
+backend/src/main/java/com/chatfriends/Bootstrap.java:18:  public void run(ApplicationArguments args) throws Exception {
+backend/src/main/java/com/chatfriends/Chat.java:13:public class Chat {
+backend/src/main/java/com/chatfriends/Chat.java:20:  public Chat(
+backend/src/main/java/com/chatfriends/Chat.java:31:  public record Message(
+backend/src/main/java/com/chatfriends/Chat.java:47:  public List<Message> history(Long before, Long after) {
+backend/src/main/java/com/chatfriends/Chat.java:60:  public Message send(String user, UUID clientId, String body) {
+backend/src/main/java/com/chatfriends/PartyApi.java:11:@RequestMapping("/api/party")
+backend/src/main/java/com/chatfriends/PartyApi.java:12:public class PartyApi {
+backend/src/main/java/com/chatfriends/PartyApi.java:16:  public PartyApi(PartyGames games, Music music) {
+backend/src/main/java/com/chatfriends/PartyApi.java:21:  public record Create(
+backend/src/main/java/com/chatfriends/PartyApi.java:24:  public record Action(@NotNull UUID clientId, String identity, UUID roundId) {}
+backend/src/main/java/com/chatfriends/PartyApi.java:26:  public record Note(@NotNull @Min(0) Integer note, @NotNull @Min(0) @Max(3) Integer lane) {}
+backend/src/main/java/com/chatfriends/PartyApi.java:28:  @GetMapping
+backend/src/main/java/com/chatfriends/PartyApi.java:29:  public Map<String, Object> overview(Principal p) {
+backend/src/main/java/com/chatfriends/PartyApi.java:33:  @GetMapping("/music/search")
+backend/src/main/java/com/chatfriends/PartyApi.java:34:  public Object search(
+backend/src/main/java/com/chatfriends/PartyApi.java:42:  @PostMapping
+backend/src/main/java/com/chatfriends/PartyApi.java:43:  public Map<String, UUID> create(Principal p, @Valid @RequestBody Create r) {
+backend/src/main/java/com/chatfriends/PartyApi.java:48:  @PostMapping("/{id}/start")
+backend/src/main/java/com/chatfriends/PartyApi.java:49:  public void start(
+backend/src/main/java/com/chatfriends/PartyApi.java:58:  @PostMapping("/{id}/note")
+backend/src/main/java/com/chatfriends/PartyApi.java:59:  public Map<String, Integer> note(Principal p, @PathVariable UUID id, @Valid @RequestBody Note r) {
+backend/src/main/java/com/chatfriends/PartyApi.java:63:  @PostMapping("/{id}/{action}")
+backend/src/main/java/com/chatfriends/PartyApi.java:64:  public void action(
+backend/src/main/java/com/chatfriends/Events.java:13:public class Events extends TextWebSocketHandler {
+backend/src/main/java/com/chatfriends/Events.java:20:  public Events(ObjectMapper json, Accounts accounts, JdbcTemplate db) {
+backend/src/main/java/com/chatfriends/Events.java:27:  public void afterConnectionEstablished(WebSocketSession raw) throws Exception {
+backend/src/main/java/com/chatfriends/Events.java:67:  public void afterConnectionClosed(WebSocketSession s, CloseStatus c) {
+backend/src/main/java/com/chatfriends/Events.java:73:  public void broadcast(Object event) {
+backend/src/main/java/com/chatfriends/Events.java:88:  public void presence() {
+backend/src/main/java/com/chatfriends/Events.java:101:  public void closeUser(String name) {
+backend/src/main/java/com/chatfriends/Events.java:117:  public void reap() {
+backend/src/main/java/com/chatfriends/Profiles.java:14:@RequestMapping("/api")
+backend/src/main/java/com/chatfriends/Profiles.java:15:public class Profiles {
+backend/src/main/java/com/chatfriends/Profiles.java:24:  public Profiles(Accounts accounts, Events events, Media media, TransactionTemplate tx) {
+backend/src/main/java/com/chatfriends/Profiles.java:31:  public record Member(UUID id, String username, String displayName, Long avatarVersion) {}
+backend/src/main/java/com/chatfriends/Profiles.java:33:  @GetMapping("/members")
+backend/src/main/java/com/chatfriends/Profiles.java:34:  public List<Member> members() {
+backend/src/main/java/com/chatfriends/Profiles.java:42:  public record Change(
+backend/src/main/java/com/chatfriends/Profiles.java:45:  @PatchMapping("/profile")
+backend/src/main/java/com/chatfriends/Profiles.java:46:  public Map<String, Object> update(Principal p, @RequestBody Change b) {
+backend/src/main/java/com/chatfriends/Profiles.java:105:  @PostMapping(
+backend/src/main/java/com/chatfriends/Profiles.java:108:  public Map<String, Object> avatar(
+backend/src/main/java/com/chatfriends/Profiles.java:127:  @DeleteMapping("/profile/avatar")
+backend/src/main/java/com/chatfriends/Profiles.java:128:  public void removeAvatar(Principal p) {
+backend/src/main/java/com/chatfriends/Profiles.java:134:  @GetMapping("/avatars/{id}")
+backend/src/main/java/com/chatfriends/Profiles.java:135:  public ResponseEntity<byte[]> image(@PathVariable UUID id) {
+backend/src/main/java/com/chatfriends/Games.java:17:public class Games {
+backend/src/main/java/com/chatfriends/Games.java:24:  public Games(JdbcTemplate db, TransactionTemplate tx, Accounts accounts, Roulette roulette) {
+backend/src/main/java/com/chatfriends/Games.java:82:  public Map<String, Object> overview(String name) {
+backend/src/main/java/com/chatfriends/Games.java:131:  public Map<String, Object> spin(String name, UUID clientId) {
+backend/src/main/java/com/chatfriends/Games.java:166:  public UUID create(String name, UUID clientId, boolean solo) {
+backend/src/main/java/com/chatfriends/Games.java:170:  public void action(String name, UUID id, String action) {
+backend/src/main/java/com/chatfriends/RequestBudget.java:10:public class RequestBudget {
+backend/src/main/java/com/chatfriends/RequestBudget.java:17:  public RequestBudget() {
+backend/src/main/java/com/chatfriends/RequestBudget.java:25:  public synchronized boolean allow(String key, int limit, int seconds) {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:16:public class LiveKitGateway {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:18:  final String key, secret, room, publicUrl;
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:20:  public LiveKitGateway(
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:25:      @Value("${app.livekit-public-url}") String publicUrl) {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:30:    this.publicUrl = publicUrl;
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:41:  public String token(String identity, String name) {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:57:  public String musicToken() {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:68:  public List<ParticipantInfo> participants() {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:81:  public void permission(String identity, boolean screen) {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:100:  public void remove(String identity) {
+backend/src/main/java/com/chatfriends/LiveKitGateway.java:111:  public void verifyWebhook(String body, String authorization) {
+backend/src/main/java/com/chatfriends/MediaAdmission.java:14:/** All public signaling passes here. Never forward a refreshed elevated JWT unchanged. */
+backend/src/main/java/com/chatfriends/MediaAdmission.java:16:public class MediaAdmission {
+backend/src/main/java/com/chatfriends/MediaAdmission.java:21:  public MediaAdmission(LiveKitGateway live, Media media, Accounts accounts) {
+backend/src/main/java/com/chatfriends/MediaAdmission.java:27:  public String downscope(String token) {
+backend/src/main/java/com/chatfriends/MediaAdmission.java:54:  @GetMapping("/api/livekit/admit")
+backend/src/main/java/com/chatfriends/MediaAdmission.java:55:  public ResponseEntity<Void> admit(
+backend/src/main/java/com/chatfriends/MigrationHistory.java:11:public class MigrationHistory {
+backend/src/main/java/com/chatfriends/MusicGateway.java:24:public class MusicGateway {
+backend/src/main/java/com/chatfriends/OutlookApi.java:11:@RequestMapping("/api/outlook")
+backend/src/main/java/com/chatfriends/OutlookApi.java:12:public class OutlookApi {
+backend/src/main/java/com/chatfriends/OutlookApi.java:15:  public OutlookApi(Outlook outlook) {
+backend/src/main/java/com/chatfriends/OutlookApi.java:19:  public record Create(@NotNull UUID clientId, @Valid @NotNull Outlook.Details details) {}
+backend/src/main/java/com/chatfriends/OutlookApi.java:21:  public record Edit(@Min(1) int version, @Valid @NotNull Outlook.Details details) {}
+backend/src/main/java/com/chatfriends/OutlookApi.java:23:  public record Cancel(@Min(1) int version) {}
+backend/src/main/java/com/chatfriends/OutlookApi.java:25:  public record Response(@NotNull String response) {}
+backend/src/main/java/com/chatfriends/OutlookApi.java:27:  @GetMapping
+backend/src/main/java/com/chatfriends/OutlookApi.java:28:  public List<Outlook.CalendarEvent> list(
+backend/src/main/java/com/chatfriends/OutlookApi.java:33:  @PostMapping
+backend/src/main/java/com/chatfriends/OutlookApi.java:34:  public Map<String, UUID> create(Principal p, @Valid @RequestBody Create r) {
+backend/src/main/java/com/chatfriends/OutlookApi.java:38:  @PutMapping("/{id}")
+backend/src/main/java/com/chatfriends/OutlookApi.java:39:  public void update(Principal p, @PathVariable UUID id, @Valid @RequestBody Edit r) {
+backend/src/main/java/com/chatfriends/OutlookApi.java:43:  @PostMapping("/{id}/cancel")
+backend/src/main/java/com/chatfriends/OutlookApi.java:44:  public void cancel(Principal p, @PathVariable UUID id, @Valid @RequestBody Cancel r) {
+backend/src/main/java/com/chatfriends/OutlookApi.java:48:  @PostMapping("/{id}/response")
+backend/src/main/java/com/chatfriends/OutlookApi.java:49:  public void respond(Principal p, @PathVariable UUID id, @Valid @RequestBody Response r) {
+backend/src/main/java/com/chatfriends/PartyGames.java:15:public class PartyGames {
+backend/src/main/java/com/chatfriends/PartyGames.java:24:  public PartyGames(Games games, ObjectMapper json, MusicGateway bot, Media media) {
+backend/src/main/java/com/chatfriends/PartyGames.java:91:  public UUID create(String name, UUID clientId, String kind, String videoId) {
+backend/src/main/java/com/chatfriends/PartyGames.java:95:  public UUID create(String name, UUID clientId, String kind, String videoId, String difficulty) {
+backend/src/main/java/com/chatfriends/PartyGames.java:148:  public Map<String, Object> overview(String name) {
+backend/src/main/java/com/chatfriends/PartyGames.java:316:  public void action(String name, UUID id, UUID clientId, String action, String voice) {
+backend/src/main/java/com/chatfriends/PartyGames.java:320:  public void action(
+backend/src/main/java/com/chatfriends/PartyGames.java:562:  public void rhythmStart(String name, UUID id) {
+backend/src/main/java/com/chatfriends/PartyGames.java:676:  public int note(String name, UUID id, int index, int lane) {
+backend/src/main/java/com/chatfriends/PartyGames.java:805:  @Scheduled(fixedDelay = 1000, scheduler = "partyScheduler")
+backend/src/main/java/com/chatfriends/PartyGames.java:806:  public void advance() {
+backend/src/main/java/com/chatfriends/RateLimit.java:7:public class RateLimit {
+backend/src/main/java/com/chatfriends/RateLimit.java:10:  public RateLimit(JdbcTemplate db) {
+backend/src/main/java/com/chatfriends/RateLimit.java:14:  public boolean allow(String key, int limit, int seconds) {
+backend/src/main/java/com/chatfriends/RateLimit.java:31:  public void prune() {
+backend/src/main/java/com/chatfriends/RequestGuard.java:13:public class RequestGuard extends OncePerRequestFilter {
+backend/src/main/java/com/chatfriends/RequestGuard.java:17:  public RequestGuard(RequestBudget budget, String proxyKey) {
+backend/src/main/java/com/chatfriends/Security.java:15:public class Security {
+backend/src/main/java/com/chatfriends/Shortcuts.java:16:@RequestMapping("/api/me/shortcuts")
+backend/src/main/java/com/chatfriends/Shortcuts.java:17:public class Shortcuts {
+backend/src/main/java/com/chatfriends/Shortcuts.java:34:  public Shortcuts(Accounts accounts, RateLimit rate, ObjectMapper json) {
+backend/src/main/java/com/chatfriends/Shortcuts.java:40:  public record Binding(String action, String code, boolean ctrl, boolean alt, boolean shift,
+backend/src/main/java/com/chatfriends/Shortcuts.java:43:  public record Settings(String platform, Long revision, Boolean enabled, Boolean allowWhileTyping,
+backend/src/main/java/com/chatfriends/Shortcuts.java:97:  @GetMapping
+backend/src/main/java/com/chatfriends/Shortcuts.java:98:  public Settings get(Principal p, @RequestParam(required = false) String platform) {
+backend/src/main/java/com/chatfriends/Shortcuts.java:102:  @PutMapping
+backend/src/main/java/com/chatfriends/Shortcuts.java:103:  public Settings save(Principal p, @RequestBody Settings b) throws JacksonException {
+backend/src/main/java/com/chatfriends/Webhook.java:6:public class Webhook {
+backend/src/main/java/com/chatfriends/Webhook.java:11:  public Webhook(
+backend/src/main/java/com/chatfriends/Webhook.java:18:  @PostMapping("/api/livekit/webhook")
+backend/src/main/java/com/chatfriends/Webhook.java:19:  public void webhook(
+backend/src/main/java/com/chatfriends/WebSockets.java:14:public class WebSockets implements WebSocketConfigurer {
+backend/src/main/java/com/chatfriends/WebSockets.java:18:  public WebSockets(Events events, @Value("${app.origin}") String origin) {
+backend/src/main/java/com/chatfriends/WebSockets.java:23:  public void registerWebSocketHandlers(WebSocketHandlerRegistry r) {
+backend/src/main/java/com/chatfriends/WebSockets.java:28:              public boolean beforeHandshake(
+backend/src/main/java/com/chatfriends/WebSockets.java:44:              public void afterHandshake(
+backend/src/main/java/com/chatfriends/SessionSecurity.java:10:public class SessionSecurity {
+backend/src/main/java/com/chatfriends/SessionSecurity.java:19:  public SessionSecurity(
+backend/src/main/java/com/chatfriends/Roulette.java:18:public class Roulette {
+backend/src/main/java/com/chatfriends/Roulette.java:26:  public Roulette(JdbcTemplate db, TransactionTemplate tx, Accounts accounts) {
+backend/src/main/java/com/chatfriends/Roulette.java:145:  public UUID create(String name, UUID clientId, boolean solo) {
+backend/src/main/java/com/chatfriends/Roulette.java:236:  public void bet(
+backend/src/main/java/com/chatfriends/Roulette.java:362:  public void action(String name, UUID id, String action) {
+backend/src/main/java/com/chatfriends/Roulette.java:461:  public void next(String name, UUID id, UUID clientId) {
+backend/src/main/java/com/chatfriends/Roulette.java:511:  @Scheduled(fixedDelay = 1000)
+backend/src/main/java/com/chatfriends/Roulette.java:512:  public void advance() {

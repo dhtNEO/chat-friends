@@ -1,0 +1,35 @@
+test_enqueue_during_disconnect_is_not_stranded (test_bot.Lifecycle.test_enqueue_during_disconnect_is_not_stranded) ... ok
+test_failed_song_advances_and_queue_is_bounded (test_bot.Lifecycle.test_failed_song_advances_and_queue_is_bounded) ... ok
+test_metadata_reads_fragmented_output_until_eof (test_bot.Lifecycle.test_metadata_reads_fragmented_output_until_eof) ... ok
+test_paused_player_leaves_an_empty_room_and_clears_queue (test_bot.Lifecycle.test_paused_player_leaves_an_empty_room_and_clears_queue) ... ok
+test_private_api_requires_scoped_key_and_never_returns_token (test_bot.Lifecycle.test_private_api_requires_scoped_key_and_never_returns_token) ... ok
+test_publish_options_are_compatible_with_pinned_rtc_sdk (test_bot.Lifecycle.test_publish_options_are_compatible_with_pinned_rtc_sdk) ... ok
+test_rotated_control_key_is_reloaded_and_missing_key_fails_closed (test_bot.Lifecycle.test_rotated_control_key_is_reloaded_and_missing_key_fails_closed) ... ok
+test_search_metadata_is_retained_only_in_bounded_fresh_catalog (test_bot.Lifecycle.test_search_metadata_is_retained_only_in_bounded_fresh_catalog) ... ok
+test_skip_cancels_current_before_next_and_stop_clears (test_bot.Lifecycle.test_skip_cancels_current_before_next_and_stop_clears) ... ok
+test_live_and_long_videos_rejected (test_bot.Validation.test_live_and_long_videos_rejected) ... ok
+test_only_youtube_video_links_or_prefixed_search (test_bot.Validation.test_only_youtube_video_links_or_prefixed_search) ... ok
+test_dense_five_minute_chart_keeps_ending_and_bounds (test_detection.SpectralDetection.test_dense_five_minute_chart_keeps_ending_and_bounds) ... ok
+test_fast_subdivisions_remain_real_onsets_in_dense_chart (test_detection.SpectralDetection.test_fast_subdivisions_remain_real_onsets_in_dense_chart) ... ok
+test_gain_changes_preserve_soft_attacks_and_timing (test_detection.SpectralDetection.test_gain_changes_preserve_soft_attacks_and_timing) ... ok
+test_invalid_density_is_rejected (test_detection.SpectralDetection.test_invalid_density_is_rejected) ... ok
+test_lanes_follow_frequency_content (test_detection.SpectralDetection.test_lanes_follow_frequency_content) ... ok
+test_nearby_weak_pre_attack_does_not_steal_a_strong_beat (test_detection.SpectralDetection.test_nearby_weak_pre_attack_does_not_steal_a_strong_beat) ... ok
+test_quiet_percussion_is_retained_under_a_sustained_instrument (test_detection.SpectralDetection.test_quiet_percussion_is_retained_under_a_sustained_instrument) ... ok
+test_stationary_noise_tone_silence_and_slow_swell_do_not_invent_beats (test_detection.SpectralDetection.test_stationary_noise_tone_silence_and_slow_swell_do_not_invent_beats) ... ok
+test_stereo_phase_does_not_cancel_attacks (test_detection.SpectralDetection.test_stereo_phase_does_not_cancel_attacks) ... ok
+test_sustained_vibrato_is_not_percussion (test_detection.SpectralDetection.test_sustained_vibrato_is_not_percussion) ... ok
+test_syncopation_and_changing_tempo_follow_the_audio (test_detection.SpectralDetection.test_syncopation_and_changing_tempo_follow_the_audio) ... ok
+test_five_minutes_keep_notes_through_the_end (test_rhythm.Detection.test_five_minutes_keep_notes_through_the_end) ... ok
+test_notes_follow_transients_and_stay_bounded (test_rhythm.Detection.test_notes_follow_transients_and_stay_bounded) ... ok
+test_silence_does_not_invent_beats (test_rhythm.Detection.test_silence_does_not_invent_beats) ... ok
+test_empty_release_does_not_interrupt_normal_music (test_rhythm.RhythmLifecycle.test_empty_release_does_not_interrupt_normal_music) ... ok
+test_prepare_analyzes_exact_pcm_then_reuses_reservation (test_rhythm.RhythmLifecycle.test_prepare_analyzes_exact_pcm_then_reuses_reservation) ... ok
+test_private_rhythm_routes_require_secret (test_rhythm.RhythmLifecycle.test_private_rhythm_routes_require_secret) ... ok
+test_reserved_bot_rejects_queue_and_controls (test_rhythm.RhythmLifecycle.test_reserved_bot_rejects_queue_and_controls) ... ok
+test_start_is_idempotent_and_release_cancels_publisher (test_rhythm.RhythmLifecycle.test_start_is_idempotent_and_release_cancels_publisher) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 12.755s
+
+OK

@@ -47,6 +47,10 @@ Para internet: preencha `.env`, DNS, firewall e roteador conforme [NETWORKING](d
 - Reserva de tela atômica com lease de 30 s, heartbeat, revogação e reconciliação. Sinalização passa por admissão que revalida sessão e retira fontes de tela de tokens reutilizados; veja [SECURITY](docs/SECURITY.md) para fronteiras e limite de múltiplas tracks maliciosas.
 - Compose dev/prd, backup/restauração, diagnóstico, Terraform GCP sem apply, CI e documentação operacional.
 
+## Plano ativo de refatoração
+
+O [plano de refatoração](docs/refactor/README.md) reúne 30 specs para agentes e mantenedores. Consulte o [backlog](docs/refactor/backlog.json) e o [fluxo de execução](docs/refactor/WORKFLOW.md) antes de começar. Estado, responsável e evidências são atualizados junto de cada implementação. O relatório original está preservado como histórico; os achados devem ser revalidados na versão atual.
+
 ## Desenvolvimento e documentação
 
 `./scripts/check.sh` executa testes com PostgreSQL separado e build/lint do frontend em containers. [CONTRIBUTING](CONTRIBUTING.md) explica execução parcial e testes de navegador. Não execute testes destrutivos contra o banco `friends`.
