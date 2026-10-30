@@ -29,6 +29,13 @@ import {
   type SecurityState,
 } from "./AccountSecurity";
 import { GamesClub } from "./GamesClub";
+import {
+  createChatSync,
+  parseChatEvent,
+  isMessage,
+  chatStatusLabel,
+  type ChatStatus,
+} from "./ChatSync";
 import { Outlook } from "./Outlook";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
@@ -316,14 +323,18 @@ function Workspace({
   const [voiceIdentity, setVoiceIdentity] = useState<string>();
   const [members, setMembers] = useState<Member[]>([]);
   const loadMembers = useCallback(
-    () =>
-      api<Member[]>("/members")
-        .then(setMembers)
+    (signal?: AbortSignal) =>
+      api<Member[]>("/members", "GET", undefined, { signal })
+        .then((rows) => {
+          if (!signal?.aborted) setMembers(rows);
+        })
         .catch(() => {}),
     [],
   );
   useEffect(() => {
-    void loadMembers();
+    const controller = new AbortController();
+    void loadMembers(controller.signal);
+    return () => controller.abort();
   }, [loadMembers]);
   const people = useMemo(
     () => ({
@@ -334,16 +345,16 @@ function Workspace({
   );
   const [messages, setMessages] = useState<Message[]>([]),
     [online, setOnline] = useState<string[]>([]),
-    [connected, setConnected] = useState(false),
+    [chatStatus, setChatStatus] = useState<ChatStatus>("connecting"),
     [more, setMore] = useState(true),
     [pending, setPending] = useState<{ clientId: string; body: string }[]>([]);
+  const [chatError, setChatError] = useState("");
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({}),
     [dock, setDock] = useState<DockviewApi | null>(null),
     [stageMaximized, setStageMaximized] = useState(false),
     [streamMaximized, setStreamMaximized] = useState(false);
-  const initialized = useRef(false);
-  const latest = useRef(0),
-    queue = useRef(pending);
+  const chat = useRef<ReturnType<typeof createChatSync> | null>(null);
+  const queue = useRef(pending);
   queue.current = pending;
   const hosts = useRef(new Map<string, { el: HTMLElement; frames: number }>());
   const attach = useCallback((id: string) => {
@@ -412,7 +423,6 @@ function Workspace({
           (a, b) => a.id - b.id,
         ),
       );
-      for (const m of items) latest.current = Math.max(latest.current, m.id);
       setPending((old) =>
         old.filter(
           (p) =>
@@ -425,80 +435,113 @@ function Workspace({
     [me.user.id],
   );
   async function send(msg: { clientId: string; body: string }) {
+    const current = chat.current;
+    if (!current) return;
     try {
-      const saved = await api<Message>("/messages", "POST", msg);
+      const saved = await api<unknown>("/messages", "POST", msg, {
+        signal: current.signal,
+      });
+      if (current !== chat.current || current.signal.aborted) return;
+      if (!isMessage(saved))
+        throw new Error("Confirmação de mensagem inválida.");
       merge([saved]);
+      current.observe(saved);
     } catch (e) {
-      onError((e as Error).message);
+      if (current === chat.current && !current.signal.aborted)
+        onError((e as Error).message);
     }
   }
   useEffect(() => {
-    let alive = true,
-      ws: WebSocket | undefined,
-      retry: ReturnType<typeof setTimeout>,
-      ping: ReturnType<typeof setInterval>,
-      lastPong = Date.now();
-    const catchUp = async () => {
-      if (!initialized.current) {
-        merge(await api<Message[]>("/messages"));
-        initialized.current = true;
-        return;
-      }
-      let rows: Message[];
-      let cursor = latest.current;
-      do {
-        rows = await api<Message[]>("/messages?after=" + cursor);
-        if (!alive) return;
-        merge(rows);
-        if (rows.length) cursor = rows[rows.length - 1].id;
-      } while (rows.length === 100);
-    };
+    let alive = true;
+    let socket: WebSocket | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let ping: ReturnType<typeof setInterval> | undefined;
+    const sync = createChatSync({
+      read: (after, signal) =>
+        api<unknown>(
+          after === undefined ? "/messages" : "/messages?after=" + after,
+          "GET",
+          undefined,
+          { signal },
+        ),
+      merge,
+      status: (status) => {
+        setChatStatus(status);
+        if (status === "updated") setChatError("");
+      },
+      error: (error) => setChatError(error.message),
+    });
+    chat.current = sync;
     const connect = () => {
-      ws = new WebSocket(
+      if (!alive) return;
+      const ws = new WebSocket(
         `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`,
       );
+      socket = ws;
+      let lastPong = Date.now();
+      const active = () => alive && socket === ws;
       ws.onopen = () => {
-        setConnected(true);
+        if (!active()) return;
+        sync.connection(true);
         lastPong = Date.now();
-        void catchUp().catch((e) => onError(e.message));
         for (const p of queue.current) void send(p);
         ping = setInterval(() => {
-          if (Date.now() - lastPong > 35000) ws?.close();
-          else if (ws?.readyState === WebSocket.OPEN) ws.send("ping");
+          if (!active()) return;
+          if (Date.now() - lastPong > 35000) ws.close();
+          else if (ws.readyState === WebSocket.OPEN) ws.send("ping");
         }, 10000);
       };
       ws.onmessage = (e) => {
-        const event = JSON.parse(e.data);
-        if (event.type === "message") merge([event.message]);
+        if (!active()) return;
+        const event = parseChatEvent(e.data);
+        if (!event) return;
+        if (event.type === "message") sync.observe(event.message);
         if (event.type === "presence") setOnline(event.users);
         if (event.type === "pong") lastPong = Date.now();
         if (event.type === "profile") {
-          void loadMembers();
+          void loadMembers(sync.signal);
           void onRefresh();
         }
       };
       ws.onclose = () => {
+        if (!active()) return;
         clearInterval(ping);
-        setConnected(false);
+        sync.connection(false);
         setOnline([]);
-        if (alive) retry = setTimeout(connect, 2000 + Math.random() * 1000);
+        retry = setTimeout(connect, 2000 + Math.random() * 1000);
       };
     };
     connect();
     return () => {
       alive = false;
+      chat.current = null;
+      sync.dispose();
       clearTimeout(retry);
       clearInterval(ping);
-      ws?.close();
+      if (socket) {
+        socket.onopen = socket.onmessage = socket.onclose = null;
+        socket.close();
+      }
     };
-  }, [merge, loadMembers, onRefresh]);
+  }, [merge, loadMembers, onRefresh, onError]);
   async function older() {
+    const current = chat.current;
+    if (!current) return;
     try {
-      const rows = await api<Message[]>("/messages?before=" + messages[0]?.id);
+      const rows = await api<Message[]>(
+        "/messages?before=" + messages[0]?.id,
+        "GET",
+        undefined,
+        { signal: current.signal },
+      );
+      if (current !== chat.current || current.signal.aborted) return;
+      if (!Array.isArray(rows) || !rows.every(isMessage))
+        throw new Error("Resposta de histórico inválida.");
       merge(rows);
       setMore(rows.length === 50);
     } catch (e) {
-      onError((e as Error).message);
+      if (current === chat.current && !current.signal.aborted)
+        onError((e as Error).message);
     }
   }
   function post(body: string) {
@@ -577,7 +620,8 @@ function Workspace({
       return (
         <ChatView
           me={me.user}
-          connected={connected}
+          chatStatus={chatStatus}
+          chatError={chatError}
           messages={messages}
           pending={pending}
           more={more}
@@ -978,7 +1022,8 @@ function dayLabel(d: Date) {
 }
 function ChatView({
   me,
-  connected,
+  chatStatus,
+  chatError,
   messages,
   pending,
   more,
@@ -987,7 +1032,8 @@ function ChatView({
   onRetry,
 }: {
   me: User;
-  connected: boolean;
+  chatStatus: ChatStatus;
+  chatError: string;
   messages: Message[];
   pending: { clientId: string; body: string }[];
   more: boolean;
@@ -1043,9 +1089,16 @@ function ChatView({
           </h1>
           <p>O ponto de encontro de todo dia.</p>
         </div>
-        <span className="connection">
-          <span className={"dot " + (connected ? "green" : "")} />
-          {connected ? "Conectado" : "Reconectando…"}
+        <span
+          className="connection"
+          role="status"
+          aria-live="polite"
+          title={chatError || undefined}
+        >
+          <span
+            className={"dot " + (chatStatus === "updated" ? "green" : "")}
+          />
+          {chatStatusLabel[chatStatus]}
         </span>
       </header>
       <div

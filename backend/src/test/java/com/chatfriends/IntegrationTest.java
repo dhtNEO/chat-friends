@@ -168,6 +168,49 @@ class IntegrationTest {
   }
 
   @Test
+  void chatCommitOrderPreventsCursorFromSkippingUncommittedMessage() throws Exception {
+    // Hold the real chat lock after allocating a lower ID. Another sender must
+    // not ACK a higher ID while this transaction is invisible to catch-up.
+    try (var pool = Executors.newVirtualThreadPerTaskExecutor();
+        var first = accounts.db.getDataSource().getConnection()) {
+      first.setAutoCommit(false);
+      try {
+        first.createStatement().execute("select pg_advisory_xact_lock(1)");
+        long lower;
+        try (var insert = first.prepareStatement(
+            "insert into messages(author_id,client_id,body) values(?,?,?) returning id")) {
+          insert.setObject(1, accounts.get("ana").id());
+          insert.setObject(2, UUID.randomUUID());
+          insert.setString(3, "commit sintético A");
+          try (var result = insert.executeQuery()) {
+            assertTrue(result.next());
+            lower = result.getLong(1);
+          }
+        }
+        var ack = pool.submit(() -> chat.send("bia", UUID.randomUUID(), "commit sintético B"));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        boolean waiting = false;
+        while (System.nanoTime() < deadline && !ack.isDone()) {
+          waiting = accounts.db.queryForObject(
+              "select exists(select 1 from pg_locks where locktype='advisory' and objid=1 and not granted)", Boolean.class);
+          if (waiting) break;
+          Thread.sleep(10);
+        }
+        assertTrue(waiting, "O segundo envio deve aguardar o lock de commit");
+        assertFalse(ack.isDone(), "Nenhum ACK antes do commit anterior");
+        assertTrue(chat.history(null, 0L).isEmpty());
+        first.commit();
+        var higher = ack.get(5, TimeUnit.SECONDS);
+        assertTrue(higher.id() > lower);
+        assertEquals(List.of(lower, higher.id()),
+            chat.history(null, 0L).stream().map(Chat.Message::id).toList());
+      } finally {
+        first.rollback();
+      }
+    }
+  }
+
+  @Test
   void validationAndRateLimit() {
     assertThrows(ResponseStatusException.class, () -> chat.send("ana", UUID.randomUUID(), " "));
     assertThrows(
