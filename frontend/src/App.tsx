@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -37,9 +36,11 @@ import {
   type ChatStatus,
 } from "./ChatSync";
 import { Outlook } from "./Outlook";
+import { ChatComposer, limitMessage } from "./ChatComposer";
+import { createChatOutbox, deliveryLabel, type Delivery } from "./ChatOutbox";
 import { Voice } from "./Voice";
 import { Icon, type IconName } from "./Icon";
-import { Avatar, PeopleContext, Popover, avatarSrc, usePeople } from "./ui";
+import { Avatar, PeopleContext, avatarSrc, usePeople } from "./ui";
 import { Profile } from "./Profile";
 import { loadShortcuts, setShortcuts, useKeyboardShortcuts } from "./Shortcuts";
 import { Lockup, Logo } from "./Logo";
@@ -347,15 +348,24 @@ function Workspace({
     [online, setOnline] = useState<string[]>([]),
     [chatStatus, setChatStatus] = useState<ChatStatus>("connecting"),
     [more, setMore] = useState(true),
-    [pending, setPending] = useState<{ clientId: string; body: string }[]>([]);
+    [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [chatError, setChatError] = useState("");
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({}),
     [dock, setDock] = useState<DockviewApi | null>(null),
     [stageMaximized, setStageMaximized] = useState(false),
     [streamMaximized, setStreamMaximized] = useState(false);
   const chat = useRef<ReturnType<typeof createChatSync> | null>(null);
-  const queue = useRef(pending);
-  queue.current = pending;
+  const outbox = useRef<ReturnType<typeof createChatOutbox> | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draftMemory = useRef<Record<string, string>>({});
+  const draftKey = `${me.user.id}:geral`;
+  function changeDraft(value: string) {
+    draftMemory.current = {
+      ...draftMemory.current,
+      [draftKey]: limitMessage(value),
+    };
+    setDrafts(draftMemory.current);
+  }
   const hosts = useRef(new Map<string, { el: HTMLElement; frames: number }>());
   const attach = useCallback((id: string) => {
     let host = hosts.current.get(id);
@@ -423,34 +433,10 @@ function Workspace({
           (a, b) => a.id - b.id,
         ),
       );
-      setPending((old) =>
-        old.filter(
-          (p) =>
-            !items.some(
-              (m) => m.authorId === me.user.id && m.clientId === p.clientId,
-            ),
-        ),
-      );
+      outbox.current?.confirm(items);
     },
     [me.user.id],
   );
-  async function send(msg: { clientId: string; body: string }) {
-    const current = chat.current;
-    if (!current) return;
-    try {
-      const saved = await api<unknown>("/messages", "POST", msg, {
-        signal: current.signal,
-      });
-      if (current !== chat.current || current.signal.aborted) return;
-      if (!isMessage(saved))
-        throw new Error("Confirmação de mensagem inválida.");
-      merge([saved]);
-      current.observe(saved);
-    } catch (e) {
-      if (current === chat.current && !current.signal.aborted)
-        onError((e as Error).message);
-    }
-  }
   useEffect(() => {
     let alive = true;
     let socket: WebSocket | undefined;
@@ -471,6 +457,17 @@ function Workspace({
       },
       error: (error) => setChatError(error.message),
     });
+    const sender = createChatOutbox({
+      authorId: me.user.id,
+      post: (message, signal) =>
+        api<unknown>("/messages", "POST", message, { signal }),
+      saved: (message) => {
+        merge([message]);
+        sync.observe(message);
+      },
+      changed: setDeliveries,
+    });
+    outbox.current = sender;
     chat.current = sync;
     const connect = () => {
       if (!alive) return;
@@ -484,7 +481,7 @@ function Workspace({
         if (!active()) return;
         sync.connection(true);
         lastPong = Date.now();
-        for (const p of queue.current) void send(p);
+        sender.connection(true);
         ping = setInterval(() => {
           if (!active()) return;
           if (Date.now() - lastPong > 35000) ws.close();
@@ -507,6 +504,7 @@ function Workspace({
         if (!active()) return;
         clearInterval(ping);
         sync.connection(false);
+        sender.connection(false);
         setOnline([]);
         retry = setTimeout(connect, 2000 + Math.random() * 1000);
       };
@@ -515,6 +513,8 @@ function Workspace({
     return () => {
       alive = false;
       chat.current = null;
+      outbox.current = null;
+      sender.dispose();
       sync.dispose();
       clearTimeout(retry);
       clearInterval(ping);
@@ -523,7 +523,7 @@ function Workspace({
         socket.close();
       }
     };
-  }, [merge, loadMembers, onRefresh, onError]);
+  }, [merge, loadMembers, onRefresh, onError, me.user.id]);
   async function older() {
     const current = chat.current;
     if (!current) return;
@@ -544,10 +544,11 @@ function Workspace({
         onError((e as Error).message);
     }
   }
-  function post(body: string) {
-    const msg = { clientId: crypto.randomUUID(), body };
-    setPending((old) => [...old, msg]);
-    void send(msg);
+  function post() {
+    // Clear the shared memory synchronously: two submit events before React's
+    // next render must consume the draft only once and allocate only one UUID.
+    if (outbox.current?.enqueue(draftMemory.current[draftKey] ?? ""))
+      changeDraft("");
   }
   const [drawer, setDrawer] = useState(false),
     [compact, setCompact] = useState(isCompact),
@@ -623,11 +624,13 @@ function Workspace({
           chatStatus={chatStatus}
           chatError={chatError}
           messages={messages}
-          pending={pending}
+          deliveries={deliveries}
+          body={drafts[draftKey] ?? ""}
+          onDraft={changeDraft}
           more={more}
           onOlder={() => void older()}
           onSend={post}
-          onRetry={(p) => void send(p)}
+          onRetry={(clientId) => outbox.current?.retry(clientId)}
         />
       );
     if (kind === "outlook") return <Outlook me={me.user} />;
@@ -965,48 +968,6 @@ function Linkified({ text }: { text: string }) {
     </>
   );
 }
-const EMOJIS = [
-  "😀",
-  "😂",
-  "🤣",
-  "😅",
-  "😊",
-  "😍",
-  "😎",
-  "🤔",
-  "😴",
-  "😭",
-  "😡",
-  "🥲",
-  "🤯",
-  "🥳",
-  "😏",
-  "🙃",
-  "👍",
-  "👎",
-  "👏",
-  "🙏",
-  "💪",
-  "🔥",
-  "✨",
-  "🎉",
-  "❤️",
-  "💜",
-  "💀",
-  "👀",
-  "🎮",
-  "🕹️",
-  "🏆",
-  "🎯",
-  "⚔️",
-  "🛡️",
-  "🍕",
-  "🍺",
-  "☕",
-  "🌙",
-  "✅",
-  "❌",
-];
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 function dayLabel(d: Date) {
   const today = new Date(),
@@ -1025,7 +986,9 @@ function ChatView({
   chatStatus,
   chatError,
   messages,
-  pending,
+  deliveries,
+  body,
+  onDraft,
   more,
   onOlder,
   onSend,
@@ -1035,14 +998,30 @@ function ChatView({
   chatStatus: ChatStatus;
   chatError: string;
   messages: Message[];
-  pending: { clientId: string; body: string }[];
+  deliveries: Delivery[];
+  body: string;
+  onDraft: (value: string) => void;
   more: boolean;
   onOlder: () => void;
-  onSend: (body: string) => void;
-  onRetry: (p: { clientId: string; body: string }) => void;
+  onSend: () => void;
+  onRetry: (clientId: string) => void;
 }) {
-  const [body, setBody] = useState("");
-  const inputId = useId();
+  const pending = deliveries.filter((entry) => entry.state !== "confirmed");
+  const confirmed = new Set(
+    deliveries
+      .filter((entry) => entry.state === "confirmed")
+      .map((entry) => entry.clientId),
+  );
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const until = Math.max(0, ...deliveries.map((entry) => entry.retryAt));
+    if (until <= Date.now()) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+      if (Date.now() >= until) clearInterval(timer);
+    }, 250);
+    return () => clearInterval(timer);
+  }, [deliveries]);
   const directory = usePeople();
   // Show today's name and photo, even on old messages.
   const author = (m: Message) => {
@@ -1050,7 +1029,6 @@ function ChatView({
     return { name: who?.displayName ?? m.author, src: avatarSrc(who) };
   };
   const list = useRef<HTMLDivElement>(null),
-    input = useRef<HTMLInputElement>(null),
     browsingHistory = useRef(false),
     scrolled = useRef(false);
   // Scroll only the list: scrollIntoView would also shift the dock containers.
@@ -1063,23 +1041,6 @@ function ChatView({
     });
     scrolled.current = true;
   }, [messages.length, pending.length]);
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!body.trim()) return;
-    browsingHistory.current = false;
-    onSend(body);
-    setBody("");
-  }
-  function insert(emoji: string) {
-    const el = input.current,
-      start = el?.selectionStart ?? body.length,
-      end = el?.selectionEnd ?? body.length;
-    setBody(body.slice(0, start) + emoji + body.slice(end));
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(start + emoji.length, start + emoji.length);
-    });
-  }
   return (
     <section className="chat">
       <header className="chat-header">
@@ -1183,6 +1144,9 @@ function ChatView({
                     <p>
                       <Linkified text={m.body} />
                     </p>
+                    {m.authorId === me.id && confirmed.has(m.clientId) && (
+                      <small className="delivery-confirmed">Enviado</small>
+                    )}
                   </div>
                 </article>
               </div>
@@ -1190,49 +1154,31 @@ function ChatView({
           })}
         </div>
         {pending.map((p) => (
-          <div className="pending" key={p.clientId}>
+          <div className="pending" key={p.clientId} data-state={p.state}>
             <p>{p.body}</p>
-            <span>Aguardando confirmação · </span>
-            <button onClick={() => onRetry(p)}>Tentar novamente</button>
+            <span role="status">{deliveryLabel[p.state]}</span>
+            {p.error && <p role="alert">{p.error}</p>}
+            {p.state === "retryable-failure" && (
+              <button
+                disabled={now < p.retryAt}
+                onClick={() => onRetry(p.clientId)}
+              >
+                {now < p.retryAt
+                  ? `Aguarde ${Math.ceil((p.retryAt - now) / 1000)} segundos`
+                  : "Tentar novamente"}
+              </button>
+            )}
           </div>
         ))}
       </div>
-      <form className="composer" onSubmit={submit}>
-        <label htmlFor={inputId} className="sr-only">
-          Mensagem em geral
-        </label>
-        <div className="composer-box">
-          <input
-            id={inputId}
-            ref={input}
-            placeholder="Conversar em #geral…"
-            maxLength={4000}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            autoComplete="off"
-          />
-          <Popover label="Emojis" icon="smile" className="emoji-picker">
-            <div className="emoji-grid">
-              {EMOJIS.map((emoji) => (
-                <button type="button" key={emoji} onClick={() => insert(emoji)}>
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </Popover>
-          <button
-            className="send"
-            aria-label="Enviar mensagem"
-            disabled={!body.trim()}
-          >
-            <Icon name="send" size={18} />
-          </button>
-        </div>
-        <footer>
-          <span>Enter para enviar · texto simples</span>
-          <span>{body.length}/4000</span>
-        </footer>
-      </form>
+      <ChatComposer
+        body={body}
+        onDraft={onDraft}
+        onSend={() => {
+          browsingHistory.current = false;
+          onSend();
+        }}
+      />
     </section>
   );
 }
