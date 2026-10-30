@@ -173,7 +173,8 @@
       "evidence": [
         "docs/refactor/executions/T06.md",
         "https://github.com/dhtNEO/chat-friends/commit/11899e2b15c1f86af4bc21ff099be63c6eaa3085",
-        "docs/refactor/DECISIONS.md#d006--drawer-mobile-com-modalidade-nativa"
+        "docs/refactor/DECISIONS.md#d006--drawer-modal-e-popovers-t06-30102026",
+        "https://github.com/dhtNEO/chat-friends/pull/35"
       ],
       "blocked_reason": null,
       "notes": [
