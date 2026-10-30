@@ -40,3 +40,9 @@
 - Aceite T03 registrado após integração/CI; T04 implementa estados por envio e retry explícito com UUID/corpo estáveis.
 - Rascunho por conta/canal em memória, compartilhado entre painéis e descartado no logout; composer multiline, IME e emoji em 4.000 unidades UTF-16.
 - Contratos/guias atualizados; 17 casos T04, 8 de mídia demo e 117 backend verificados. Ocorrência isolada em auth e limites dos checks registrados em [execução T04](executions/T04.md). Revisão/CI pendentes.
+
+## 30/10/2026 — Histórico T05 para revisão
+
+- Merge/CI da T04 registrados; T05 revalidada e medida com 10000 mensagens antes de limitar a janela a 200, navegada em blocos de 50.
+- Âncora de ID/deslocamento, loading/error/end, seleção preservada, contador e retorno explícito a recentes; histórico separado de regiões live.
+- 11 casos T05, medição comparativa, 8 streams demo e 117 backend verificados; corrida de fixture T03 corrigida sem enfraquecer asserções. [Resultados e pendências](executions/T05.md), incluindo leitor real, revisão e CI.

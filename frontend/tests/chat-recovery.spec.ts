@@ -12,12 +12,17 @@ const message = (id: number): Message => ({
 async function chatPage(page: Page) {
   let outage = false;
   let failed = false;
+  let releaseFailure!: () => void;
+  const failureGate = new Promise<void>((resolve) => {
+    releaseFailure = resolve;
+  });
   const after: number[] = [];
   const sockets: WebSocketRoute[] = [];
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.clock.install();
-  await page.route("**/api/**", (route) => {
+  const instant = new Date("2026-10-30T12:00:00Z");
+  await page.clock.install({ time: instant });
+  await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === "/api/me")
       return route.fulfill({
@@ -46,6 +51,7 @@ async function chatPage(page: Page) {
       after.push(Number(cursor));
       if (outage && !failed) {
         failed = true;
+        await failureGate;
         return route.fulfill({ status: 503 });
       }
       const end = outage ? 201 : 100;
@@ -72,12 +78,18 @@ async function chatPage(page: Page) {
   await expect(
     page.getByText(message(100).body, { exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".connection")).toContainText("Atualizado");
+  // Let Dockview finish its initial animation-frame layout before pausing time.
+  await page.clock.pauseAt(
+    new Date((await page.evaluate(() => Date.now())) + 1000),
+  );
   return {
     after,
     sockets,
     errors,
     fail: () => {
       outage = true;
+      return releaseFailure;
     },
   };
 }
@@ -86,10 +98,11 @@ test("cursor 100, GET falha e WS 201 recuperam 101–201 sem fechar o socket", a
   page,
 }) => {
   const chat = await chatPage(page);
-  chat.fail();
+  const releaseFailure = chat.fail();
   chat.sockets[0].close();
   await page.clock.runFor(3100);
   await expect.poll(() => chat.sockets.length).toBe(2);
+  releaseFailure();
   await expect(page.locator(".connection")).toContainText("Chat indisponível");
   chat.sockets[1].send(
     JSON.stringify({ type: "message", message: message(201) }),

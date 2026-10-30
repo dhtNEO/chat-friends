@@ -18,6 +18,14 @@ Executar a máquina de estados e o composer previstos na spec T04, sem alterar H
 
 Rascunho e fila pertencem ao Workspace da conta, com chave conta/canal geral, compartilhados pelos painéis. Não persistir em storage/disco; logout/expiração/troca de conta elimina a memória. Reload pode perder envios locais não confirmados, sem apagar o histórico do servidor. Validar duplo submit, ACK tardio, queda/timeout após commit, 429, IME, emoji no limite e fechamento/reabertura/logout. Decisão detalha o comportamento já aprovado da T04 e não dispensa dependências ou checks.
 
+## D005 — Janela paginada e leitura do histórico T05 (30/10/2026)
+
+A [medição anterior à mudança](measurements/T05-baseline.json) em Chromium/Vite dev, 1440×1000, 10000 mensagens sintéticas (5% com 4000 UTF-16), registrou 10000 mensagens renderizadas, 93893 nós DOM, 175,1 MiB de heap e 80,528 s para catch-up (62,116 s de script e 6,914 s de layout). Amostra local única, sem throttling; não representa WAN ou produção. A lista inteira é custosa neste cenário.
+
+Adotar janela explícita de até 200 mensagens por painel, navegada em páginas de 50, mantendo dados confirmados em memória e busca HTTP quando necessário. Não usar virtualização contínua com alturas estimadas: páginas explícitas preservam DOM estável da leitura e leitura assistiva previsível. Ancorar pelo ID e deslocamento do texto visível; recompor após prepend, zoom/reflow e mudanças de altura. Chegada de mensagens não desloca a janela pausada.
+
+Seleção ativa pausa acompanhamento e impede navegação que removeria seus nós; continua copiável. Histórico não é região live: anunciar apenas contagens de novas mensagens/páginas solicitadas, sem reler conteúdo antigo. Ir para recentes é explícito. T05 mantém a exigência de limite mensurado, seleção, alturas variáveis e acesso a todo o histórico; não altera HTTP, retenção, migrações ou mídia. Comparar a mesma medição após implementar e registrar limites de testes assistivos.
+
 ## Próximas decisões
 
 Registrar ID, data, contexto, opções, escolha, justificativa, specs afetadas e validação necessária. Alterações de marca, navegação, budgets, contratos, retenção e garantias de mídia exigem registro; não presumir aprovação por constarem como proposta no relatório.

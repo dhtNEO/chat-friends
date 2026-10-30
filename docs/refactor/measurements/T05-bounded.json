@@ -1,0 +1,20 @@
+{
+  "scenario": "bounded",
+  "messagesAvailable": 10000,
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "browser": "154.0.8037.57",
+  "mode": "Vite dev, sem throttling; HTTP/WS sintéticos; 5% textos de 4000 UTF-16",
+  "catchUpMs": 10135,
+  "renderedMessages": 200,
+  "domNodes": 19891,
+  "jsHeapUsedMiB": 41.5,
+  "scriptMs": 6589,
+  "layoutMs": 1573,
+  "scroll": {
+    "height": 54198,
+    "viewport": 737
+  }
+}

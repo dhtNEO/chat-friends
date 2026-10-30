@@ -1,0 +1,20 @@
+{
+  "scenario": "baseline",
+  "messagesAvailable": 10000,
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "browser": "154.0.8037.57",
+  "mode": "Vite dev, sem throttling; HTTP/WS sintéticos; 5% textos de 4000 UTF-16",
+  "catchUpMs": 80528,
+  "renderedMessages": 10000,
+  "domNodes": 93893,
+  "jsHeapUsedMiB": 175.1,
+  "scriptMs": 62116,
+  "layoutMs": 6914,
+  "scroll": {
+    "height": 2702592,
+    "viewport": 781
+  }
+}
