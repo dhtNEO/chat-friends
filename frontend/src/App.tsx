@@ -39,6 +39,7 @@ import { Outlook } from "./Outlook";
 import { ChatComposer, limitMessage } from "./ChatComposer";
 import { createChatOutbox, deliveryLabel, type Delivery } from "./ChatOutbox";
 import { Voice } from "./Voice";
+import { useChatHistory, type HistoryPageState } from "./useChatHistory";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, avatarSrc, usePeople } from "./ui";
 import { Profile } from "./Profile";
@@ -347,7 +348,10 @@ function Workspace({
   const [messages, setMessages] = useState<Message[]>([]),
     [online, setOnline] = useState<string[]>([]),
     [chatStatus, setChatStatus] = useState<ChatStatus>("connecting"),
-    [more, setMore] = useState(true),
+    [historyPage, setHistoryPage] = useState<HistoryPageState>({
+      phase: "idle",
+      error: "",
+    }),
     [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [chatError, setChatError] = useState("");
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({}),
@@ -355,6 +359,7 @@ function Workspace({
     [stageMaximized, setStageMaximized] = useState(false),
     [streamMaximized, setStreamMaximized] = useState(false);
   const chat = useRef<ReturnType<typeof createChatSync> | null>(null);
+  const historyPending = useRef(false);
   const outbox = useRef<ReturnType<typeof createChatOutbox> | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftMemory = useRef<Record<string, string>>({});
@@ -524,24 +529,45 @@ function Workspace({
       }
     };
   }, [merge, loadMembers, onRefresh, onError, me.user.id]);
-  async function older() {
+  async function older(): Promise<number | undefined> {
     const current = chat.current;
-    if (!current) return;
+    const cursor = messages[0]?.id;
+    if (
+      !current ||
+      cursor === undefined ||
+      historyPending.current ||
+      historyPage.phase === "end"
+    )
+      return;
+    historyPending.current = true;
+    setHistoryPage({ phase: "loading", error: "" });
     try {
       const rows = await api<Message[]>(
-        "/messages?before=" + messages[0]?.id,
+        "/messages?before=" + cursor,
         "GET",
         undefined,
         { signal: current.signal },
       );
       if (current !== chat.current || current.signal.aborted) return;
-      if (!Array.isArray(rows) || !rows.every(isMessage))
+      if (
+        !Array.isArray(rows) ||
+        rows.length > 50 ||
+        !rows.every(
+          (row, i) =>
+            isMessage(row) &&
+            row.id < cursor &&
+            (i === 0 || row.id > rows[i - 1].id),
+        )
+      )
         throw new Error("Resposta de histórico inválida.");
       merge(rows);
-      setMore(rows.length === 50);
+      setHistoryPage({ phase: rows.length < 50 ? "end" : "idle", error: "" });
+      return rows.length;
     } catch (e) {
       if (current === chat.current && !current.signal.aborted)
-        onError((e as Error).message);
+        setHistoryPage({ phase: "error", error: (e as Error).message });
+    } finally {
+      historyPending.current = false;
     }
   }
   function post() {
@@ -627,8 +653,8 @@ function Workspace({
           deliveries={deliveries}
           body={drafts[draftKey] ?? ""}
           onDraft={changeDraft}
-          more={more}
-          onOlder={() => void older()}
+          historyPage={historyPage}
+          onOlder={older}
           onSend={post}
           onRetry={(clientId) => outbox.current?.retry(clientId)}
         />
@@ -989,7 +1015,7 @@ function ChatView({
   deliveries,
   body,
   onDraft,
-  more,
+  historyPage,
   onOlder,
   onSend,
   onRetry,
@@ -1001,8 +1027,8 @@ function ChatView({
   deliveries: Delivery[];
   body: string;
   onDraft: (value: string) => void;
-  more: boolean;
-  onOlder: () => void;
+  historyPage: HistoryPageState;
+  onOlder: () => Promise<number | undefined>;
   onSend: () => void;
   onRetry: (clientId: string) => void;
 }) {
@@ -1028,19 +1054,14 @@ function ChatView({
     const who = directory.byId.get(m.authorId);
     return { name: who?.displayName ?? m.author, src: avatarSrc(who) };
   };
-  const list = useRef<HTMLDivElement>(null),
-    browsingHistory = useRef(false),
-    scrolled = useRef(false);
-  // Scroll only the list: scrollIntoView would also shift the dock containers.
-  useEffect(() => {
-    const el = list.current;
-    if (!el || browsingHistory.current) return;
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior: scrolled.current ? "smooth" : "instant",
-    });
-    scrolled.current = true;
-  }, [messages.length, pending.length]);
+  const timeline = useChatHistory(
+    messages,
+    pending.length,
+    historyPage,
+    chatStatus === "updated",
+    onOlder,
+  );
+  const visible = timeline.visible;
   return (
     <section className="chat">
       <header className="chat-header">
@@ -1065,120 +1086,179 @@ function ChatView({
       <div
         className="messages"
         aria-label="Mensagens"
-        ref={list}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          browsingHistory.current =
-            el.scrollHeight - el.scrollTop - el.clientHeight > 100;
+        role="region"
+        tabIndex={0}
+        ref={timeline.viewport}
+        onScroll={timeline.onScroll}
+        onFocus={(event) => {
+          if (event.target === event.currentTarget) timeline.pauseReading();
         }}
       >
-        {!(more && messages.length >= 50) && (
-          <div className="welcome">
-            <div className="welcome-symbol">
-              <Icon name="hash" size={28} />
-            </div>
-            <h2>Esse é o nosso lugar.</h2>
-            <p>Um oi, uma partida, uma história pra contar. Fique à vontade.</p>
-          </div>
-        )}
-        {more && messages.length >= 50 && (
+        <div ref={timeline.content}>
+          {timeline.start === 0 &&
+            (messages.length < 50 || historyPage.phase === "end") && (
+              <div className="welcome">
+                <div className="welcome-symbol">
+                  <Icon name="hash" size={28} />
+                </div>
+                <h2>Esse é o nosso lugar.</h2>
+                <p>
+                  Um oi, uma partida, uma história pra contar. Fique à vontade.
+                </p>
+              </div>
+            )}
+          <p className="chat-window-label">
+            Exibindo {messages.length ? timeline.start + 1 : 0}–{timeline.end}{" "}
+            de {messages.length} mensagens carregadas
+          </p>
           <button
             className="load-more"
-            onClick={() => {
-              browsingHistory.current = true;
-              onOlder();
-            }}
+            disabled={
+              !timeline.canPrevious ||
+              timeline.selectionActive ||
+              historyPage.phase === "loading"
+            }
+            onClick={() => void timeline.previous()}
           >
-            Carregar mensagens anteriores
+            {historyPage.phase === "loading"
+              ? "Carregando anteriores…"
+              : historyPage.phase === "error" && timeline.start === 0
+                ? "Tentar carregar anteriores"
+                : "Carregar mensagens anteriores"}
+          </button>
+          <p
+            className="chat-page-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {historyPage.phase === "loading"
+              ? "Carregando mensagens anteriores…"
+              : timeline.notice ||
+                (!timeline.canPrevious ? "Início do histórico." : "")}
+          </p>
+          {historyPage.phase === "error" && (
+            <p className="error" role="alert">
+              {historyPage.error}
+            </p>
+          )}
+          <div role="list" aria-label="Histórico de mensagens" aria-live="off">
+            {visible.map((m, i) => {
+              const at = new Date(m.createdAt),
+                prev = visible[i - 1],
+                prevAt = prev && new Date(prev.createdAt),
+                newDay = !prevAt || !sameDay(at, prevAt),
+                // Consecutive lines from one person within 5 min read as one.
+                continued =
+                  !newDay &&
+                  prev.authorId === m.authorId &&
+                  at.getTime() - prevAt.getTime() < 5 * 60 * 1000;
+              const time = (
+                <time dateTime={m.createdAt} title={at.toLocaleString("pt-BR")}>
+                  {at.toLocaleTimeString("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </time>
+              );
+              return (
+                <div key={m.id} role="listitem">
+                  {newDay && (
+                    <div className="day-separator" role="separator">
+                      <span>{dayLabel(at)}</span>
+                    </div>
+                  )}
+                  <article
+                    className={
+                      "message" +
+                      (continued ? " continued" : "") +
+                      (m.authorId === me.id ? " mine" : "")
+                    }
+                  >
+                    {continued ? (
+                      <span className="message-gutter">{time}</span>
+                    ) : (
+                      <Avatar
+                        name={author(m).name}
+                        src={author(m).src}
+                        size={38}
+                      />
+                    )}
+                    <div>
+                      {!continued && (
+                        <header>
+                          <strong>{author(m).name}</strong>
+                          {time}
+                        </header>
+                      )}
+                      <p data-message-id={m.id}>
+                        <Linkified text={m.body} />
+                      </p>
+                      {m.authorId === me.id && confirmed.has(m.clientId) && (
+                        <small className="delivery-confirmed">Enviado</small>
+                      )}
+                    </div>
+                  </article>
+                </div>
+              );
+            })}
+          </div>
+          {timeline.canNext && (
+            <button
+              className="load-more"
+              disabled={timeline.selectionActive}
+              onClick={timeline.next}
+            >
+              Mensagens mais recentes
+            </button>
+          )}
+          {pending.map((p) => (
+            <div className="pending" key={p.clientId} data-state={p.state}>
+              <p>{p.body}</p>
+              <span role="status">{deliveryLabel[p.state]}</span>
+              {p.error && <p role="alert">{p.error}</p>}
+              {p.state === "retryable-failure" && (
+                <button
+                  disabled={now < p.retryAt}
+                  onClick={() => onRetry(p.clientId)}
+                >
+                  {now < p.retryAt
+                    ? `Aguarde ${Math.ceil((p.retryAt - now) / 1000)} segundos`
+                    : "Tentar novamente"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="chat-new-messages">
+        {!timeline.paused && (
+          <button onClick={timeline.pauseReading}>Pausar acompanhamento</button>
+        )}
+        {timeline.unread > 0 && (
+          <span>
+            {timeline.unread}{" "}
+            {timeline.unread === 1 ? "nova mensagem" : "novas mensagens"}
+          </span>
+        )}
+        {timeline.paused && (
+          <button disabled={timeline.selectionActive} onClick={timeline.recent}>
+            Ir para recentes
           </button>
         )}
-        <div role="log" aria-live="polite" aria-relevant="additions">
-          {messages.map((m, i) => {
-            const at = new Date(m.createdAt),
-              prev = messages[i - 1],
-              prevAt = prev && new Date(prev.createdAt),
-              newDay = !prevAt || !sameDay(at, prevAt),
-              // Consecutive lines from one person within 5 min read as one.
-              continued =
-                !newDay &&
-                prev.authorId === m.authorId &&
-                at.getTime() - prevAt.getTime() < 5 * 60 * 1000;
-            const time = (
-              <time dateTime={m.createdAt} title={at.toLocaleString("pt-BR")}>
-                {at.toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </time>
-            );
-            return (
-              <div key={m.id}>
-                {newDay && (
-                  <div className="day-separator" role="separator">
-                    <span>{dayLabel(at)}</span>
-                  </div>
-                )}
-                <article
-                  className={
-                    "message" +
-                    (continued ? " continued" : "") +
-                    (m.authorId === me.id ? " mine" : "")
-                  }
-                >
-                  {continued ? (
-                    <span className="message-gutter">{time}</span>
-                  ) : (
-                    <Avatar
-                      name={author(m).name}
-                      src={author(m).src}
-                      size={38}
-                    />
-                  )}
-                  <div>
-                    {!continued && (
-                      <header>
-                        <strong>{author(m).name}</strong>
-                        {time}
-                      </header>
-                    )}
-                    <p>
-                      <Linkified text={m.body} />
-                    </p>
-                    {m.authorId === me.id && confirmed.has(m.clientId) && (
-                      <small className="delivery-confirmed">Enviado</small>
-                    )}
-                  </div>
-                </article>
-              </div>
-            );
-          })}
-        </div>
-        {pending.map((p) => (
-          <div className="pending" key={p.clientId} data-state={p.state}>
-            <p>{p.body}</p>
-            <span role="status">{deliveryLabel[p.state]}</span>
-            {p.error && <p role="alert">{p.error}</p>}
-            {p.state === "retryable-failure" && (
-              <button
-                disabled={now < p.retryAt}
-                onClick={() => onRetry(p.clientId)}
-              >
-                {now < p.retryAt
-                  ? `Aguarde ${Math.ceil((p.retryAt - now) / 1000)} segundos`
-                  : "Tentar novamente"}
-              </button>
-            )}
-          </div>
-        ))}
+        {timeline.selectionActive && (
+          <span>Seleção preservada. Termine a seleção para navegar.</span>
+        )}
       </div>
-      <ChatComposer
-        body={body}
-        onDraft={onDraft}
-        onSend={() => {
-          browsingHistory.current = false;
-          onSend();
-        }}
-      />
+      <div
+        className="sr-only chat-announcement"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {timeline.announcement}
+      </div>
+      <ChatComposer body={body} onDraft={onDraft} onSend={onSend} />
     </section>
   );
 }

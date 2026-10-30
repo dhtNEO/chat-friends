@@ -39,3 +39,9 @@ Capturas históricas do Chromium Linux, anteriores aos novos controles de áudio
 - **Transmissão**: a qualidade pode ser trocada sem parar de transmitir; o cursor do mouse é escondido por padrão (desligue em Opções de transmissão para apresentações); o som desta página fica fora do áudio capturado quando o navegador permite, evitando que todos escutem a própria voz com atraso.
 - Links nas mensagens abrem em outra aba. O chat abre no máximo duas vistas lado a lado.
 - A conexão de voz usa o mesmo endereço do site, evitando a regra de bloqueadores como uBlock Origin e Brave para conexões de terceiros entre endereços DuckDNS. Outras regras ou bloqueios de WebRTC ainda podem impedir a conexão.
+
+## Ler mensagens antigas
+
+Carregar mensagens anteriores mantém a mensagem visível no lugar. O painel mostra até 200 mensagens por página de leitura; use Carregar mensagens anteriores e Mensagens mais recentes para navegar em blocos de 50. O indicador informa qual parte dos dados carregados está exibida. Falhas oferecem nova tentativa e o início do histórico é indicado.
+
+Ao rolar para trás, focar a região de mensagens pelo teclado ou escolher Pausar acompanhamento, novas mensagens aumentam um contador e não puxam sua leitura. Ir para recentes volta às mensagens mais novas. Enquanto há seleção de texto, a navegação fica desabilitada para preservar a cópia; termine a seleção para mudar de página. Cada painel aberto conserva sua própria posição. Leitores de tela encontram a lista histórica e anúncios separados de novas mensagens/quantidade carregada, sem reler o conteúdo de páginas antigas como chegada nova.
