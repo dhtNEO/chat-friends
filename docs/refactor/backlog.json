@@ -38,7 +38,7 @@
       "dias_pessoa": "2–4",
       "dependencias": "—",
       "evidencias": "E03 E04",
-      "status": "in_review",
+      "status": "done",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
@@ -46,7 +46,8 @@
       "evidence": [
         "docs/refactor/executions/T02.md",
         "https://github.com/dhtNEO/chat-friends/commit/e8d245ff5d97ac676e48ac61c8cd567906335254",
-        "https://github.com/dhtNEO/chat-friends/pull/31"
+        "https://github.com/dhtNEO/chat-friends/pull/31",
+        "https://github.com/dhtNEO/chat-friends/pull/32"
       ],
       "blocked_reason": null,
       "notes": [
@@ -54,7 +55,9 @@
         "Revalidação estática atual: App.load captura qualquer falha de GET /me, executa setMe(null) e encerra loading sem alerta na abertura; api/upload usam fetch sem timeout e upload perde status. Não é evidência de execução de navegador.",
         "2026-10-30: in_progress → in_review. Implementação e critérios técnicos cobertos: 33 testes de sessão/transporte, 8 de transmissões demo, 116 de backend aprovados; npm ci/lint/build, validate.py e diff --check aprovados. Código verificado corresponde ao commit e8d245ff5d97ac676e48ac61c8cd567906335254.",
         "scripts/check.sh parou no download do Wrapper por DNS; backend reexecutado com proxy/CA e friends_test passou. Detalhes e limitações sintéticas em executions/T02.md. Não alegar aprovação do script inteiro nem SFU/WAN real.",
-        "Próximo passo: revisão do PR #31 e CI. Revisão humana pendente; não marcar done antes do aceite."
+        "Próximo passo: revisão do PR #31 e CI. Revisão humana pendente; não marcar done antes do aceite.",
+        "2026-10-30: usuário declarou “aceito t02” nesta conversa. PR #31 integrado em ef1893c. CI run 41061348965: backend/frontend/infra/music aprovados; stack falhou em dois casos de auth por fixture /media/state sem leases. Trace local confirmou TypeError em Voice.flatMap; fixture corrigida sem enfraquecer asserções.",
+        "Aceite registrado com 33 testes api/auth, npm ci, lint e build aprovados na retomada. CI anterior não é declarado verde; demais evidências e limites da T02 preservados. Correção da fixture e aceite no PR #32."
       ]
     },
     {
@@ -66,19 +69,20 @@
       "dias_pessoa": "3–5",
       "dependencias": "T02",
       "evidencias": "E05",
-      "status": "blocked",
+      "status": "in_progress",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
-      "validated_sha": "ef1893cca0d38015bd0c42ef7e8be2ca05685768",
+      "validated_sha": "8599283d5f74a1e17af6e466aebc39d94b32f3f1",
       "evidence": [
         "docs/refactor/executions/T03.md"
       ],
-      "blocked_reason": "T02 permanece in_review no backlog; integração do PR #31 não substitui o aceite e a transição canônica exigidos pelo WORKFLOW.",
+      "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → blocked; Codex assume preparação independente, sem iniciar implementação dependente. T03 sem owner anterior; checkout inicial limpo.",
         "Revalidação estática no SHA registrado confirma latest avançado por WS, catch-up somente no onopen e callbacks sem guarda completa após cleanup. Traço 100/falha/201 documentado; não é reprodução dinâmica.",
-        "Próximo passo: concluir T02 no fluxo canônico, revalidar base e transicionar blocked → in_progress antes de implementar e executar testes. Critérios essenciais permanecem pendentes."
+        "Próximo passo: concluir T02 no fluxo canônico, revalidar base e transicionar blocked → in_progress antes de implementar e executar testes. Critérios essenciais permanecem pendentes.",
+        "2026-10-30: blocked → in_progress após aceite explícito da T02 pelo usuário e correção/verificação da fixture que falhou no CI. Revalidação no HEAD 8599283 confirma o mesmo fluxo de cursor/catch-up e callbacks; refactor remota permanece ef1893c. Owner Codex mantido; árvore inicial limpa."
       ]
     },
     {
