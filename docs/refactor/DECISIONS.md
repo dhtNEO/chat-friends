@@ -38,6 +38,12 @@ Manter cores originais válidas em --primary/--secondary e no contrato salvo; to
 
 Texto normal exige 4,5:1 (também usado conservadoramente onde há texto grande); gráficos/bordas relevantes e foco exigem 3:1. Separar gradiente de texto/indicadores do gradiente de preenchimento. Foco usa anel claro com separador escuro opaco para funcionar também sobre preenchimentos claros; não depender de mistura transparente ou brilho posterior. Validar hex restaurado, com fallback por campo sem escrita corretiva no armazenamento. Preview, salvar e cancelamento usam a mesma derivação. Validar matemática independentemente e estados renderizados (incluindo CSS de jogos), sem declarar auditoria completa de cores fixas sem evidência.
 
+## D008 — Liberação e contrato de navegação T08 (30/10/2026)
+
+Após explicação do bloqueio T01/T06/T09, o usuário autorizou: “vamos implementar a t08. faça como você achar melhor.” Dispensar essas dependências como bloqueio específico da T08: T01 é substituída para esta entrega pelos quatro destinos explicitamente definidos; T06 será reutilizada com suas verificações humanas ainda pendentes; T09 será reutilização incremental das primitivas atuais/T07, sem executar T09 ou afirmar catálogo entregue. Não marcar pesquisa/aceites dessas tarefas como realizados. Dependências históricas ficam na spec e notes; dependencias executáveis da T08 passam a nenhuma para o validador refletir a decisão.
+
+Shell simples padrão com Conversa/Sala/Jogos/Agenda, Mais e auxiliar sob demanda. Dockview avançado opt-in por conta; parâmetro explícito shell=advanced permite fallback/entrada avançada sem apagar snapshots layout:v4:compact/wide. Modo simples não grava esses snapshots. URL #/v1/conversa|sala|jogos|agenda e histórico selecionam apresentação, sem entrar na voz automaticamente; hash desconhecido usa Conversa com replace. Mesmo Workspace/Voice, portal de palco com destino DOM permanente e players existentes; reposicionar hosts fisicamente, sem recriar portal por rota/breakpoint/modo. Validar identidade, sessão e três transmissões. Sem mudanças de API/migrações/produção.
+
 ## Próximas decisões
 
 Registrar ID, data, contexto, opções, escolha, justificativa, specs afetadas e validação necessária. Alterações de marca, navegação, budgets, contratos, retenção e garantias de mídia exigem registro; não presumir aprovação por constarem como proposta no relatório.
