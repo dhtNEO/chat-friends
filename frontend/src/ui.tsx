@@ -176,7 +176,9 @@ export function Popover({
         setOpen(false);
     };
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const modal = document.activeElement?.closest("dialog:modal");
+      if (modal && !modal.contains(root.current)) return;
       e.preventDefault();
       setOpen(false);
       root.current?.querySelector("button")?.focus({ preventScroll: true });
@@ -200,7 +202,9 @@ export function Popover({
         title={label}
         onClick={(e) => {
           setHost(
-            e.currentTarget.closest<HTMLElement>(".app-shell") || document.body,
+            e.currentTarget.closest<HTMLElement>("dialog:modal") ||
+              e.currentTarget.closest<HTMLElement>(".app-shell") ||
+              document.body,
           );
           setPlacement(null);
           setOpen(!open);

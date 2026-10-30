@@ -26,6 +26,12 @@ Adotar janela explícita de até 200 mensagens por painel, navegada em páginas 
 
 Seleção ativa pausa acompanhamento e impede navegação que removeria seus nós; continua copiável. Histórico não é região live: anunciar apenas contagens de novas mensagens/páginas solicitadas, sem reler conteúdo antigo. Ir para recentes é explícito. T05 mantém a exigência de limite mensurado, seleção, alturas variáveis e acesso a todo o histórico; não altera HTTP, retenção, migrações ou mídia. Comparar a mesma medição após implementar e registrar limites de testes assistivos.
 
+## D006 — Drawer modal e popovers T06 (30/10/2026)
+
+O drawer mobile é navegação modal: usar dialog.showModal, título acessível, botão Fechar menu com foco inicial, contenção de Tab e retorno ao acionador. A modalidade nativa torna o restante do documento inert sem sobrescrever atributos existentes de outros componentes. Conteúdo continua montado ao fechar para preservar hosts/controles de voz; header e fechamento ficam fora da área rolável.
+
+Escape pertence à camada ativa. Popovers existentes continuam não modais, sem aria-modal/fundo inert/contenção global. Seu Escape não pode consumir o fechamento de um modal que esteja na frente; caso um popover esteja dentro de dialog modal, o portal fica nesse diálogo para não se tornar inert fora dele. Não alterar semântica de menus, emoji ou controles de voz indiscriminadamente. Navegação pelo drawer fecha e devolve foco ao acionador; mudanças de breakpoint também encerram a modalidade. T06 não altera mídia, sessão, HTTP ou migrações. Validar teclado, fundo, resize, 320 px/paisagem/zoom e leitores por contrato acessível; confirmação NVDA/VoiceOver real deve permanecer pendente se não executada.
+
 ## Próximas decisões
 
 Registrar ID, data, contexto, opções, escolha, justificativa, specs afetadas e validação necessária. Alterações de marca, navegação, budgets, contratos, retenção e garantias de mídia exigem registro; não presumir aprovação por constarem como proposta no relatório.

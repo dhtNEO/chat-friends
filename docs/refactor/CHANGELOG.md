@@ -46,3 +46,9 @@
 - Merge/CI da T04 registrados; T05 revalidada e medida com 10000 mensagens antes de limitar a janela a 200, navegada em blocos de 50.
 - Âncora de ID/deslocamento, loading/error/end, seleção preservada, contador e retorno explícito a recentes; histórico separado de regiões live.
 - 11 casos T05, medição comparativa, 8 streams demo e 117 backend verificados; corrida de fixture T03 corrigida sem enfraquecer asserções. [Resultados e pendências](executions/T05.md), incluindo leitor real, revisão e CI.
+
+## 30/10/2026 — Drawer T06
+
+- T05 integrada; pendência auditiva anterior preservada sem atribuir aceite inexistente.
+- Drawer mobile com diálogo nativo, fundo inert, contenção/retorno de foco, Escape, botão e fechamento após navegação; decisão D006 preserva popovers não modais.
+- Testes por teclado, árvore acessível e layouts; procedimento humano e limites em [execução T06](executions/T06.md).
