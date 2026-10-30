@@ -52,6 +52,10 @@ F0: baseline, garantias de mídia e dependências (T01/T21/T24). F1: sessão/cha
 | [T29](specs/T29.md) | Consolidar documentação e nomes públicos | P2 | T01 T15 T24 T26 |
 | [T30](specs/T30.md) | Planejar rollout gradual e aceite final | P1 | T05 T12 T13 T14 T15 T16 T18 T20 T21 T23 T25 T26 T27 T28 T29 |
 
+## Preparação de pesquisa T01
+
+O [kit de pesquisa](research/T01-preparacao.md) reúne inventário estático atual, jornadas, heurísticas, roteiro de duas rodadas, métricas e [formulário vazio](research/T01-resultados.csv). Preparação não equivale a pesquisa concluída: sessões, baseline e revisão humana permanecem pendentes; estado canônico no backlog.
+
 ## Histórico e referências
 
 O [pacote original completo](archive/2026-10-29/README.md) preserva relatório, pesquisa UI/UX, wireframes, specs, backlog exportado e evidências sintéticas. Não editar esse snapshot para indicar progresso. As capturas e limites de uma tela representam a versão analisada, não a main atual.
