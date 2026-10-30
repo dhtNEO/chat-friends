@@ -69,7 +69,7 @@
       "dias_pessoa": "3–5",
       "dependencias": "T02",
       "evidencias": "E05",
-      "status": "in_review",
+      "status": "done",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
@@ -77,7 +77,8 @@
       "evidence": [
         "docs/refactor/executions/T03.md",
         "https://github.com/dhtNEO/chat-friends/commit/dd640b165b0d0c989925f3d5ab1447efc672c760",
-        "https://github.com/dhtNEO/chat-friends/pull/32"
+        "https://github.com/dhtNEO/chat-friends/pull/32",
+        "https://github.com/dhtNEO/chat-friends/actions/runs/41065717862"
       ],
       "blocked_reason": null,
       "notes": [
@@ -86,7 +87,8 @@
         "Próximo passo: concluir T02 no fluxo canônico, revalidar base e transicionar blocked → in_progress antes de implementar e executar testes. Critérios essenciais permanecem pendentes.",
         "2026-10-30: blocked → in_progress após aceite explícito da T02 pelo usuário e correção/verificação da fixture que falhou no CI. Revalidação no HEAD 8599283 confirma o mesmo fluxo de cursor/catch-up e callbacks; refactor remota permanece ef1893c. Owner Codex mantido; árvore inicial limpa.",
         "2026-10-30: in_progress → in_review; implementação dd640b1. Regressão 100/falha/201 reproduzida antes da correção e recuperada sem fechar socket após corrigir. 12 testes T03, 33 sessão/transporte, 8 streams demo e 117 backend aprovados; lint/build/validate.py/diff --check aprovados.",
-        "check.sh interrompido por DNS no download do Maven; backend completo reexecutado com proxy/CA e friends_test. Evidências e limites em executions/T03.md. Critérios técnicos preenchidos; CI/revisão da T03 pendentes. Próximo passo: revisar PR #32 e registrar aceite; não marcar done."
+        "check.sh interrompido por DNS no download do Maven; backend completo reexecutado com proxy/CA e friends_test. Evidências e limites em executions/T03.md. Critérios técnicos preenchidos; CI/revisão da T03 pendentes. Próximo passo: revisar PR #32 e registrar aceite; não marcar done.",
+        "2026-10-30: usuário confirmou “t02 e t03 aceitas” nesta conversa. PR #32 integrado em b8f52e7; CI Validate run 41065717862 concluído com success. in_review → done; evidências técnicas existentes preservadas."
       ]
     },
     {
@@ -98,14 +100,19 @@
       "dias_pessoa": "2–4",
       "dependencias": "T02 T03",
       "evidencias": "E06",
-      "status": "planned",
-      "owner": null,
+      "status": "in_progress",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
+      "validation": "confirmed",
+      "validated_sha": "b8f52e7adb3159220f25ad552cca15bb047ad91d",
+      "evidence": [
+        "docs/refactor/executions/T04.md"
+      ],
       "blocked_reason": null,
-      "notes": []
+      "notes": [
+        "2026-10-30: planned → in_progress, sem owner anterior; T02/T03 concluídas com aceite explícito. Branch codex/t04-chat-delivery derivada de refactor b8f52e7, sem mudanças locais rastreadas; work/ anterior preservado.",
+        "Revalidação atual: pending guarda apenas clientId/body; retry sempre aparece durante POST e ws.onopen reenvia toda a fila. ChatView guarda body local, usa input e insert(emoji) não verifica limite. Falhas apenas chamam onError. T04 não resolvida."
+      ]
     },
     {
       "id": "T05",
