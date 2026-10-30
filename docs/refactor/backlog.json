@@ -193,17 +193,21 @@
       "dias_pessoa": "2–4",
       "dependencias": "—",
       "evidencias": "E08",
-      "status": "in_progress",
+      "status": "in_review",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
       "validated_sha": "afb09abd6d46eb4eec1dee700b8e822ea1d4089d",
       "evidence": [
-        "docs/refactor/executions/T07.md"
+        "docs/refactor/executions/T07.md",
+        "https://github.com/dhtNEO/chat-friends/commit/875cbeeb2bd365c3415a516fea6ec73a233b295c",
+        "docs/refactor/measurements/T07-contrast.json",
+        "docs/refactor/DECISIONS.md#d007--contraste-derivado-sem-substituir-preferência-t07-30102026"
       ],
       "blocked_reason": null,
       "notes": [
-        "2026-10-30: planned → in_progress; sem dependências e sem owner anterior. Base refactor afb09ab, branch codex/t07-theme-contrast; nenhuma alteração rastreada local, work/ preservado. Revalidação: textOn ainda usa luminância >0,4; hover e gradiente reutilizam foreground da primária sem contrastar seus fundos; valores restaurados não são validados em applyTheme."
+        "2026-10-30: planned → in_progress; sem dependências e sem owner anterior. Base refactor afb09ab, branch codex/t07-theme-contrast; nenhuma alteração rastreada local, work/ preservado. Revalidação: textOn ainda usa luminância >0,4; hover e gradiente reutilizam foreground da primária sem contrastar seus fundos; valores restaurados não são validados em applyTheme.",
+        "in_progress → in_review. Código 875cbee: tokens contrastados independentes para sólido/gradiente/hover/active/texto/indicador/foco, hex validado, preferência original preservada; preview/salvar/cancelar verificados. 3 testes matemáticos (156 pares), 46 regressões UI (15 T07, 31 drawer/demo/sala/streams) e 117 backend aprovados; npm ci/lint/build, validate e diff-check aprovados. Check padrão limitado por settings Maven local vazio; equivalente backend e frontend verificados. Revisão/CI pendentes, sem done; escopo e limites em executions/T07.md."
       ]
     },
     {
