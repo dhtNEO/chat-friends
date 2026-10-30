@@ -228,7 +228,9 @@
       "validated_sha": "babba75696ffb8e6c20e0e03ab3c740918b9084f",
       "evidence": [
         "docs/refactor/executions/T08.md",
-        "docs/refactor/preparations/T08-navegacao.md"
+        "docs/refactor/preparations/T08-navegacao.md",
+        "https://github.com/dhtNEO/chat-friends/commit/8dc93ca572b975c2a50ac31ecc1a8dfb92424aa3",
+        "https://github.com/dhtNEO/chat-friends/pull/37"
       ],
       "blocked_reason": "Dependências abertas: T01 blocked (pesquisa/decisões UX pendentes), T06 in_review (leitor/zoom humanos pendentes apesar do merge), T09 planned. Sem decisão explícita de dispensa. Somente levantamento e proposta técnica independentes; runtime não alterado.",
       "notes": [
