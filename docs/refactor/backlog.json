@@ -38,16 +38,23 @@
       "dias_pessoa": "2–4",
       "dependencias": "—",
       "evidencias": "E03 E04",
-      "status": "in_progress",
+      "status": "in_review",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
       "validated_sha": "54504079276379c3c42f251daa207115ed2fed4f",
-      "evidence": [],
+      "evidence": [
+        "docs/refactor/executions/T02.md",
+        "https://github.com/dhtNEO/chat-friends/commit/e8d245ff5d97ac676e48ac61c8cd567906335254",
+        "https://github.com/dhtNEO/chat-friends/pull/31"
+      ],
       "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → in_progress; sem owner anterior e sem dependências. Checkout inicial limpo em d8fdd89; fetch autorizado, branch codex/t02-session-states baseada em refactor 5450407.",
-        "Revalidação estática atual: App.load captura qualquer falha de GET /me, executa setMe(null) e encerra loading sem alerta na abertura; api/upload usam fetch sem timeout e upload perde status. Não é evidência de execução de navegador."
+        "Revalidação estática atual: App.load captura qualquer falha de GET /me, executa setMe(null) e encerra loading sem alerta na abertura; api/upload usam fetch sem timeout e upload perde status. Não é evidência de execução de navegador.",
+        "2026-10-30: in_progress → in_review. Implementação e critérios técnicos cobertos: 33 testes de sessão/transporte, 8 de transmissões demo, 116 de backend aprovados; npm ci/lint/build, validate.py e diff --check aprovados. Código verificado corresponde ao commit e8d245ff5d97ac676e48ac61c8cd567906335254.",
+        "scripts/check.sh parou no download do Wrapper por DNS; backend reexecutado com proxy/CA e friends_test passou. Detalhes e limitações sintéticas em executions/T02.md. Não alegar aprovação do script inteiro nem SFU/WAN real.",
+        "Próximo passo: revisão do PR #31 e CI. Revisão humana pendente; não marcar done antes do aceite."
       ]
     },
     {
