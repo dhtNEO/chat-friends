@@ -102,3 +102,9 @@ Na regressão 100/falha/201 da T03, o relógio pausa após o layout inicial e a 
 ## Bootstrap Maven no CI
 
 O job backend prepara o Maven fixado com `./scripts/bootstrap-maven.sh` antes de `./mvnw -B -ntp verify`. Há no máximo três tentativas de `--version`, com esperas de 2 e 4 s, para falhas transitórias de obtenção da distribuição. Verify/testes e scan não são repetidos nem ignorados; erro persistente encerra o bootstrap com código não zero. Versão/URL/checksums continuam em backend/.mvn/wrapper/maven-wrapper.properties. `node scripts/tests/maven-bootstrap.test.mjs` testa tentativas, esperas e falha fechada, com stubs sem rede.
+
+## Drawer mobile (T06)
+
+`CHROMIUM_PATH=/usr/bin/chromium npm test -- tests/mobile-drawer.spec.ts` inicia demo isolado na porta 4186. Usa apenas conta sintética. Cobre Escape, foco inicial/retorno, Tab/Shift+Tab em ciclo, tentativa de focar fundo implicitamente inert pelo `showModal()`, nome/modalidade na árvore acessível, botão, backdrop, navegação, reabertura e transição para desktop. Verifica 320×568, paisagem 640×320 e ampliação CSS 200%; esta última simula aumento do conteúdo e não comprova zoom pela interface de todos os navegadores. Popover de emojis permanece não modal e não consome Escape de um drawer sobreposto.
+
+Verificação humana pendente: com NVDA/Firefox ou VoiceOver/Safari, abrir por teclado, ouvir nome/abertura, percorrer e tentar acessar o fundo por navegação virtual, fechar por Escape/botão e confirmar retorno de foco. Repetir com zoom do navegador em 200%, 320 px e paisagem; não confundir árvore AX do Chromium com aprovação auditiva. Resultados e SHA em [execução T06](refactor/executions/T06.md).

@@ -45,3 +45,7 @@ Capturas históricas do Chromium Linux, anteriores aos novos controles de áudio
 Carregar mensagens anteriores mantém a mensagem visível no lugar. O painel mostra até 200 mensagens por página de leitura; use Carregar mensagens anteriores e Mensagens mais recentes para navegar em blocos de 50. O indicador informa qual parte dos dados carregados está exibida. Falhas oferecem nova tentativa e o início do histórico é indicado.
 
 Ao rolar para trás, focar a região de mensagens pelo teclado ou escolher Pausar acompanhamento, novas mensagens aumentam um contador e não puxam sua leitura. Ir para recentes volta às mensagens mais novas. Enquanto há seleção de texto, a navegação fica desabilitada para preservar a cópia; termine a seleção para mudar de página. Cada painel aberto conserva sua própria posição. Leitores de tela encontram a lista histórica e anúncios separados de novas mensagens/quantidade carregada, sem reler o conteúdo de páginas antigas como chegada nova.
+
+## Menu em telas pequenas
+
+Até 900 px, **Abrir menu** abre o diálogo **Menu de navegação** e leva o foco a **Fechar menu**. Tab e Shift+Tab percorrem somente o menu enquanto o restante da página fica indisponível. Escape, Fechar menu ou tocar no fundo escuro fecham a gaveta e devolvem o foco ao botão que a abriu. Escolher um canal ou painel também fecha o menu. O fechamento permanece no cabeçalho enquanto o conteúdo interno rola. Ao passar para uma tela larga, o menu fecha e volta a navegação por painéis.

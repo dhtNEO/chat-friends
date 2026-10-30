@@ -1506,24 +1506,51 @@ input[type="range"] {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
   }
-  .drawer {
+  dialog.drawer {
     position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 40;
-    width: min(20.7143rem, 86vw);
-    overflow-y: auto;
+    inset: 0 auto auto 0;
+    margin: 0;
+    padding: 0;
+    width: min(20.7143rem, calc(100% - 1rem));
+    max-width: calc(100% - 1rem);
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    border: 0;
+    border-right: 1px solid var(--line);
+    border-radius: 0;
+    color: var(--text);
     background: var(--surface-2);
-    transform: translateX(-100%);
-    transition: transform 0.2s;
   }
-  .drawer-open .drawer {
-    transform: none;
+  dialog.drawer[open] {
+    display: flex;
+    flex-direction: column;
   }
-  .scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 30;
+  dialog.drawer::backdrop {
     background: rgba(0, 0, 0, 0.55);
+  }
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    padding: 0.7143rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .drawer-header h2 {
+    margin: 0;
+    min-width: 0;
+    font-size: 1.1rem;
+  }
+  .drawer-header button {
+    flex-shrink: 0;
+  }
+  .drawer-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
   .dockview-theme-abyss-spaced {
     --dv-spacing-padding: 0px;

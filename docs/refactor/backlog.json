@@ -152,7 +152,8 @@
         "11 casos T05 passaram. Rodada T02–T05 teve 72 passes e 1 corrida de relógio na fixture T03; caso 100/falha/201 passou após controle determinístico da fase de falha, sem remover asserções. 8 streams demo e 117 backend passaram; npm ci/lint/build/validate.py/diff --check aprovados. Check padrão interrompido por settings Maven vazio; equivalente com proxy/CA passou em friends_test.",
         "Contrato ARIA/árvore acessível e fonte tardia sob CSP estrita verificados; sem sessão auditiva com leitor real. Critério assistivo real e revisão/CI pendentes; próximo passo: revisar PR T05, conferir CI e confirmar com leitor real antes de done. Resultados/limites em executions/T05.md.",
         "Entrega no PR #34 para refactor; CI/revisão e confirmação assistiva real pendentes. Sem merge/deploy.",
-        "2026-10-30: revisão do pipeline no HEAD 5cd294d: run 41112051530 falhou no bootstrap Maven, antes dos testes; demais jobs passaram. Adicionado bootstrap com três tentativas limitadas de --version, sem repetir verify/testes/scan nem alterar pins. 3 testes Node, bootstrap real em cache vazio e rejeição de checksum inválido verificados; conferir novo CI no PR #34."
+        "2026-10-30: revisão do pipeline no HEAD 5cd294d: run 41112051530 falhou no bootstrap Maven, antes dos testes; demais jobs passaram. Adicionado bootstrap com três tentativas limitadas de --version, sem repetir verify/testes/scan nem alterar pins. 3 testes Node, bootstrap real em cache vazio e rejeição de checksum inválido verificados; conferir novo CI no PR #34.",
+        "2026-10-30: usuário informou merge da T05; PR #34 integrado em dce75a7 com CI 41134157772 aprovado. Confirmação auditiva real continua explicitamente pendente na spec; não declarar done sem essa evidência. T06 não depende de T05."
       ]
     },
     {
@@ -164,14 +165,23 @@
       "dias_pessoa": "2–3",
       "dependencias": "—",
       "evidencias": "E01",
-      "status": "planned",
-      "owner": null,
+      "status": "in_review",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
+      "validation": "confirmed",
+      "validated_sha": "dce75a7f20df620fd9c4e95013e69727784269e9",
+      "evidence": [
+        "docs/refactor/executions/T06.md",
+        "https://github.com/dhtNEO/chat-friends/commit/11899e2b15c1f86af4bc21ff099be63c6eaa3085",
+        "docs/refactor/DECISIONS.md#d006--drawer-modal-e-popovers-t06-30102026",
+        "https://github.com/dhtNEO/chat-friends/pull/35"
+      ],
       "blocked_reason": null,
-      "notes": []
+      "notes": [
+        "2026-10-30: planned → in_progress; sem owner anterior e sem dependências. Codex reservou antes de implementar, branch codex/t06-mobile-drawer derivada de refactor dce75a7; sem alterações rastreadas locais, work/ anterior preservado.",
+        "Revalidação no SHA atual: drawer é div deslocada por transform e scrim; não há nome/modalidade, foco inicial, contenção, inert, Escape, botão Fechar menu ou retorno explícito de foco. open(kind) já fecha drawer ao navegar para outros painéis; preservar. Popover usa diálogo não modal e portal na app-shell; avaliar apenas propriedade de Escape/host em presença de modal.",
+        "Implementação 11899e2: diálogo nativo com fundo implicitamente inert, foco inicial/ciclo/retorno, Escape/botão/backdrop e fechamento por navegação/breakpoint; popovers permanecem não modais. 10 casos drawer e 117 backend aprovados, lint/build aprovados. in_progress → in_review; leitura auditiva real, zoom da interface do navegador, revisão e CI pendentes, sem done. Check padrão limitado por settings Maven vazio; equivalente com proxy/CA e friends_test aprovado. Detalhes em executions/T06.md."
+      ]
     },
     {
       "id": "T07",

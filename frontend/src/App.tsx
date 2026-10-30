@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type Ref,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -39,6 +40,7 @@ import { Outlook } from "./Outlook";
 import { ChatComposer, limitMessage } from "./ChatComposer";
 import { createChatOutbox, deliveryLabel, type Delivery } from "./ChatOutbox";
 import { Voice } from "./Voice";
+import { MobileDrawer } from "./MobileDrawer";
 import { useChatHistory, type HistoryPageState } from "./useChatHistory";
 import { Icon, type IconName } from "./Icon";
 import { Avatar, PeopleContext, avatarSrc, usePeople } from "./ui";
@@ -580,6 +582,8 @@ function Workspace({
     [compact, setCompact] = useState(isCompact),
     [roster, setRoster] = useState<HTMLElement | null>(null),
     [quick, setQuick] = useState<HTMLElement | null>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const dismissDrawer = useCallback(() => setDrawer(false), []);
   useEffect(() => {
     const media = matchMedia(compactQuery),
       update = () => {
@@ -741,16 +745,29 @@ function Workspace({
           (compact ? " compact" : "")
         }
       >
-        {compact && <div className="drawer">{sidebar}</div>}
+        {compact && (
+          <MobileDrawer
+            id="mobile-navigation"
+            open={drawer}
+            onDismiss={dismissDrawer}
+            trigger={menuTrigger}
+          >
+            {sidebar}
+          </MobileDrawer>
+        )}
         <nav className="activity-bar" aria-label="Painéis">
           {!compact && <Logo size={34} />}
           <ActivityButton
+            buttonRef={menuTrigger}
+            expanded={compact ? drawer : undefined}
+            controls={compact ? "mobile-navigation" : undefined}
+            popup={compact ? "dialog" : undefined}
             icon="menu"
             label={compact ? "Abrir menu" : "Mostrar canais"}
             title="Canais"
             active={compact ? drawer : !!slots.nav}
             onClick={() => {
-              if (compact) setDrawer(!drawer);
+              if (compact) setDrawer((current) => !current);
               else if (slots.nav) close("nav");
               else open("nav");
             }}
@@ -850,13 +867,6 @@ function Workspace({
             }
           />
         </nav>
-        {drawer && (
-          <div
-            className="scrim"
-            aria-hidden="true"
-            onClick={() => setDrawer(false)}
-          />
-        )}
         <div
           className="workbench"
           onDoubleClick={(e) => {
@@ -931,6 +941,10 @@ function Workspace({
   );
 }
 function ActivityButton({
+  buttonRef,
+  expanded,
+  controls,
+  popup,
   icon,
   label,
   title,
@@ -938,6 +952,10 @@ function ActivityButton({
   badge,
   onClick,
 }: {
+  buttonRef?: Ref<HTMLButtonElement>;
+  expanded?: boolean;
+  controls?: string;
+  popup?: "dialog";
   icon: IconName;
   label: string;
   title: string;
@@ -947,9 +965,13 @@ function ActivityButton({
 }) {
   return (
     <button
+      ref={buttonRef}
       className={"activity" + (active ? " active" : "")}
       aria-label={label}
-      aria-pressed={active}
+      aria-pressed={expanded === undefined ? active : undefined}
+      aria-expanded={expanded}
+      aria-controls={controls}
+      aria-haspopup={popup}
       title={title}
       onClick={onClick}
     >
