@@ -38,14 +38,17 @@
       "dias_pessoa": "2–4",
       "dependencias": "—",
       "evidencias": "E03 E04",
-      "status": "planned",
-      "owner": null,
+      "status": "in_progress",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
+      "validation": "confirmed",
+      "validated_sha": "54504079276379c3c42f251daa207115ed2fed4f",
       "evidence": [],
       "blocked_reason": null,
-      "notes": []
+      "notes": [
+        "2026-10-30: planned → in_progress; sem owner anterior e sem dependências. Checkout inicial limpo em d8fdd89; fetch autorizado, branch codex/t02-session-states baseada em refactor 5450407.",
+        "Revalidação estática atual: App.load captura qualquer falha de GET /me, executa setMe(null) e encerra loading sem alerta na abertura; api/upload usam fetch sem timeout e upload perde status. Não é evidência de execução de navegador."
+      ]
     },
     {
       "id": "T03",

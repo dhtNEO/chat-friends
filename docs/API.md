@@ -44,6 +44,16 @@ WebSocket `/ws`: sessão autenticada, `Origin` exatamente APP_ORIGIN. Cliente en
 
 401: sem sessão/conta desativada. 403: CSRF, origem ou autorização. 400: entrada inválida. 409: conflito/lease/sala cheia. 429: limite. 503: SFU indisponível ou revogação pendente. A interface não deve repetir POST de chat com novo UUID quando a resposta é incerta. Atualizar senha/desativar pode ter sido aplicado mesmo se a expulsão de mídia retornar 503; a reconciliação continuará.
 
+### Tratamento no cliente (T02)
+
+A sessão distingue `loading`, `anonymous`, `authenticated` e `unavailable`. Falha inicial de `GET /me` por 5xx/rede/timeout oferece **Tentar novamente**, sem apresentar login como se a sessão tivesse expirado. Durante uso, falhas de `/me` preservam o espaço montado e os rascunhos; a recuperação consulta apenas `/me`. Um 401 autenticado encerra identidade e desmonta os recursos de mídia. 403 informa falta de permissão sem encerrar a conta; 428 abre confirmação de identidade (senha e TOTP quando habilitado), sem repetir a operação original. O 401 do formulário de login informa credenciais inválidas.
+
+`api(path, method, body, {signal?, timeoutMs?})` e `upload(path, blob, {signal?, timeoutMs?})` compartilham `ApiError`: `status` HTTP (0 para falha sem resposta), `code` e `retryAfter` em **milissegundos** ou null. Códigos: `UNAUTHENTICATED`, `FORBIDDEN`, `REAUTH_REQUIRED`, `RATE_LIMITED`, `UNAVAILABLE`, `NETWORK`, `TIMEOUT`, `ABORTED` e `HTTP_<status>` para outros erros. Login, CSRF e upload usam a mesma classificação. Cancelamento explícito e resposta de uma sessão anterior usam `ABORTED`; respostas antigas não encerram nem substituem a conta atual.
+
+O cliente interpreta `Retry-After` em segundos ou data HTTP em 429/5xx e impede novo envio ao mesmo método/caminho durante a espera (independente da query), preservando o status original. Não agenda reenvio automático. Sem header válido, a mensagem de limite orienta aguardar. O botão de recuperação de sessão permanece desabilitado até o prazo expirar.
+
+Timeouts abrangem obtenção de headers e leitura do corpo: padrão **15 s**, buscas `/music/search` e `/party/music/search` **60 s**, preparação `POST /party/{id}/start` **120 s**, upload de avatar **60 s**. O chamador pode ajustar `timeoutMs`; a obtenção prévia de CSRF é uma requisição separada. Timeout/erro de rede não prova que uma mutação falhou no servidor: verificar o resultado antes de repetir. O transporte não repete mutações, nem após renovar a identidade; preservar `clientId` nos fluxos idempotentes existentes.
+
 As identidades de mídia são geradas pelo servidor e vinculadas à conta e sessão. Duas abas usam identidades diferentes; ocupam duas das 16 conexões. O cliente não escolhe sala, privilégios administrativos nem permissão de câmera.
 
 `micMuted` vem da publicação de microfone na SFU; `deaf` é estado declarado pelo cliente autenticado e pode levar até 5 s para aparecer nos outros clientes. Não é prova de que o dispositivo físico está sem som. Ganho de microfone e volumes de recepção ficam no cliente, não alteram os ajustes de outros usuários. `screen` informa tetos de até 1080p/60 fps/8 Mbps; resolução efetiva depende da captura e da conexão.

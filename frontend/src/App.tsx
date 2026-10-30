@@ -18,11 +18,16 @@ import {
   ApiError,
   api,
   login,
+  resetSession,
   type Member,
   type User,
   type Message,
 } from "./api";
-import { MfaGate, type SecurityState } from "./AccountSecurity";
+import {
+  MfaGate,
+  Reauthentication,
+  type SecurityState,
+} from "./AccountSecurity";
 import { GamesClub } from "./GamesClub";
 import { Outlook } from "./Outlook";
 import { Voice } from "./Voice";
@@ -49,72 +54,146 @@ import {
 } from "./Dock";
 export default function App() {
   const [me, setMe] = useState<{
-      user: User;
-      spaceName: string;
-      security: SecurityState;
-    } | null>(null),
-    [loading, setLoading] = useState(true),
-    [error, setError] = useState(""),
-    [notice, setNotice] = useState("");
+    user: User;
+    spaceName: string;
+    security: SecurityState;
+  } | null>(null);
+  const [status, setStatus] = useState<
+    "loading" | "anonymous" | "authenticated" | "unavailable"
+  >("loading");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [showLogin, setShowLogin] = useState(false);
+  const [failure, setFailure] = useState("");
+  const [retryAt, setRetryAt] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [retrying, setRetrying] = useState(false);
+  const [reauth, setReauth] = useState("");
+  const sequence = useRef(0);
   const load = useCallback(async (afterLogin = false) => {
+    const id = ++sequence.current;
+    setRetrying(true);
     try {
-      setMe(await api("/me"));
+      const next = await api<NonNullable<typeof me>>("/me");
+      if (id !== sequence.current) return;
+      setMe(next);
+      setStatus("authenticated");
+      setFailure("");
     } catch (e) {
-      setMe(null);
-      if (afterLogin) {
-        if (e instanceof ApiError && e.status === 401)
+      if (e instanceof ApiError && e.status === 401) {
+        if (afterLogin)
           throw new Error(
             "O login foi aceito, mas a sessão não foi mantida. Permita os cookies deste site e confira se está usando o endereço correto.",
           );
-        if (e instanceof ApiError && e.status >= 500)
-          throw new Error(
-            "O servidor está indisponível no momento. Tente novamente em instantes.",
-          );
-        throw e;
+        return;
       }
+      if (
+        id !== sequence.current ||
+        (e instanceof ApiError && e.code === "ABORTED")
+      )
+        return;
+      setStatus("unavailable");
+      setFailure((e as Error).message);
+      setRetryAt(
+        e instanceof ApiError && e.retryAfter ? Date.now() + e.retryAfter : 0,
+      );
+      // Keep an already mounted login form and its fields after accepted login.
     } finally {
-      setLoading(false);
+      if (id === sequence.current) setRetrying(false);
     }
   }, []);
   useEffect(() => {
     const expired = () => {
+      ++sequence.current;
       setMe(null);
+      setStatus("anonymous");
+      setShowLogin(true);
+      setRetrying(false);
       setError("");
+      setFailure("");
+      setReauth("");
     };
+    const confirm = (event: Event) =>
+      setReauth((event as CustomEvent<{ path: string }>).detail.path);
     window.addEventListener("session-ended", expired);
+    window.addEventListener("reauth-required", confirm);
     void load();
-    return () => window.removeEventListener("session-ended", expired);
+    return () => {
+      ++sequence.current;
+      window.removeEventListener("session-ended", expired);
+      window.removeEventListener("reauth-required", confirm);
+    };
   }, [load]);
+  useEffect(() => {
+    if (retryAt <= Date.now()) return;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [retryAt]);
   useEffect(() => {
     applyTheme(me?.user.primaryColor, me?.user.secondaryColor);
   }, [me]);
-  if (loading) return <main className="loading">Preparando o seu espaço…</main>;
-  if (!me)
-    return (
-      <Login
-        notice={notice}
-        onLogin={async () => {
-          setNotice("");
-          await load(true);
-        }}
-      />
-    );
-  if (me.security.mfaPending || me.security.enrollmentRequired)
-    return <MfaGate state={me.security} onDone={load} />;
+  if (status === "loading")
+    return <main className="loading">Preparando o seu espaço…</main>;
   return (
-    <Workspace
-      me={me}
-      error={error}
-      onError={setError}
-      onRefresh={load}
-      onLogout={(message = "") => {
-        setMe(null);
-        setError("");
-        setNotice(message);
-      }}
-    />
+    <>
+      {status === "unavailable" && (
+        <section className="session-notice" role="alert">
+          <p>{failure}</p>
+          <button
+            disabled={retrying || now < retryAt}
+            onClick={() => void load()}
+          >
+            {retrying
+              ? "Verificando sessão…"
+              : now < retryAt
+                ? `Aguarde ${Math.ceil((retryAt - now) / 1000)} segundos`
+                : "Tentar novamente"}
+          </button>
+        </section>
+      )}
+      {!me ? (
+        status === "anonymous" || showLogin ? (
+          <Login
+            notice={notice}
+            onLogin={async () => {
+              setNotice("");
+              await load(true);
+            }}
+          />
+        ) : null
+      ) : me.security.mfaPending || me.security.enrollmentRequired ? (
+        <MfaGate state={me.security} onDone={load} />
+      ) : (
+        <Workspace
+          key={me.user.id}
+          me={me}
+          error={error}
+          onError={setError}
+          onRefresh={load}
+          onLogout={(message = "") => {
+            resetSession();
+            ++sequence.current;
+            setMe(null);
+            setStatus("anonymous");
+            setShowLogin(true);
+            setError("");
+            setFailure("");
+            setReauth("");
+            setNotice(message);
+          }}
+        />
+      )}
+      {reauth && me && (
+        <Reauthentication
+          path={reauth}
+          mfaEnabled={me.security.mfaEnabled}
+          onClose={() => setReauth("")}
+        />
+      )}
+    </>
   );
 }
+
 function Login({
   notice,
   onLogin,
