@@ -12,14 +12,22 @@
       "dias_pessoa": "2–3",
       "dependencias": "—",
       "evidencias": "E01 E02 E14",
-      "status": "planned",
-      "owner": null,
+      "status": "blocked",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
-      "blocked_reason": null,
-      "notes": []
+      "validation": "confirmed",
+      "validated_sha": "736d22939be8329981732e2e9360efc9c52ccf1d",
+      "evidence": [
+        "docs/refactor/research/T01-preparacao.md",
+        "docs/refactor/research/T01-resultados.csv"
+      ],
+      "blocked_reason": "Preparativos concluídos; faltam piloto, duas rodadas consentidas com 5–8 participantes cada, baseline real e revisão/decisões de Produto/UX.",
+      "notes": [
+        "2026-10-30: T01 sem owner e sem dependências; Codex reservou planned → in_progress após revalidação estática no SHA registrado. Plano ativo sem baseline humana; inadequação da organização permanece hipótese.",
+        "2026-10-30: in_progress → blocked após entregar inventário, jornadas, heurísticas técnicas, roteiro e formulário vazio. Nenhuma sessão, medição ou aprovação humana realizada; não liberar tarefas dependentes.",
+        "Próximo passo: Produto/UX preparar recrutamento, consentimento/retenção e ambiente descartável, executar piloto/R1, revisar e realizar R2. Registrar transferência de owner e resultados no mesmo fluxo.",
+        "Checkout inicial limpo em d8fdd89; fetch bloqueado por conexão ao proxy. Base e código atual consultados pelo conector GitHub; cópia documental isolada em work/t01-snapshot para validate.py."
+      ]
     },
     {
       "id": "T02",

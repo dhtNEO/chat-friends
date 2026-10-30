@@ -8,3 +8,10 @@
 - Fluxo de execução/handoff para agentes e verificador de consistência.
 - README e AGENTS raiz apontam para o plano ativo.
 - Nenhuma tarefa funcional implementada por esta inicialização.
+
+## 30/10/2026 — Preparativos T01
+
+- Inventário estático no SHA de refactor, jornadas e heurísticas separadas das hipóteses de usuários.
+- Roteiro de duas rodadas com 5–8 participantes cada, métricas, metas propostas e formulário vazio.
+- Reserva/revalidação registradas; tarefa mantém critérios humanos pendentes no backlog.
+- Nenhum redesign, resultado de sessão ou decisão de marca presumido.
