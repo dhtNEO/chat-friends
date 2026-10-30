@@ -58,3 +58,9 @@
 - T06 integrada; pendências humanas anteriores não são declaradas executadas por causa do merge.
 - Limiar de luminância substituído por contraste WCAG dos pares; preenchimentos/gradientes/hover/active/texto/indicador/foco têm tokens separados, preservando preferência original.
 - Hex restaurado validado por campo, previews e cancelamento mantidos; estados renderizados e matriz independente de 156 pares em [execução T07](executions/T07.md).
+
+## 30/10/2026 — Preparativos independentes T08
+
+- Integração T07 confirmada; T08 revalidada no SHA atual e bloqueada por T01/T06/T09 abertas, sem dispensa presumida.
+- Proposta de contratos URL/Voltar, preservação reversível de v4 e identidade de mídia, com matriz de verificação; nenhum runtime ou critério funcional implementado.
+- [Evidências e próximo passo](executions/T08.md); dependências e estado permanecem no backlog.

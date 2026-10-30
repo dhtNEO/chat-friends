@@ -208,7 +208,8 @@
       "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → in_progress; sem dependências e sem owner anterior. Base refactor afb09ab, branch codex/t07-theme-contrast; nenhuma alteração rastreada local, work/ preservado. Revalidação: textOn ainda usa luminância >0,4; hover e gradiente reutilizam foreground da primária sem contrastar seus fundos; valores restaurados não são validados em applyTheme.",
-        "in_progress → in_review. Código 875cbee: tokens contrastados independentes para sólido/gradiente/hover/active/texto/indicador/foco, hex validado, preferência original preservada; preview/salvar/cancelar verificados. 3 testes matemáticos (156 pares), 46 regressões UI (15 T07, 31 drawer/demo/sala/streams) e 117 backend aprovados; npm ci/lint/build, validate e diff-check aprovados. Check padrão limitado por settings Maven local vazio; equivalente backend e frontend verificados. Revisão/CI pendentes, sem done; escopo e limites em executions/T07.md."
+        "in_progress → in_review. Código 875cbee: tokens contrastados independentes para sólido/gradiente/hover/active/texto/indicador/foco, hex validado, preferência original preservada; preview/salvar/cancelar verificados. 3 testes matemáticos (156 pares), 46 regressões UI (15 T07, 31 drawer/demo/sala/streams) e 117 backend aprovados; npm ci/lint/build, validate e diff-check aprovados. Check padrão limitado por settings Maven local vazio; equivalente backend e frontend verificados. Revisão/CI pendentes, sem done; escopo e limites em executions/T07.md.",
+        "2026-10-30: usuário informou merge; PR #36 integrado em babba756 confirmado. Aceite/integração não estabelece por si resultado de CI não consultado nesta execução."
       ]
     },
     {
@@ -220,14 +221,21 @@
       "dias_pessoa": "4–7",
       "dependencias": "T01 T06 T09",
       "evidencias": "E02 E14",
-      "status": "planned",
-      "owner": null,
+      "status": "blocked",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
-      "blocked_reason": null,
-      "notes": []
+      "validation": "confirmed",
+      "validated_sha": "babba75696ffb8e6c20e0e03ab3c740918b9084f",
+      "evidence": [
+        "docs/refactor/executions/T08.md",
+        "docs/refactor/preparations/T08-navegacao.md"
+      ],
+      "blocked_reason": "Dependências abertas: T01 blocked (pesquisa/decisões UX pendentes), T06 in_review (leitor/zoom humanos pendentes apesar do merge), T09 planned. Sem decisão explícita de dispensa. Somente levantamento e proposta técnica independentes; runtime não alterado.",
+      "notes": [
+        "2026-10-30: owner Codex reservado para preparativos independentes e bloqueio registrado antes de qualquer implementação. Base refactor babba756; branch codex/t08-preparacao; nenhuma alteração rastreada local, work/ preservado. Não entrar em in_progress/in_review de implementação com dependências abertas (validate.py/WORKFLOW).",
+        "Revalidação atual: Dockview é o shell padrão, compactQuery usa 900 px, storage layout:v4:compact/wide; não há roteamento hash/popstate/pushState em src. Voice e hosts de mídia estão fora dos painéis de destino; preservar identidade dos objetos durante navegação/resize. Destinos Conversa/Sala/Jogos/Agenda foram indicados pelo usuário, sem alegar resultados de pesquisa T01 ou entrega T09.",
+        "Próximo passo: concluir dependências ou registrar decisão explícita de dispensa para T08, mantendo pendências reais. Proposta revisável de URL/migração/identidade e matriz de testes em preparations/T08-navegacao.md; nenhuma feature dependente implementada nem teste funcional novo declarado."
+      ]
     },
     {
       "id": "T09",
