@@ -1381,14 +1381,22 @@ input[type="range"] {
 .composer-box:focus-within {
   border-color: #3d3560;
 }
-.composer input {
+.composer textarea {
   border: 0;
   background: none;
   padding: 0.6429rem 0.7143rem;
   font-size: 1rem;
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  max-height: 12rem;
 }
-.composer input:focus-visible {
+.composer textarea:focus-visible {
   outline: none;
+}
+.delivery-confirmed {
+  color: var(--faint);
+  font-size: 0.75rem;
 }
 .composer footer {
   display: flex;
