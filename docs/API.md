@@ -90,3 +90,13 @@ Rotas autenticadas `/api/party`, mãos de blackjack, prontidão e acertos de rit
 ## Outlook
 
 Calendário compartilhado autenticado: listagem por intervalo, criação de jogatinas, edição/cancelamento pelo criador ou administrador e respostas individuais de presença. Rotas e contratos em [OUTLOOK.md](OUTLOOK.md#api-autenticada). Requer o esquema de agenda da V11 (linha de jogos) ou V12 (integração com atalhos).
+
+### Recuperação do chat no cliente (T03)
+
+O cursor de recuperação é o último ID confirmado por uma página HTTP válida e completa. O maior ID observado por WS ou ACK é separado e nunca substitui esse cursor. A abertura carrega as últimas 50 mensagens e consulta `after`; reconexões e novos eventos consultam `after` a partir do cursor confirmado, em uma única sequência de páginas. IDs podem ter lacunas de sequências/rollbacks; não exigir IDs consecutivos. O lock de gravação e o ACK após commit permanecem no servidor.
+
+Durante sincronização ou falha, eventos entram em buffer deduplicado por ID; páginas e buffer são integrados em ordem crescente, sem duplicar a lista. O buffer retém no máximo 1000 mensagens; excedentes continuam recuperáveis por HTTP e o maior ID observado permanece como alvo. Eventos próximos são agrupados por 250 ms antes da leitura. Envelopes WS inválidos são ignorados; páginas HTTP inválidas não avançam o cursor e entram no fluxo de recuperação.
+
+Falhas de leitura são repetidas mesmo com WS aberto: backoff de 1 s, dobrando até 30 s, com jitter adicional de 0–20%, respeitando o maior prazo de `Retry-After`. Reconectar não antecipa uma espera vigente. 401, 403, 428 e cancelamento não recebem retentativa automática por timer. Não se acrescenta reenvio de mutações; preservar o `clientId` nas retentativas idempotentes já existentes. Nenhuma mudança de esquema ou protocolo HTTP/WS.
+
+O indicador distingue **Conectando…**, **Sincronizando…**, **Atualizado** e **Chat indisponível**. Uma falha de sincronização fica no indicador do chat e é limpa ao atualizar. Logout aborta leituras/envios pendentes, cancela timers e descarta handlers/respostas da geração anterior, inclusive callbacks já capturados antes do fechamento do socket.

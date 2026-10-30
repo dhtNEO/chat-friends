@@ -24,6 +24,7 @@ async function loginForm(
       return route.fulfill({
         json: {
           lease: { identity: null, leaseId: null, expiresAt: null },
+          leases: [],
           participants: [],
         },
       });
