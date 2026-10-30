@@ -2375,6 +2375,8 @@ kbd {
   }
 }
 .stream-selector {
+  max-height: 45%;
+  overflow: auto;
   flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
@@ -2453,5 +2455,34 @@ kbd {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+.stream-selection-summary {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.stream-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.35rem;
+  cursor: pointer;
+}
+.stream-choice input {
+  width: auto;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.stream-choice span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container (max-width: 24rem) {
+  .stream-selection-summary {
+    grid-column: 1 / -1;
   }
 }

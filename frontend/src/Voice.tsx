@@ -102,7 +102,7 @@ export function Voice({
   onError: (s: string) => void;
 }) {
   const [settings, setSettings] = useAudioSettings(userId);
-  const [gallery, setGallery] = useState(false);
+  const [streamSelection, setStreamSelection] = useState<string[] | null>(null);
   // Independent multipliers for the streams in this call; output/stream remain master volumes.
   const [streamVolumes, setStreamVolumes] = useState<Record<string, number>>(
     {},
@@ -156,7 +156,6 @@ export function Voice({
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]),
     [device, setDevice] = useState("default"),
     [quality, setQuality] = useState("normal"),
-    [focus, setFocus] = useState<string | null>(null),
     [adjusting, setAdjusting] = useState<string | null>(null);
   const [state, setState] = useState<{
     leases: Lease[];
@@ -315,6 +314,8 @@ export function Voice({
       for (const event of [
         RoomEvent.ParticipantConnected,
         RoomEvent.ParticipantDisconnected,
+        RoomEvent.TrackPublished,
+        RoomEvent.TrackUnpublished,
         RoomEvent.TrackSubscribed,
         RoomEvent.TrackUnsubscribed,
         RoomEvent.ActiveSpeakersChanged,
@@ -680,12 +681,59 @@ export function Voice({
   useEffect(() => {
     notifyStreaming.current(streaming);
   }, [streaming]);
-  const featured = live.find((t) => t.identity === focus) ?? live[0];
-  const visibleStreams = gallery ? live : featured ? [featured] : [];
-  const selectStream = (identity: string) => {
-    setFocus(identity);
-    setGallery(false);
-  };
+  // List authorized broadcasts before their remote tracks have arrived. Selection
+  // must never depend on already subscribing to/playing the chosen video.
+  const availableStreams = state.leases.flatMap((l) =>
+    l.identity
+      ? [
+          {
+            identity: l.identity,
+            name:
+              participants.find((p) => p.identity === l.identity)?.name ||
+              state.participants.find((p) => p.identity === l.identity)?.name ||
+              "Amigo",
+            track: tracks.find((t) => t.identity === l.identity)?.track,
+          },
+        ]
+      : [],
+  );
+  if (self && sharing && !availableStreams.some((t) => t.identity === self)) {
+    availableStreams.push({
+      identity: self,
+      name: room.current?.localParticipant.name || "Você",
+      track: tracks.find((t) => t.identity === self)?.track,
+    });
+  }
+  const selectedIds =
+    streamSelection ?? availableStreams.slice(0, 1).map((t) => t.identity);
+  const visibleStreams = availableStreams.filter((t) =>
+    selectedIds.includes(t.identity),
+  );
+  const gallery = visibleStreams.length > 1;
+  const selectStream = (identity: string) => setStreamSelection([identity]);
+  const toggleStream = (identity: string) =>
+    setStreamSelection(
+      selectedIds.includes(identity)
+        ? selectedIds.filter((id) => id !== identity)
+        : [...selectedIds, identity],
+    );
+  useEffect(() => {
+    // Subscription preferences belong only to this viewer. Voice/music stay subscribed.
+    for (const participant of room.current?.remoteParticipants.values() ?? []) {
+      for (const publication of participant.trackPublications.values()) {
+        if (
+          publication.source !== Track.Source.ScreenShare &&
+          publication.source !== Track.Source.ScreenShareAudio
+        )
+          continue;
+        const wanted = visibleStreams.some(
+          (stream) => stream.identity === participant.identity,
+        );
+        if (publication.isDesired !== wanted)
+          publication.setSubscribed?.(wanted);
+      }
+    }
+  });
   const voices = participants.flatMap((p) => {
     const track = p.getTrackPublication(Track.Source.Microphone)?.track
       ?.mediaStreamTrack;
@@ -787,27 +835,35 @@ export function Voice({
     sixty = (connection.current?.screen.fps ?? 60) >= 60;
   const screenContent = (
     <div className="stream-stage">
-      {(live.length > 1 || (gallery && live.length > 0)) && (
+      {availableStreams.length > 0 && (
         <div
           className="stream-selector"
           role="group"
           aria-label="Escolher transmissão"
         >
-          {live.map((t) => (
-            <button
-              key={t.identity}
-              aria-pressed={!gallery && featured?.identity === t.identity}
-              onClick={() => selectStream(t.identity)}
-            >
-              Tela de {account(t.identity)?.displayName ?? t.name}
-            </button>
+          <span className="stream-selection-summary" role="status">
+            Assistindo {visibleStreams.length} de {availableStreams.length}{" "}
+            lives · escolha até 3
+          </span>
+          {availableStreams.map((t) => (
+            <label className="stream-choice" key={t.identity}>
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(t.identity)}
+                aria-label={`Assistir live de ${account(t.identity)?.displayName ?? t.name}`}
+                onChange={() => toggleStream(t.identity)}
+              />
+              <span>{account(t.identity)?.displayName ?? t.name}</span>
+            </label>
           ))}
           <button
-            aria-pressed={gallery}
-            onClick={() => setGallery((value) => !value)}
+            onClick={() =>
+              setStreamSelection(availableStreams.map((t) => t.identity))
+            }
           >
             Assistir todas
           </button>
+          <button onClick={() => setStreamSelection([])}>Limpar seleção</button>
         </div>
       )}
       <div
@@ -823,29 +879,36 @@ export function Voice({
               role="group"
               aria-label={`Tela de ${account(stream.identity)?.displayName ?? stream.name}`}
             >
-              <Screen
-                track={stream.track}
-                name={account(stream.identity)?.displayName ?? stream.name}
-                avatar={avatarSrc(account(stream.identity))}
-                local={stream.identity === self}
-                viewers={Math.max(people.length - 1, 0)}
-                volume={
-                  gallery
-                    ? (streamVolumes[stream.identity] ?? 100)
-                    : settings.stream
-                }
-                expanded={hosts.stream ? streamMaximized : maximized}
-                onExpand={onMaximizeStream}
-                onVolume={(volume) =>
-                  gallery
-                    ? setStreamVolumes((old) => ({
-                        ...old,
-                        [stream.identity]: volume,
-                      }))
-                    : setSettings((old) => ({ ...old, stream: volume }))
-                }
-                onError={onError}
-              />
+              {stream.track ? (
+                <Screen
+                  track={stream.track}
+                  name={account(stream.identity)?.displayName ?? stream.name}
+                  avatar={avatarSrc(account(stream.identity))}
+                  local={stream.identity === self}
+                  viewers={Math.max(people.length - 1, 0)}
+                  volume={streamVolumes[stream.identity] ?? 100}
+                  expanded={hosts.stream ? streamMaximized : maximized}
+                  onExpand={onMaximizeStream}
+                  onVolume={(volume) =>
+                    setStreamVolumes((old) => ({
+                      ...old,
+                      [stream.identity]: volume,
+                    }))
+                  }
+                  onError={onError}
+                />
+              ) : (
+                <div className="stage-empty" role="status">
+                  <h3>
+                    {account(stream.identity)?.displayName ?? stream.name}
+                  </h3>
+                  <p>
+                    {joined
+                      ? "Conectando à live…"
+                      : "Entre na voz para assistir. Você não precisa transmitir."}
+                  </p>
+                </div>
+              )}
             </div>
           ))
         ) : (
@@ -853,13 +916,19 @@ export function Voice({
             <span className="stage-empty-icon">
               <Icon name="screen" size={34} />
             </span>
-            <h3>Ninguém está transmitindo</h3>
+            <h3>
+              {availableStreams.length
+                ? "Selecione as lives que quer assistir"
+                : "Ninguém está transmitindo"}
+            </h3>
             <p>
-              {joined
-                ? "Compartilhe sua tela para todo mundo assistir junto."
-                : people.length
-                  ? "Tem gente na sala. Entre e puxe uma cadeira."
-                  : "A sala está tranquila. Seja o primeiro a entrar."}
+              {availableStreams.length
+                ? "Marque uma, duas ou três lives acima. Sua escolha vale só para você."
+                : joined
+                  ? "Compartilhe sua tela para todo mundo assistir junto."
+                  : people.length
+                    ? "Tem gente na sala. Entre e puxe uma cadeira."
+                    : "A sala está tranquila. Seja o primeiro a entrar."}
             </p>
           </div>
         )}
@@ -879,7 +948,9 @@ export function Voice({
               "person tile" +
               (p.speaking && !p.micMuted ? " speaking" : "") +
               (isLive(p.identity) ? " live" : "") +
-              (featured?.identity === p.identity ? " featured" : "") +
+              (visibleStreams.some((t) => t.identity === p.identity)
+                ? " featured"
+                : "") +
               (adjusting === p.identity ? " adjusting" : "") +
               (cardDrag.dragging === p.layoutKey ? " is-dragging" : "") +
               (cardDrag.over === p.layoutKey &&
@@ -1347,8 +1418,7 @@ export function Voice({
               ? 0
               : ((settings.output / 100) *
                   (source === Track.Source.ScreenShareAudio
-                    ? settings.stream *
-                      (gallery ? (streamVolumes[identity] ?? 100) / 100 : 1)
+                    ? (settings.stream * (streamVolumes[identity] ?? 100)) / 100
                     : identity === MUSIC_IDENTITY
                       ? settings.music
                       : personVolume(identity))) /

@@ -12,6 +12,8 @@ import {
 export const RoomEvent = {
   ParticipantConnected: "participantConnected",
   ParticipantDisconnected: "participantDisconnected",
+  TrackPublished: "trackPublished",
+  TrackUnpublished: "trackUnpublished",
   TrackSubscribed: "trackSubscribed",
   TrackUnsubscribed: "trackUnsubscribed",
   ActiveSpeakersChanged: "activeSpeakersChanged",
