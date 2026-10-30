@@ -66,14 +66,20 @@
       "dias_pessoa": "3–5",
       "dependencias": "T02",
       "evidencias": "E05",
-      "status": "planned",
-      "owner": null,
+      "status": "blocked",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
-      "blocked_reason": null,
-      "notes": []
+      "validation": "confirmed",
+      "validated_sha": "ef1893cca0d38015bd0c42ef7e8be2ca05685768",
+      "evidence": [
+        "docs/refactor/executions/T03.md"
+      ],
+      "blocked_reason": "T02 permanece in_review no backlog; integração do PR #31 não substitui o aceite e a transição canônica exigidos pelo WORKFLOW.",
+      "notes": [
+        "2026-10-30: planned → blocked; Codex assume preparação independente, sem iniciar implementação dependente. T03 sem owner anterior; checkout inicial limpo.",
+        "Revalidação estática no SHA registrado confirma latest avançado por WS, catch-up somente no onopen e callbacks sem guarda completa após cleanup. Traço 100/falha/201 documentado; não é reprodução dinâmica.",
+        "Próximo passo: concluir T02 no fluxo canônico, revalidar base e transicionar blocked → in_progress antes de implementar e executar testes. Critérios essenciais permanecem pendentes."
+      ]
     },
     {
       "id": "T04",
