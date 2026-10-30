@@ -308,3 +308,173 @@ test("servidor indisponível após aceitar login continua visível no formulári
   );
   await canRetry(page);
 });
+
+async function sessionPage(page: Page, onMe: (route: Route) => Promise<void>) {
+  let profileChanged = () => {};
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/me") return onMe(route);
+    if (path === "/api/csrf") return route.fulfill({ json: csrf });
+    if (path === "/api/messages" || path === "/api/members")
+      return route.fulfill({ json: [] });
+    if (path === "/api/media/state")
+      return route.fulfill({
+        json: { lease: {}, leases: [], participants: [] },
+      });
+    return route.fulfill({ status: 404 });
+  });
+  await page.routeWebSocket("**/ws", (socket) => {
+    profileChanged = () => socket.send(JSON.stringify({ type: "profile" }));
+    socket.onMessage(() => undefined);
+  });
+  await page.goto("/");
+  return () => profileChanged();
+}
+
+for (const failure of ["503", "offline"] as const) {
+  test(`GET /me ${failure} na abertura oferece recuperação sem mostrar login`, async ({
+    page,
+  }) => {
+    let unavailable = true;
+    await sessionPage(page, (route) =>
+      unavailable
+        ? failure === "503"
+          ? route.fulfill({ status: 503 })
+          : route.abort("failed")
+        : route.fulfill({ json: signedIn }),
+    );
+    await expect(page.getByRole("alert")).toContainText(/servidor|conexão/i);
+    await expect(page.getByLabel("Usuário", { exact: true })).toHaveCount(0);
+    unavailable = false;
+    await page
+      .getByRole("button", { name: "Tentar novamente", exact: true })
+      .click();
+    await expect(page.getByLabel("Mensagem em geral")).toBeVisible();
+    await expect(page.locator(".session-notice")).toHaveCount(0);
+  });
+}
+
+test("GET /me pendente mantém estado carregando", async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await sessionPage(page, async (route) => {
+    await pending;
+    await route.fulfill({ status: 401 });
+  });
+  await expect(page.getByText("Preparando o seu espaço…")).toBeVisible();
+  await expect(page.getByLabel("Usuário", { exact: true })).toHaveCount(0);
+  release();
+  await expect(page.getByLabel("Usuário", { exact: true })).toBeVisible();
+});
+
+test("falha de /me durante uso preserva espaço e rascunho até recuperar", async ({
+  page,
+}) => {
+  let unavailable = false;
+  const refresh = await sessionPage(page, (route) =>
+    unavailable
+      ? route.fulfill({ status: 503 })
+      : route.fulfill({ json: signedIn }),
+  );
+  const draft = page.getByLabel("Mensagem em geral");
+  await draft.fill("rascunho sintético preservado");
+  unavailable = true;
+  refresh();
+  await expect(page.locator(".session-notice")).toBeVisible();
+  await expect(draft).toHaveValue("rascunho sintético preservado");
+  unavailable = false;
+  await page
+    .getByRole("button", { name: "Tentar novamente", exact: true })
+    .click();
+  await expect(page.locator(".session-notice")).toHaveCount(0);
+  await expect(draft).toHaveValue("rascunho sintético preservado");
+});
+
+test("401 durante leitura encerra espaço e recursos montados", async ({
+  page,
+}) => {
+  let expired = false;
+  const refresh = await sessionPage(page, (route) =>
+    expired
+      ? route.fulfill({ status: 401 })
+      : route.fulfill({ json: signedIn }),
+  );
+  await expect(page.getByLabel("Mensagem em geral")).toBeVisible();
+  expired = true;
+  refresh();
+  await expect(page.getByLabel("Usuário", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Mensagem em geral")).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "Sala de voz", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("GET /me 429 respeita Retry-After antes da recuperação", async ({
+  page,
+}) => {
+  let calls = 0;
+  await sessionPage(page, (route) => {
+    calls++;
+    return calls === 1
+      ? route.fulfill({ status: 429, headers: { "Retry-After": "2" } })
+      : route.fulfill({ json: signedIn });
+  });
+  await expect(page.getByRole("button", { name: /Aguarde/ })).toBeDisabled();
+  expect(calls).toBe(1);
+  await page
+    .getByRole("button", { name: "Tentar novamente", exact: true })
+    .click();
+  await expect(page.getByLabel("Mensagem em geral")).toBeVisible();
+  expect(calls).toBe(2);
+});
+
+for (const status of [403, 428]) {
+  test(`${status} mantém conta e 428 oferece confirmação sem reenviar`, async ({
+    page,
+  }) => {
+    let calls = 0;
+    await sessionPage(page, (route) => route.fulfill({ json: signedIn }));
+    await page.route("**/api/messages", (route) => {
+      if (route.request().method() === "GET")
+        return route.fulfill({ json: [] });
+      calls++;
+      return route.fulfill({ status });
+    });
+    const draft = page.getByLabel("Mensagem em geral");
+    await draft.fill("ação sintética");
+    await draft.press("Enter");
+    if (status === 428) {
+      const dialog = page.getByRole("dialog", {
+        name: "Confirmar identidade",
+        exact: true,
+      });
+      await expect(dialog).toBeVisible();
+      await page.route("**/api/security/reauth", (route) =>
+        route.fulfill({ status: 204 }),
+      );
+      await dialog
+        .getByLabel("Senha para confirmar identidade")
+        .fill("synthetic-password");
+      await dialog
+        .getByRole("button", { name: "Confirmar identidade", exact: true })
+        .click();
+      await expect(dialog.getByRole("status")).toContainText(
+        "Identidade confirmada",
+      );
+      await dialog.getByRole("button", { name: "Fechar", exact: true }).click();
+    } else {
+      await expect(
+        page
+          .getByText("Você não tem permissão para esta operação.", {
+            exact: true,
+          })
+          .first(),
+      ).toBeVisible();
+    }
+    await expect(draft).toBeVisible();
+    await expect(page.getByLabel("Usuário", { exact: true })).toHaveCount(0);
+    expect(calls).toBe(1);
+  });
+}

@@ -470,3 +470,59 @@ test("dois espectadores comuns escolhem 1, 2 ou 3 lives independentemente, antes
     await otherContext.close();
   }
 });
+
+test("401 encerra sessão, captura local e sala de mídia", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getDisplayMedia = async () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = 360;
+      canvas.getContext("2d")!.fillRect(0, 0, 640, 360);
+      const stream = canvas.captureStream(10);
+      Object.assign(window, { sessionTestTracks: stream.getTracks() });
+      return stream;
+    };
+  });
+  await page.goto("/");
+  await page.getByLabel("Usuário", { exact: true }).fill("admin");
+  await page.getByLabel("Senha", { exact: true }).fill("demo-streams");
+  await page.getByRole("button", { name: "Entrar no espaço" }).click();
+  await page.evaluate(`(async () => {
+    const { Room } = await import('/src/demo/livekit.ts');
+    const disconnect = Room.prototype.disconnect;
+    Room.prototype.disconnect = async function() {
+      window.sessionTestDisconnected = true;
+      return disconnect.call(this);
+    };
+  })()`);
+  await page
+    .getByRole("button", { name: "Entrar na voz", exact: true })
+    .click();
+  await expect(page.getByText("Voz conectada", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Compartilhar tela", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Parar transmissão", exact: true }),
+  ).toBeVisible();
+  // The real transport observes 401; only the SDK/signaling is simulated.
+  await page.evaluate(`(async () => {
+    const fetch = window.fetch;
+    window.fetch = (input, init) => String(input) === '/api/me'
+      ? Promise.resolve(new Response('', { status: 401 })) : fetch(input, init);
+    const { api } = await import('/src/api.ts');
+    await api('/me').catch(() => {});
+  })()`);
+  await expect(page.getByLabel("Usuário", { exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        `window.sessionTestDisconnected === true && window.sessionTestTracks.length > 0 && window.sessionTestTracks.every(t => t.readyState === 'ended')`,
+      ),
+    )
+    .toBe(true);
+  await expect(
+    page.getByRole("region", { name: "Sala de voz", exact: true }),
+  ).toHaveCount(0);
+});

@@ -15,3 +15,9 @@
 - Roteiro de duas rodadas com 5–8 participantes cada, métricas, metas propostas e formulário vazio.
 - Reserva/revalidação registradas; tarefa mantém critérios humanos pendentes no backlog.
 - Nenhum redesign, resultado de sessão ou decisão de marca presumido.
+
+## 30/10/2026 — T02 para revisão
+
+- Sessão diferencia carregamento, anonimato, autenticação e indisponibilidade, com recuperação e preservação de contexto.
+- Transporte unifica erros/rede/timeout/upload, Retry-After e descarte de respostas de sessão anterior; confirmação 428 sem reenvio automático.
+- Contrato e testes de sessão/transmissões atualizados; resultados e limites em [execução T02](executions/T02.md). Revisão pendente; estado no backlog.

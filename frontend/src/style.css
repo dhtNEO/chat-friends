@@ -2486,3 +2486,10 @@ kbd {
     grid-column: 1 / -1;
   }
 }
+
+.session-notice {
+  padding: 1rem;
+  background: var(--panel, #24283d);
+  color: var(--text, #fff);
+  border-bottom: 1px solid currentColor;
+}

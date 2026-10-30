@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { api } from "./api";
 export type SecurityState = {
   mfaEnabled: boolean;
@@ -231,5 +237,85 @@ export function AccountSecurity() {
         ))}
       </ul>
     </section>
+  );
+}
+
+// Reauthentication grants a short window; the original mutation is never replayed.
+export function Reauthentication({
+  path,
+  mfaEnabled,
+  onClose,
+}: {
+  path: string;
+  mfaEnabled: boolean;
+  onClose: () => void;
+}) {
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      onCancel={onClose}
+      aria-label="Confirmar identidade"
+      className="settings"
+    >
+      <h2>Confirmar identidade</h2>
+      <p>
+        Confirme sua identidade para concluir a ação solicitada. Depois, repita
+        a ação manualmente.
+      </p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const proof = Object.fromEntries(new FormData(form));
+          setBusy(true);
+          void api("/security/reauth", "POST", proof)
+            .then(() => {
+              form.reset();
+              setNotice(
+                "Identidade confirmada. Feche esta janela e repita a ação desejada.",
+              );
+            })
+            .catch((e) => setNotice(e.message))
+            .finally(() => setBusy(false));
+        }}
+      >
+        <label>
+          Senha para confirmar identidade
+          <input
+            autoFocus
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            maxLength={128}
+          />
+        </label>
+        {mfaEnabled && (
+          <label>
+            Código do autenticador
+            <input
+              name="code"
+              autoComplete="one-time-code"
+              required
+              maxLength={32}
+            />
+          </label>
+        )}
+        <button disabled={busy}>Confirmar identidade</button>
+      </form>
+      {notice && <p role="status">{notice}</p>}
+      <button onClick={onClose}>Fechar</button>
+      <p>
+        {path.startsWith("/admin/")
+          ? "Ação administrativa"
+          : "Ação da conta ou do espaço"}
+      </p>
+    </dialog>
   );
 }
