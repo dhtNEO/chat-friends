@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-30",
+  "base": "afb09abd6d46eb4eec1dee700b8e822ea1d4089d",
+  "method": "Oráculo WCAG independente dos geradores; sRGB fracionário em 513 pontos por segmento, extremos incluídos; 7 presets + 21 pares extremos/médios + 128 pares LCG seed1707. Matriz sintética, não auditoria global WCAG.",
+  "pairCount": 156,
+  "minimum": {
+    "solid": 4.600214801878829,
+    "gradient": 4.600060732363575,
+    "accentText": 4.600781783710425,
+    "border": 3.1002905757560097,
+    "indicator": 4.600781783710425,
+    "title": 4.528442194634357,
+    "focus": 19.79292613723972
+  },
+  "presets": [
+    {
+      "name": "VGH Roxo",
+      "primary": "#7d3cff",
+      "secondary": "#b980fa",
+      "solidMinimum": 4.6038733498750535,
+      "gradientMinimum": 4.601855339441141
+    },
+    {
+      "name": "Violeta",
+      "primary": "#8b5cf6",
+      "secondary": "#ec4899",
+      "solidMinimum": 4.6050827602682265,
+      "gradientMinimum": 4.600065874127153
+    },
+    {
+      "name": "Oceano",
+      "primary": "#0ea5e9",
+      "secondary": "#22d3ee",
+      "solidMinimum": 5.947347696499013,
+      "gradientMinimum": 5.947347696499013
+    },
+    {
+      "name": "Floresta",
+      "primary": "#16a34a",
+      "secondary": "#a3e635",
+      "solidMinimum": 5.033004456063326,
+      "gradientMinimum": 5.033004456063326
+    },
+    {
+      "name": "Pôr do sol",
+      "primary": "#f97316",
+      "secondary": "#facc15",
+      "solidMinimum": 5.8828894377829295,
+      "gradientMinimum": 5.8828894377829295
+    },
+    {
+      "name": "Cereja",
+      "primary": "#e11d48",
+      "secondary": "#f472b6",
+      "solidMinimum": 4.609611615178626,
+      "gradientMinimum": 4.601271103878409
+    },
+    {
+      "name": "Grafite",
+      "primary": "#64748b",
+      "secondary": "#94a3b8",
+      "solidMinimum": 4.611268375609189,
+      "gradientMinimum": 4.600060732363575
+    }
+  ]
+}

@@ -49,3 +49,7 @@ Ao rolar para trás, focar a região de mensagens pelo teclado ou escolher Pausa
 ## Menu em telas pequenas
 
 Até 900 px, **Abrir menu** abre o diálogo **Menu de navegação** e leva o foco a **Fechar menu**. Tab e Shift+Tab percorrem somente o menu enquanto o restante da página fica indisponível. Escape, Fechar menu ou tocar no fundo escuro fecham a gaveta e devolvem o foco ao botão que a abriu. Escolher um canal ou painel também fecha o menu. O fechamento permanece no cabeçalho enquanto o conteúdo interno rola. Ao passar para uma tela larga, o menu fecha e volta a navegação por painéis.
+
+## Cores e legibilidade
+
+Em Configurações → Aparência, as cores escolhidas continuam sendo sua preferência salva. Texto, botões, estados de interação e indicadores usam variações dessas cores para manter contraste; um gradiente preto/branco pode precisar de extremos ajustados nos controles. A amostra circular mostra a escolha original. A prévia e o tema salvo usam o mesmo resultado; fechar Configurações sem salvar restaura as últimas cores salvas. Valores restaurados inválidos usam o padrão por campo, sem sobrescrever automaticamente sua preferência.

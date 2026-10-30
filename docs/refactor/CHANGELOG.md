@@ -52,3 +52,9 @@
 - T05 integrada; pendência auditiva anterior preservada sem atribuir aceite inexistente.
 - Drawer mobile com diálogo nativo, fundo inert, contenção/retorno de foco, Escape, botão e fechamento após navegação; decisão D006 preserva popovers não modais.
 - Testes por teclado, árvore acessível e layouts; procedimento humano e limites em [execução T06](executions/T06.md).
+
+## 30/10/2026 — Contraste personalizado T07
+
+- T06 integrada; pendências humanas anteriores não são declaradas executadas por causa do merge.
+- Limiar de luminância substituído por contraste WCAG dos pares; preenchimentos/gradientes/hover/active/texto/indicador/foco têm tokens separados, preservando preferência original.
+- Hex restaurado validado por campo, previews e cancelamento mantidos; estados renderizados e matriz independente de 156 pares em [execução T07](executions/T07.md).

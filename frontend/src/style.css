@@ -46,8 +46,11 @@ select {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-select:focus-visible {
-  outline: 0.1429rem solid var(--accent);
+select:focus-visible,
+textarea:focus-visible {
+  outline: 0.1429rem solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--focus-gap);
 }
 button {
   cursor: pointer;
@@ -114,11 +117,14 @@ h3 {
 .primary {
   background: var(--accent-strong);
   color: var(--on-primary);
-  border-color: var(--accent-strong);
+  border-color: var(--control-border);
   font-weight: 700;
 }
 .primary:hover {
   background: var(--accent-hover);
+}
+.primary:active {
+  background: var(--accent-active);
 }
 .secondary {
   background: #262432;
@@ -265,7 +271,7 @@ h3 {
   --text: #ececf3;
   --muted: #9b9cb1;
   --faint: #6f7086;
-  /* Personal colors (theme.ts); the rest derives from them. */
+  /* Original preferences; functional tokens are computed by theme.ts. */
   --primary: #7d3cff;
   --secondary: #b980fa;
   /* VGH logo; theme.ts recomputes these from each person's colors. */
@@ -278,12 +284,21 @@ h3 {
   --logo-accent: #c799fb;
   --logo-ink: #4b2499;
   --on-primary: #ffffff;
-  --accent-strong: var(--primary);
-  --accent: color-mix(in srgb, var(--primary) 62%, white);
-  --accent-hover: color-mix(in srgb, var(--primary) 85%, white);
-  --accent-soft: color-mix(in srgb, var(--primary) 18%, transparent);
-  --secondary-text: color-mix(in srgb, var(--secondary) 70%, white);
-  --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+  --accent-strong: #7d3cff;
+  --accent-hover: #8854ef;
+  --accent-active: #6e35e0;
+  --accent: #b590ff;
+  --accent-soft: #291e49;
+  --secondary-text: #c08dfb;
+  --control-border: #9865ff;
+  --on-gradient: #000000;
+  --gradient: linear-gradient(135deg in srgb, #894fff, #c08cfa);
+  --gradient-hover: linear-gradient(135deg in srgb, #9764ff, #c89afb);
+  --gradient-active: linear-gradient(135deg in srgb, #875ae3, #b289e0);
+  --indicator-gradient: linear-gradient(135deg in srgb, #b590ff, #d7b7fc);
+  --text-gradient: linear-gradient(135deg in srgb, #c5a7ff, #e0c6fd);
+  --focus-ring: #ffffff;
+  --focus-gap: #080916;
   --live: #ef4444;
   --online: #4ade80;
   --danger: #f05252;
@@ -344,7 +359,7 @@ h3 {
   bottom: 0.7rem;
   width: 0.2rem;
   border-radius: 0 0.2rem 0.2rem 0;
-  background: var(--gradient);
+  background: var(--indicator-gradient);
 }
 .activity small {
   position: absolute;
@@ -744,7 +759,7 @@ input[type="range"] {
   padding: 0;
   border: 0;
   background: transparent;
-  accent-color: var(--accent-strong);
+  accent-color: var(--accent);
 }
 .noise-toggle {
   display: flex;
@@ -754,7 +769,7 @@ input[type="range"] {
 .noise-toggle input {
   width: auto;
   margin: 0;
-  accent-color: var(--accent-strong);
+  accent-color: var(--accent);
 }
 
 /* Palco da sala de voz */
@@ -795,7 +810,7 @@ input[type="range"] {
   padding: 0.15rem 0.35rem;
   background: var(--accent-strong);
   border-radius: 0.3rem;
-  color: white;
+  color: var(--on-primary);
 }
 .music-status {
   margin-left: auto;
@@ -1414,9 +1429,6 @@ input[type="range"] {
   resize: vertical;
   max-height: 12rem;
 }
-.composer textarea:focus-visible {
-  outline: none;
-}
 .delivery-confirmed {
   color: var(--faint);
   font-size: 0.75rem;
@@ -1636,17 +1648,21 @@ input[type="range"] {
   color: var(--secondary-text);
 }
 .channel.selected::before {
-  background: var(--gradient);
+  background: var(--indicator-gradient);
 }
 .control.join,
 .send {
   background: var(--gradient);
-  color: var(--on-primary);
+  color: var(--on-gradient);
+  border: 1px solid var(--control-border);
 }
 .control.join:hover,
 .send:hover {
-  background: var(--gradient);
-  filter: brightness(1.1);
+  background: var(--gradient-hover);
+}
+.control.join:active,
+.send:active {
+  background: var(--gradient-active);
 }
 .stage-empty {
   background: radial-gradient(
@@ -1943,12 +1959,12 @@ body:has(.compact) .demo-badge {
   background:
     radial-gradient(
       50% 60% at 22% 30%,
-      color-mix(in srgb, var(--primary) 26%, transparent),
+      color-mix(in srgb, var(--primary) 12%, transparent),
       transparent 70%
     ),
     radial-gradient(
       40% 50% at 85% 75%,
-      color-mix(in srgb, var(--secondary) 16%, transparent),
+      color-mix(in srgb, var(--secondary) 8%, transparent),
       transparent 70%
     ),
     #080916;
@@ -1975,7 +1991,8 @@ body:has(.compact) .demo-badge {
   transform: perspective(36rem) rotateX(62deg);
   transform-origin: bottom;
   mask-image: linear-gradient(to top, black 15%, transparent 95%);
-  opacity: 0.6;
+  /* Bound the decorative grid behind text; theme.ts includes this overlap. */
+  opacity: 0.1;
   pointer-events: none;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -2011,7 +2028,7 @@ body:has(.compact) .demo-badge {
   color: #f7f2ff;
 }
 .login-hero h1 span {
-  background: var(--gradient);
+  background: var(--text-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -2073,20 +2090,23 @@ body:has(.compact) .demo-badge {
 }
 .login-card input:focus-visible {
   border-color: var(--accent);
-  outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
-  outline-offset: 0;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 .login-card .primary {
   margin-top: 0.4rem;
   padding: 0.95rem;
-  border: 0;
+  border: 1px solid var(--control-border);
   background: var(--gradient);
-  color: var(--on-primary);
+  color: var(--on-gradient);
   font-size: 1rem;
   box-shadow: 0 10px 30px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 .login-card .primary:hover {
-  filter: brightness(1.1);
+  background: var(--gradient-hover);
+}
+.login-card .primary:active {
+  background: var(--gradient-active);
 }
 .login-help {
   margin: 1.6rem 0 0;
@@ -2550,4 +2570,12 @@ kbd {
   background: var(--panel, #24283d);
   color: var(--text, #fff);
   border-bottom: 1px solid currentColor;
+}
+
+/* Two-tone focus remains visible on light fills and dark/gradient surfaces.
+   Keep after component shadows so their glow cannot replace the opaque gap. */
+:root :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--focus-gap);
 }
