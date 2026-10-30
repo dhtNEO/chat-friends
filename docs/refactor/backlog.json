@@ -131,18 +131,24 @@
       "dias_pessoa": "2–4",
       "dependencias": "T03 T04",
       "evidencias": "E07",
-      "status": "in_progress",
+      "status": "in_review",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
       "validated_sha": "3b986830ece4ff31063c612f18413c658bbda64b",
       "evidence": [
-        "docs/refactor/executions/T05.md"
+        "docs/refactor/executions/T05.md",
+        "docs/refactor/measurements/T05-baseline.json",
+        "docs/refactor/measurements/T05-bounded.json",
+        "https://github.com/dhtNEO/chat-friends/commit/68814f80850bc990fcd5101782ad11162387f2f7"
       ],
       "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → in_progress; sem owner anterior. T03/T04 concluídas, branch codex/t05-chat-history derivada de refactor 3b98683; sem alterações locais rastreadas, work/ anterior preservado.",
-        "Revalidação: older() faz merge sem âncora/cursor visual, loading/error/end ou trava de duplicidade. ChatView renderiza messages inteira em role=log live; efeito por tamanho só usa browsingHistory, sem contador/Ir para recentes. Medir 10000 antes de escolher janela/virtualização."
+        "Revalidação: older() faz merge sem âncora/cursor visual, loading/error/end ou trava de duplicidade. ChatView renderiza messages inteira em role=log live; efeito por tamanho só usa browsingHistory, sem contador/Ir para recentes. Medir 10000 antes de escolher janela/virtualização.",
+        "2026-10-30: in_progress → in_review. Medição anterior com 10000 renderizadas/80528ms motivou janela explícita de 200 em blocos de 50; amostra final 200 renderizadas/10135ms. Âncora ID/deslocamento, paginação com trava, seleção, contador e regiões assistivas separadas implementados no código 68814f8.",
+        "11 casos T05 passaram. Rodada T02–T05 teve 72 passes e 1 corrida de relógio na fixture T03; caso 100/falha/201 passou após controle determinístico da fase de falha, sem remover asserções. 8 streams demo e 117 backend passaram; npm ci/lint/build/validate.py/diff --check aprovados. Check padrão interrompido por settings Maven vazio; equivalente com proxy/CA passou em friends_test.",
+        "Contrato ARIA/árvore acessível e fonte tardia sob CSP estrita verificados; sem sessão auditiva com leitor real. Critério assistivo real e revisão/CI pendentes; próximo passo: revisar PR T05, conferir CI e confirmar com leitor real antes de done. Resultados/limites em executions/T05.md."
       ]
     },
     {
