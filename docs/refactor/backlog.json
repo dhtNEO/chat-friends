@@ -100,18 +100,22 @@
       "dias_pessoa": "2–4",
       "dependencias": "T02 T03",
       "evidencias": "E06",
-      "status": "in_progress",
+      "status": "in_review",
       "owner": "Codex",
       "updated_at": "2026-10-30",
       "validation": "confirmed",
       "validated_sha": "b8f52e7adb3159220f25ad552cca15bb047ad91d",
       "evidence": [
-        "docs/refactor/executions/T04.md"
+        "docs/refactor/executions/T04.md",
+        "https://github.com/dhtNEO/chat-friends/commit/c6067c235bce6cf3941ce00b5b318766deb02445"
       ],
       "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → in_progress, sem owner anterior; T02/T03 concluídas com aceite explícito. Branch codex/t04-chat-delivery derivada de refactor b8f52e7, sem mudanças locais rastreadas; work/ anterior preservado.",
-        "Revalidação atual: pending guarda apenas clientId/body; retry sempre aparece durante POST e ws.onopen reenvia toda a fila. ChatView guarda body local, usa input e insert(emoji) não verifica limite. Falhas apenas chamam onError. T04 não resolvida."
+        "Revalidação atual: pending guarda apenas clientId/body; retry sempre aparece durante POST e ws.onopen reenvia toda a fila. ChatView guarda body local, usa input e insert(emoji) não verifica limite. Falhas apenas chamam onError. T04 não resolvida.",
+        "2026-10-30: in_progress → in_review. Máquina de estados, UUID estável, retry explícito/Retry-After, rejeições sem reenvio, rascunho em memória por conta/canal e composer multiline/IME/UTF-16 implementados. Código c6067c2.",
+        "17 casos T04 verificados, 8 streams demo e 117 backend passaram; npm ci/lint/build, validate.py e diff --check aprovados. Rodada T02/T03/T04 teve 60 passes e um timeout ao carregar login; o caso passou isoladamente sem alteração. Não declarar rodada inteira verde.",
+        "check.sh interrompido por settings Maven vazio no ambiente; backend reexecutado com settings/proxy/CA explícitos em friends_test. Resultados/limites em executions/T04.md. Próximo passo: revisar PR T04 e conferir CI; aceite humano T04 pendente, não marcar done."
       ]
     },
     {
