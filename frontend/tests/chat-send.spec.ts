@@ -80,7 +80,7 @@ async function setup(
     sockets.push(socket);
     socket.onMessage(() => socket.send(JSON.stringify({ type: "pong" })));
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await expect(page.getByLabel("Mensagem em geral")).toBeVisible();
   await expect(page.locator(".connection")).toContainText("Atualizado");
   return {

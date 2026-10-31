@@ -42,7 +42,7 @@ test("demo abre a nova interface e indica que MFA exige aplicação conectada", 
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto(origin);
+  await page.goto(origin + "/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("demo");
   await page.getByLabel("Senha", { exact: true }).fill("demo-only-password");
   await page.getByRole("button", { name: "Entrar no espaço" }).click();
@@ -73,7 +73,7 @@ test("voz, preferências e atalhos convivem com a transmissão reorganizada", as
   page,
 }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto(origin);
+  await page.goto(origin + "/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("demo-voz");
   await page.getByLabel("Senha", { exact: true }).fill("demo-only-password");
   await page.getByRole("button", { name: /Entrar no espaço/ }).click();
@@ -231,7 +231,7 @@ test("sair da voz e fazer logout encerram os contextos de áudio", async ({
       }
     };
   });
-  await page.goto(origin);
+  await page.goto(origin + "/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("demo-cleanup");
   await page.getByLabel("Senha", { exact: true }).fill("demo-only-password");
   await page.getByRole("button", { name: /Entrar no espaço/ }).click();

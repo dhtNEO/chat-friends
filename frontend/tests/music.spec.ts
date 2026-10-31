@@ -7,7 +7,7 @@ test.skip(
 );
 
 async function signIn(page: Page) {
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("amigo-musica");
   await page.getByLabel("Senha", { exact: true }).fill("demo-musica");
   await page.getByRole("button", { name: "Entrar no espaço" }).click();

@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 test.skip(!process.env.ROOM_LAYOUT_DEMO_TEST, "Exige npm run demo e ROOM_LAYOUT_DEMO_TEST=1.");
 
 async function enter(page: Page) {
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("demo-paineis");
   await page.getByLabel("Senha", { exact: true }).fill("demo-only-password");
   await page.getByRole("button", { name: /Entrar no espaço/ }).click();

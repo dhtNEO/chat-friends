@@ -1,0 +1,212 @@
+.simple-shell {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: 10.5rem minmax(0, 1fr);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+.simple-shell[hidden],
+.simple-panel[hidden] {
+  display: none;
+}
+.destination-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 0.5rem;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+  background: var(--surface);
+}
+.destination-nav > .logo {
+  margin: 0.5rem auto 1.5rem;
+}
+.destination-nav a,
+.destination-nav button {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.7rem;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.destination-nav [aria-current="page"] {
+  background: var(--accent-soft);
+  border-color: var(--control-border);
+  color: var(--accent);
+}
+.destination-nav a:hover,
+.destination-nav button:hover {
+  background: var(--surface-3);
+}
+.simple-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.simple-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+}
+.simple-header h1 {
+  font-size: 1.15rem;
+  margin: 0;
+}
+.simple-panels {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+.simple-panels.with-aux {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 40%);
+}
+.simple-panel {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  grid-column: 1;
+  grid-row: 1;
+}
+.simple-panel.auxiliary {
+  grid-column: 2;
+  border-left: 1px solid var(--line);
+}
+.simple-stage-frame {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.simple-stage-frame > .slot {
+  height: 100%;
+}
+.simple-panel > .chat {
+  height: 100%;
+}
+.simple-miniplayer:empty {
+  display: none;
+}
+.simple-mini-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.simple-mini-controls strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.simple-mini-controls button {
+  min-height: 44px;
+}
+.simple-more-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+.simple-shell dialog.drawer {
+  position: fixed;
+  inset: 0 auto auto 0;
+  margin: 0;
+  padding: 0;
+  width: min(22rem, calc(100% - 1rem));
+  max-width: calc(100% - 1rem);
+  height: 100%;
+  max-height: 100%;
+  border: 0;
+  color: var(--text);
+  background: var(--surface-2);
+}
+.simple-shell dialog.drawer[open] {
+  display: flex;
+  flex-direction: column;
+}
+.simple-shell dialog.drawer::backdrop {
+  background: #0009;
+}
+.simple-shell .drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem;
+  flex-shrink: 0;
+}
+.simple-shell .drawer-header h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+.simple-shell .drawer-content {
+  min-height: 0;
+  overflow: auto;
+}
+@media (max-width: 1023px) {
+  .simple-shell {
+    grid-template-columns: 8rem minmax(0, 1fr);
+  }
+}
+@media (max-width: 599px) {
+  .simple-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .destination-nav {
+    grid-row: 2;
+    flex-direction: row;
+    gap: 0;
+    padding: 0.25rem 0.1rem max(0.25rem, env(safe-area-inset-bottom));
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+  .destination-nav > .logo {
+    display: none;
+  }
+  .destination-nav a,
+  .destination-nav button {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.4rem 0.1rem;
+    font-size: 0.78rem;
+  }
+  .simple-body {
+    grid-row: 1;
+  }
+  .simple-header {
+    padding: 0.5rem 0.75rem;
+  }
+  .simple-miniplayer strong {
+    font-size: 0.85rem;
+  }
+}
+.app-shell[hidden] {
+  display: none;
+}
+.destination-nav span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+}

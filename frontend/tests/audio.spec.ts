@@ -84,7 +84,7 @@ test.beforeAll(async ({ request }) => {
 async function signIn(page: Page, username: string) {
   const password = process.env.TEST_ADMIN_PASSWORD;
   if (!password) throw new Error("TEST_ADMIN_PASSWORD obrigatório");
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill(username);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar no espaço" }).click();

@@ -50,7 +50,7 @@ test("autenticador, recuperação e revogação da própria sessão pela interfa
       })
     ).status(),
   ).toBe(200);
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill(username);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar no espaço" }).click();

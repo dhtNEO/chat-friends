@@ -208,7 +208,8 @@
       "blocked_reason": null,
       "notes": [
         "2026-10-30: planned → in_progress; sem dependências e sem owner anterior. Base refactor afb09ab, branch codex/t07-theme-contrast; nenhuma alteração rastreada local, work/ preservado. Revalidação: textOn ainda usa luminância >0,4; hover e gradiente reutilizam foreground da primária sem contrastar seus fundos; valores restaurados não são validados em applyTheme.",
-        "in_progress → in_review. Código 875cbee: tokens contrastados independentes para sólido/gradiente/hover/active/texto/indicador/foco, hex validado, preferência original preservada; preview/salvar/cancelar verificados. 3 testes matemáticos (156 pares), 46 regressões UI (15 T07, 31 drawer/demo/sala/streams) e 117 backend aprovados; npm ci/lint/build, validate e diff-check aprovados. Check padrão limitado por settings Maven local vazio; equivalente backend e frontend verificados. Revisão/CI pendentes, sem done; escopo e limites em executions/T07.md."
+        "in_progress → in_review. Código 875cbee: tokens contrastados independentes para sólido/gradiente/hover/active/texto/indicador/foco, hex validado, preferência original preservada; preview/salvar/cancelar verificados. 3 testes matemáticos (156 pares), 46 regressões UI (15 T07, 31 drawer/demo/sala/streams) e 117 backend aprovados; npm ci/lint/build, validate e diff-check aprovados. Check padrão limitado por settings Maven local vazio; equivalente backend e frontend verificados. Revisão/CI pendentes, sem done; escopo e limites em executions/T07.md.",
+        "2026-10-30: usuário informou merge; PR #36 integrado em babba756 confirmado. Aceite/integração não estabelece por si resultado de CI não consultado nesta execução."
       ]
     },
     {
@@ -218,16 +219,29 @@
       "titulo": "Criar navegação adaptativa e shell simplificado",
       "responsavel": "Design/Frontend",
       "dias_pessoa": "4–7",
-      "dependencias": "T01 T06 T09",
+      "dependencias": "—",
       "evidencias": "E02 E14",
-      "status": "planned",
-      "owner": null,
+      "status": "in_review",
+      "owner": "Codex",
       "updated_at": "2026-10-30",
-      "validation": "pending",
-      "validated_sha": null,
-      "evidence": [],
+      "validation": "confirmed",
+      "validated_sha": "babba75696ffb8e6c20e0e03ab3c740918b9084f",
+      "evidence": [
+        "docs/refactor/executions/T08.md",
+        "docs/refactor/preparations/T08-navegacao.md",
+        "https://github.com/dhtNEO/chat-friends/commit/8dc93ca572b975c2a50ac31ecc1a8dfb92424aa3",
+        "https://github.com/dhtNEO/chat-friends/pull/37",
+        "docs/refactor/DECISIONS.md#d008--liberação-e-contrato-de-navegação-t08-30102026",
+        "https://github.com/dhtNEO/chat-friends/commit/4b1b00c1e6e0bb4c75cd9e84bb269f6956a1e0ea"
+      ],
       "blocked_reason": null,
-      "notes": []
+      "notes": [
+        "2026-10-30: owner Codex reservado para preparativos independentes e bloqueio registrado antes de qualquer implementação. Base refactor babba756; branch codex/t08-preparacao; nenhuma alteração rastreada local, work/ preservado. Não entrar em in_progress/in_review de implementação com dependências abertas (validate.py/WORKFLOW).",
+        "Revalidação atual: Dockview é o shell padrão, compactQuery usa 900 px, storage layout:v4:compact/wide; não há roteamento hash/popstate/pushState em src. Voice e hosts de mídia estão fora dos painéis de destino; preservar identidade dos objetos durante navegação/resize. Destinos Conversa/Sala/Jogos/Agenda foram indicados pelo usuário, sem alegar resultados de pesquisa T01 ou entrega T09.",
+        "Próximo passo: concluir dependências ou registrar decisão explícita de dispensa para T08, mantendo pendências reais. Proposta revisável de URL/migração/identidade e matriz de testes em preparations/T08-navegacao.md; nenhuma feature dependente implementada nem teste funcional novo declarado.",
+        "2026-10-30: blocked → in_progress por autorização explícita do usuário após explicar dependências. D008 dispensa T01/T06/T09 como bloqueio exclusivo da T08, sem concluir essas tarefas; usar navegação pedida e componentes atuais. Revalidação babba756 permanece válida; work/ preservado.",
+        "in_progress → in_review: shell simples implementado em 4b1b00c, D008 autoriza dispensa específica; 57 testes demo/layout/navegação/mídia/contraste + 49 sessão/chat e 117 backend aprovados, npm ci/lint/build, validate e diff-check aprovados. v4 preservado, mesmos proprietários de mídia, URL/Voltar e miniplayer verificados. Check padrão limitado por settings Maven do ambiente; equivalente aprovado. Teclado virtual real, zoom via interface de dispositivo, revisão e CI pendentes; não done. PR #37 passa de preparação a implementação; execução registra limites/ocorrências sem inventar pesquisa/aceite."
+      ]
     },
     {
       "id": "T09",

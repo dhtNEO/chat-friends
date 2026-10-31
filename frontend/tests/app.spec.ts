@@ -6,7 +6,7 @@ async function signIn(page: import("@playwright/test").Page) {
     throw new Error("TEST_ADMIN_PASSWORD obrigatório; nenhuma senha padrão");
   if (cookies.length) await page.context().addCookies(cookies);
   const response = await page.request.get("/api/me");
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   if (response.status() !== 200) {
     await page
       .getByLabel("Usuário", { exact: true })
@@ -47,7 +47,7 @@ test("admin cria conta, recebe mensagem em tempo real e desativa sessão", async
   await expect(page.getByText("Conta criada.", { exact: false })).toBeVisible();
   const context = await browser.newContext();
   const friend = await context.newPage();
-  await friend.goto("/");
+  await friend.goto("/?shell=advanced");
   await friend.getByLabel("Usuário", { exact: true }).fill(username);
   await friend.getByLabel("Senha", { exact: true }).fill(friendPassword);
   await friend.getByRole("button", { name: "Entrar no espaço" }).click();

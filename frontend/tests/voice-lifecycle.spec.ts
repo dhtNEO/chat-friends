@@ -84,7 +84,7 @@ test("logout encerra captura pendente antes de terminar o download do RNNoise", 
     await route.continue().catch(() => {});
   });
   try {
-    await page.goto("/");
+    await page.goto("/?shell=advanced");
     await page.getByLabel("Usuário", { exact: true }).fill(username);
     await page.getByLabel("Senha", { exact: true }).fill(password);
     await page.getByRole("button", { name: /Entrar no espaço/ }).click();

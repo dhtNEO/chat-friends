@@ -73,7 +73,7 @@ async function chatPage(page: Page) {
     sockets.push(socket);
     socket.onMessage(() => socket.send(JSON.stringify({ type: "pong" })));
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await expect.poll(() => errors).toEqual([]);
   await expect(
     page.getByText(message(100).body, { exact: true }),
@@ -179,7 +179,7 @@ test("UI conecta/sincroniza e logout cancela HTTP, timers e handlers antigos", a
     if (path === "/api/members") return route.fulfill({ json: [] });
     return route.fulfill({ status: 404 });
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await expect(page.locator(".connection")).toContainText("Conectando…");
   await page.evaluate(`(() => {
     const ws = window.chatSockets.at(-1);

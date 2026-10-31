@@ -43,7 +43,7 @@ async function loginForm(
   await page.routeWebSocket("**/ws", (socket) => {
     socket.onMessage(() => undefined);
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill(username);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: /Entrar no espaço/ }).click();
@@ -328,7 +328,7 @@ async function sessionPage(page: Page, onMe: (route: Route) => Promise<void>) {
     profileChanged = () => socket.send(JSON.stringify({ type: "profile" }));
     socket.onMessage(() => undefined);
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   return () => profileChanged();
 }
 

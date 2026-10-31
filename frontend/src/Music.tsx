@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "./api";
 
 export const MUSIC_IDENTITY = "music-bot";
@@ -23,10 +24,12 @@ function duration(seconds: number | null) {
   return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 }
 export function Music({
+  miniHost,
   identity,
   volume,
   onVolume,
 }: {
+  miniHost?: HTMLElement | null;
   identity: string | undefined;
   volume: number;
   onVolume: (value: number) => void;
@@ -108,7 +111,7 @@ export function Music({
       setBusy(false);
     }
   }
-  return (
+  const panel = (
     <section className="music-panel" aria-label="Bot de música">
       <header className="music-header">
         <strong>♫ Bot de música</strong>
@@ -258,5 +261,37 @@ export function Music({
         Todos ouvem a mesma música. Vídeos de até 20 minutos; até 30 na fila.
       </p>
     </section>
+  );
+  return (
+    <>
+      {panel}
+      {miniHost &&
+        createPortal(
+          <div
+            className="simple-mini-controls"
+            aria-label="Miniplayer de música"
+          >
+            <strong>{state.current?.title ?? "Música da Sala"}</strong>
+            <button
+              disabled={
+                disabled || !state.current || state.status === "loading"
+              }
+              aria-label={
+                state.status === "paused"
+                  ? "Continuar música no miniplayer"
+                  : "Pausar música no miniplayer"
+              }
+              onClick={() =>
+                void change("/music/control", {
+                  action: state.status === "paused" ? "resume" : "pause",
+                })
+              }
+            >
+              {state.status === "paused" ? "Continuar" : "Pausar"}
+            </button>
+          </div>,
+          miniHost,
+        )}
+    </>
   );
 }
