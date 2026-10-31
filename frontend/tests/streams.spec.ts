@@ -13,7 +13,7 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await page.goto("/");
+    await page.goto("/?shell=advanced");
     await page.getByLabel("Usuário", { exact: true }).fill("admin");
     await page.getByLabel("Senha", { exact: true }).fill("demo-streams");
     await page.getByRole("button", { name: "Entrar no espaço" }).click();
@@ -85,7 +85,7 @@ test("publica terceira tela e para sem interromper as duas remotas", async ({
       return canvas.captureStream(10);
     };
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("admin");
   await page.getByLabel("Senha", { exact: true }).fill("demo-streams");
   await page.getByRole("button", { name: "Entrar no espaço" }).click();
@@ -143,7 +143,7 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await page.goto("/");
+    await page.goto("/?shell=advanced");
     await page.getByLabel("Usuário", { exact: true }).fill("admin");
     await page.getByLabel("Senha", { exact: true }).fill("demo-streams");
     await page.getByRole("button", { name: "Entrar no espaço" }).click();
@@ -321,7 +321,7 @@ for (const viewport of [
 }
 
 async function spectator(page: Page, username: string) {
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await expect(page.getByLabel("Usuário", { exact: true })).toBeVisible();
   // Give the UI an ordinary account and count attempts to publish a screen.
   await page.evaluate(`(() => {
@@ -484,7 +484,7 @@ test("401 encerra sessão, captura local e sala de mídia", async ({ page }) => 
       return stream;
     };
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("admin");
   await page.getByLabel("Senha", { exact: true }).fill("demo-streams");
   await page.getByRole("button", { name: "Entrar no espaço" }).click();

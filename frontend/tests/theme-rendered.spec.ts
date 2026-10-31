@@ -40,7 +40,7 @@ test.beforeAll(async ({ request }) => {
 });
 test.afterAll(() => server?.kill());
 test.beforeEach(async ({ page }) => {
-  await page.goto(origin);
+  await page.goto(origin + "/?shell=advanced");
   await expect(page.getByLabel("Usuário", { exact: true })).toBeVisible();
   await page.addStyleTag({
     content:

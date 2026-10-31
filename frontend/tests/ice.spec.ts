@@ -158,7 +158,7 @@ test("portas Docker de mídia respondem ao ICE autenticado por UDP e TCP", async
       }
     };
   });
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByRole("button", { name: "Entrar na voz" }).click();
   try {
     await expect(page.getByText("Voz conectada", { exact: true })).toBeVisible({

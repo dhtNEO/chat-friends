@@ -6,6 +6,7 @@ import { usePopout } from "./Popout";
 export type MediaPanel = "stream" | "music";
 
 export function DetachedMedia({
+  allowDock = true,
   kind,
   home,
   dock,
@@ -15,6 +16,7 @@ export function DetachedMedia({
   onDetachedChange,
   children,
 }: {
+  allowDock?: boolean;
   kind: MediaPanel;
   home: HTMLElement | null;
   dock: HTMLElement | null;
@@ -75,7 +77,7 @@ export function DetachedMedia({
         <section className="detached-media" aria-label={`Área de ${label}`}>
           <header className="media-panel-tools">
             <strong>{title}</strong>
-            {!dock && !popup.win && (
+            {allowDock && !dock && !popup.win && (
               <button onClick={onSeparate}>
                 <Icon name="split" size={15} /> Separar {label}
               </button>

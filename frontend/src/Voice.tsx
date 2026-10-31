@@ -66,6 +66,7 @@ function mediaError(e: unknown) {
           : "Falha na conexão de voz. Confira a rede e tente novamente.";
 }
 export function Voice({
+  allowDock = true,
   admin,
   userId,
   hosts,
@@ -80,11 +81,13 @@ export function Voice({
   onMaximizeStream,
   onError,
 }: {
+  allowDock?: boolean;
   admin: boolean;
   userId: string;
   // Panels may be closed or moved; the call lives here and keeps playing.
   hosts: {
     stage: HTMLElement | null;
+    miniPlayer?: HTMLElement | null;
     stream: HTMLElement | null;
     music: HTMLElement | null;
     roster: HTMLElement | null;
@@ -1053,6 +1056,7 @@ export function Voice({
     );
   const musicContent = (
     <Music
+      miniHost={hosts.miniPlayer}
       identity={joined ? self : undefined}
       volume={settings.music}
       onVolume={(music) => setSettings((old) => ({ ...old, music }))}
@@ -1380,6 +1384,7 @@ export function Voice({
     <>
       {hosts.stage && createPortal(stage, hosts.stage)}
       <DetachedMedia
+        allowDock={allowDock}
         kind="stream"
         onDetachedChange={setStreamDetached}
         home={screenHome}
@@ -1391,6 +1396,7 @@ export function Voice({
         {screenContent}
       </DetachedMedia>
       <DetachedMedia
+        allowDock={allowDock}
         kind="music"
         onDetachedChange={setMusicDetached}
         home={musicHome}

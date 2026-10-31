@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -40,6 +41,8 @@ import { Outlook } from "./Outlook";
 import { ChatComposer, limitMessage } from "./ChatComposer";
 import { createChatOutbox, deliveryLabel, type Delivery } from "./ChatOutbox";
 import { Voice } from "./Voice";
+import { SimpleShell } from "./SimpleShell";
+import { DESTINATIONS, useNavigation } from "./navigation";
 import { MobileDrawer } from "./MobileDrawer";
 import { useChatHistory, type HistoryPageState } from "./useChatHistory";
 import { Icon, type IconName } from "./Icon";
@@ -319,6 +322,18 @@ function Workspace({
   onLogout: (notice?: string) => void;
 }) {
   useKeyboardShortcuts();
+  const navigation = useNavigation(me.user.id);
+  const advancedRef = useRef(navigation.advanced);
+  advancedRef.current = navigation.advanced;
+  const [simpleExtra, setSimpleExtra] = useState<PanelKind | null>(null);
+  useEffect(() => setSimpleExtra(null), [navigation.destination]);
+  const [miniHost, setMiniHost] = useState<HTMLDivElement | null>(null);
+  const [stageHost] = useState(() => {
+    const el = document.createElement("div");
+    el.className = "slot";
+    return el;
+  });
+  const stageParking = useRef<HTMLDivElement>(null);
   // A person's shortcuts load with their session and never outlive it.
   useEffect(() => {
     void loadShortcuts().catch(() => {});
@@ -374,34 +389,37 @@ function Workspace({
     setDrafts(draftMemory.current);
   }
   const hosts = useRef(new Map<string, { el: HTMLElement; frames: number }>());
-  const attach = useCallback((id: string) => {
-    let host = hosts.current.get(id);
-    if (!host) {
-      const el = document.createElement("div");
-      el.className = "slot";
-      host = { el, frames: 0 };
-      hosts.current.set(id, host);
-    }
-    const current = host;
-    current.frames++;
-    setSlots((old) =>
-      old[id] === current.el ? old : { ...old, [id]: current.el },
-    );
-    const detach = () => {
-      current.frames--;
-      // Dockview may remount a panel right away; only drop truly closed ones.
-      setTimeout(() => {
-        if (current.frames || hosts.current.get(id) !== current) return;
-        hosts.current.delete(id);
-        setSlots((old) => {
-          const next = { ...old };
-          delete next[id];
-          return next;
+  const attach = useCallback(
+    (id: string) => {
+      let host = hosts.current.get(id);
+      if (!host) {
+        const el = id === "voice" ? stageHost : document.createElement("div");
+        el.className = "slot";
+        host = { el, frames: 0 };
+        hosts.current.set(id, host);
+      }
+      const current = host;
+      current.frames++;
+      setSlots((old) =>
+        old[id] === current.el ? old : { ...old, [id]: current.el },
+      );
+      const detach = () => {
+        current.frames--;
+        // Dockview may remount a panel right away; only drop truly closed ones.
+        setTimeout(() => {
+          if (current.frames || hosts.current.get(id) !== current) return;
+          hosts.current.delete(id);
+          setSlots((old) => {
+            const next = { ...old };
+            delete next[id];
+            return next;
+          });
         });
-      });
-    };
-    return { el: current.el, detach };
-  }, []);
+      };
+      return { el: current.el, detach };
+    },
+    [stageHost],
+  );
   const streaming = useRef(false);
   const ready = useCallback(
     (event: DockviewReadyEvent) => {
@@ -414,8 +432,10 @@ function Workspace({
     [me.user.admin],
   );
   useEffect(() => {
-    if (!dock) return;
-    const saving = dock.onDidLayoutChange(() => saveLayout(dock));
+    if (!dock || !navigation.advanced) return;
+    const saving = dock.onDidLayoutChange(() => {
+      if (advancedRef.current) saveLayout(dock);
+    });
     const maximized = dock.onDidMaximizedGroupChange(() => {
       setStageMaximized(!!dock.getPanel("voice")?.api.isMaximized());
       setStreamMaximized(!!dock.getPanel("stream")?.api.isMaximized());
@@ -432,7 +452,7 @@ function Workspace({
       maximized.dispose();
       media.removeEventListener("change", switchLayout);
     };
-  }, [dock]);
+  }, [dock, navigation.advanced]);
   const merge = useCallback(
     (items: Message[]) => {
       setMessages((old) =>
@@ -593,7 +613,44 @@ function Workspace({
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+  useLayoutEffect(() => {
+    if (navigation.advanced && !slots.voice && stageParking.current)
+      stageParking.current.appendChild(stageHost);
+  }, [navigation.advanced, slots.voice, stageHost]);
+  useEffect(() => {
+    if (navigation.advanced && dock) {
+      const kind = DESTINATIONS.find(
+        ([id]) => id === navigation.destination,
+      )![2];
+      openPanel(dock, kind);
+    }
+  }, [navigation.destination, navigation.advanced, dock]);
+  const switchMode = (advanced: boolean) => {
+    if (!advanced) {
+      if (dock) saveLayout(dock);
+      setDock(null);
+      setStageMaximized(false);
+      setStreamMaximized(false);
+    }
+    setDrawer(false);
+    setSimpleExtra(null);
+    navigation.setAdvanced(advanced);
+  };
   const open = (kind: PanelKind) => {
+    const destination = DESTINATIONS.find(([, , panel]) => panel === kind)?.[0];
+    if (destination) {
+      setSimpleExtra(null);
+      navigation.navigate(destination);
+    }
+    if (!navigation.advanced) {
+      if (
+        !destination &&
+        (kind === "stream" || kind === "music" || kind === "voice")
+      )
+        navigation.navigate("sala");
+      else if (!destination) setSimpleExtra(kind);
+      return;
+    }
     setDrawer(compact && kind === "nav");
     if (dock && !(compact && kind === "nav")) openPanel(dock, kind);
   };
@@ -722,7 +779,7 @@ function Workspace({
           onError={onError}
         />
       );
-    if (kind === "admin")
+    if (kind === "admin" && me.user.admin)
       return (
         <Settings
           panel={kind}
@@ -738,7 +795,30 @@ function Workspace({
   }
   return (
     <PeopleContext value={people}>
+      <SimpleShell
+        advanced={navigation.advanced}
+        destination={navigation.destination}
+        navigate={(d) => {
+          setSimpleExtra(null);
+          navigation.navigate(d);
+        }}
+        stageHost={stageHost}
+        render={content}
+        extra={simpleExtra}
+        onExtra={setSimpleExtra}
+        admin={me.user.admin}
+        onAdvanced={() => switchMode(true)}
+        onMiniHost={setMiniHost}
+        error={error}
+        onError={onError}
+        onLogout={() =>
+          void api("/logout", "POST")
+            .then(() => onLogout())
+            .catch((e) => onError(e.message))
+        }
+      />
       <div
+        hidden={!navigation.advanced}
         className={
           "app-shell" +
           (drawer ? " drawer-open" : "") +
@@ -757,6 +837,12 @@ function Workspace({
         )}
         <nav className="activity-bar" aria-label="Painéis">
           {!compact && <Logo size={34} />}
+          <ActivityButton
+            icon="menu"
+            label="Navegação simples"
+            title="Voltar à navegação simples"
+            onClick={() => switchMode(false)}
+          />
           <ActivityButton
             buttonRef={menuTrigger}
             expanded={compact ? drawer : undefined}
@@ -886,25 +972,30 @@ function Workspace({
             </div>
           )}
           <SlotContext value={attach}>
-            <DockviewReact
-              className="dock"
-              theme={theme}
-              components={{ slot: Slot }}
-              watermarkComponent={Empty}
-              onReady={ready}
-            />
+            {navigation.advanced && (
+              <DockviewReact
+                className="dock"
+                theme={theme}
+                components={{ slot: Slot }}
+                watermarkComponent={Empty}
+                onReady={ready}
+              />
+            )}
           </SlotContext>
         </div>
         {Object.entries(slots).map(([id, el]) =>
           createPortal(content(id), el, id),
         )}
+        <div hidden ref={stageParking} />
         <Voice
+          allowDock={navigation.advanced}
           key={me.user.id}
           userId={me.user.id}
           onIdentityChange={setVoiceIdentity}
           admin={me.user.admin}
           hosts={{
-            stage: slots.voice ?? null,
+            stage: stageHost,
+            miniPlayer: navigation.advanced ? null : miniHost,
             stream: slots.stream ?? null,
             music: slots.music ?? null,
             roster,

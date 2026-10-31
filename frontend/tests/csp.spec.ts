@@ -77,7 +77,7 @@ test("CSP prd permite validação HTTPS da mídia e bloqueia outro destino", asy
         headers: { "Access-Control-Allow-Origin": origin },
       });
     });
-    await page.goto(origin);
+    await page.goto(origin + "/?shell=advanced");
     const result = await page.evaluate(async (url) => {
       const violations: string[] = [];
       document.addEventListener("securitypolicyviolation", (event) => {

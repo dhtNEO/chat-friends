@@ -32,7 +32,7 @@ test.beforeAll(async ({ request }) => {
 });
 test.afterAll(() => server?.kill());
 async function enter(page: import("@playwright/test").Page) {
-  await page.goto(origin);
+  await page.goto(origin + "/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("jogador");
   await page.getByLabel("Senha", { exact: true }).fill("demo-only-password");
   await page.getByRole("button", { name: "Entrar no espaço" }).click();

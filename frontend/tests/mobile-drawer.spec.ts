@@ -43,7 +43,7 @@ test.afterEach(({ page }) => expect(failures.get(page)).toEqual([]));
 
 async function signIn(page: Page, viewport = { width: 320, height: 568 }) {
   await page.setViewportSize(viewport);
-  await page.goto(origin);
+  await page.goto(origin + "/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("drawer-test");
   await page.getByLabel("Senha", { exact: true }).fill("demo-only-password");
   await page.getByRole("button", { name: /Entrar no espaço/ }).click();

@@ -20,7 +20,7 @@ const prefix = "chat-friends:room-layout:v1:me:";
 const block = (page: Page, id: string) =>
   page.locator(`.room-block[data-reorder-id="${id}"]`);
 async function signIn(page: Page, join = true) {
-  await page.goto("/");
+  await page.goto("/?shell=advanced");
   await page.getByLabel("Usuário", { exact: true }).fill("amigo-layout");
   await page.getByLabel("Senha", { exact: true }).fill("layout-demo-only");
   await page.getByRole("button", { name: /Entrar no espaço/ }).click();
