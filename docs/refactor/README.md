@@ -28,7 +28,7 @@ F0: baseline, garantias de mídia e dependências (T01/T21/T24). F1: sessão/cha
 | [T05](specs/T05.md) | Preservar posição do histórico e destacar novas mensagens | P2 | T03 T04 |
 | [T06](specs/T06.md) | Corrigir foco e fechamento do menu mobile | P1 | — |
 | [T07](specs/T07.md) | Garantir contraste nas cores personalizadas | P1 | — |
-| [T08](specs/T08.md) | Criar navegação adaptativa e shell simplificado | P1 | T01 T06 T09 |
+| [T08](specs/T08.md) | Criar navegação adaptativa e shell simplificado | P1 | — (D008) |
 | [T09](specs/T09.md) | Definir sistema visual e componentes compartilhados | P1 | T01 T07 |
 | [T10](specs/T10.md) | Reorganizar entrada na voz e controles persistentes | P1 | T02 T08 T09 |
 | [T11](specs/T11.md) | Projetar transmissão, layouts prontos e janelas externas | P1 | T08 T10 |

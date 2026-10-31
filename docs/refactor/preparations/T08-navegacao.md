@@ -1,6 +1,6 @@
 # T08 — proposta técnica independente
 
-Levantamento na base babba756; **não implementado**. Estado/owner somente no [backlog](../backlog.json). Abertura das dependências impede começar o shell; este documento deixa contratos concretos para revisão e execução posterior. Não é resultado de teste com usuários.
+Levantamento original na base babba756; proposta usada na implementação autorizada pela D008. Estado/owner somente no [backlog](../backlog.json). A dispensa específica está na D008; consultar a spec e a execução para o contrato final e evidências. Este documento preserva a proposta original. Não é resultado de teste com usuários.
 
 ## Destinos e URL
 
@@ -39,4 +39,4 @@ Antes de integrar, observar identidade de Room/conexão, elementos video/audio, 
 | Mídia | Identidade dos objetos e ausência de reconexão/republish em todos os destinos, resize, histórico e modos; três lives com seleção individual/grade |
 | Sessão | Logout/expiração cancela recursos; hash não concede acesso nem reabre chamada |
 
-Estender fixtures/testes existentes; não simular teclado virtual real ou aprovação assistiva apenas redimensionando viewport. Não executar nem declarar resultados dessa matriz antes da implementação.
+Estender fixtures/testes existentes; não simular teclado virtual real ou aprovação assistiva apenas redimensionando viewport. Resultados efetivamente executados após a liberação constam na execução T08; não presumir execução de todos os checks externos desta matriz.

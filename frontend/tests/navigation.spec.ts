@@ -155,10 +155,17 @@ test("v4 intacto no simples, opt-in reversível e identidade de mídia", async (
   await login(page);
   await page.evaluate(`(async()=>{
     const {setLease,identityOf}=await import('/src/demo/world.ts');setLease(identityOf('vgeralt'));
-    const {Room}=await import('/src/demo/livekit.ts');
+    const {Room,RoomEvent,Track}=await import('/src/demo/livekit.ts');
     window.t08Sdk={connections:0,disconnects:0,room:null};
     const connect=Room.prototype.connect,disconnect=Room.prototype.disconnect;
-    Room.prototype.connect=async function(...args){window.t08Sdk.room=this;window.t08Sdk.connections++;return connect.apply(this,args);};
+    Room.prototype.connect=async function(...args){
+      window.t08Sdk.room=this;window.t08Sdk.connections++;await connect.apply(this,args);
+      for(const participant of this.remoteParticipants.values()) {
+        const sid='screen-audio-'+participant.identity;
+        participant.audioTrackPublications.set(sid,{source:Track.Source.ScreenShareAudio,track:{sid,element:null,attach(element){this.element=element;return element;},detach(){this.element=null;},setVolume(volume){this.element.dataset.appliedVolume=String(volume);}}});
+      }
+      this.emit(RoomEvent.TrackSubscribed);
+    };
     Room.prototype.disconnect=function(...args){window.t08Sdk.disconnects++;return disconnect.apply(this,args);};
   })()`);
   await nav(page).getByRole("link", { name: "Sala", exact: true }).click();
@@ -182,6 +189,9 @@ test("v4 intacto no simples, opt-in reversível e identidade de mídia", async (
     .getByRole("button", { name: "Assistir todas", exact: true })
     .click();
   await expect(page.locator(".screen video")).toHaveCount(3);
+  await expect
+    .poll(() => page.locator("audio").count())
+    .toBeGreaterThanOrEqual(3);
   await page.evaluate(() => {
     const video =
       document.querySelector<HTMLVideoElement>(".room-block video")!;
@@ -245,7 +255,11 @@ test("v4 intacto no simples, opt-in reversível e identidade de mídia", async (
             el.srcObject === stream &&
             tracks.every((track) => track.readyState === "live"),
         ) &&
-        s.audio.every((el) => el.isConnected) &&
+        s.audio.length === document.querySelectorAll("audio").length &&
+        s.audio.every(
+          (el, index) =>
+            el.isConnected && el === document.querySelectorAll("audio")[index],
+        ) &&
         document.querySelector(".music-panel") === s.music &&
         s.hosts.every((el) => el.isConnected) &&
         s.joins === 0 &&
