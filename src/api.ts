@@ -11,9 +11,31 @@ export class ApiError extends Error {
   }
 }
 
+export type FetchFn = typeof window.fetch;
+let currentFetch: FetchFn = (input, init) => window.fetch(input, init);
+
+export function setCustomFetch(fn: FetchFn) {
+  currentFetch = fn;
+}
+
+export function customFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return currentFetch(input, init);
+}
+
+export type WebSocketCreator = (url: string) => WebSocket;
+let currentWebSocketCreator: WebSocketCreator = (url: string) => new window.WebSocket(url);
+
+export function setWebSocketCreator(creator: WebSocketCreator) {
+  currentWebSocketCreator = creator;
+}
+
+export function createWebSocket(url: string): WebSocket {
+  return currentWebSocketCreator(url);
+}
+
 async function authenticationFetch(path: string, options?: RequestInit) {
   try {
-    return await fetch(path, options);
+    return await customFetch(path, options);
   } catch {
     throw new Error(
       "Não foi possível acessar o servidor. Confira sua conexão e tente novamente.",
@@ -40,7 +62,7 @@ export async function api<T = void>(
   body?: unknown,
 ): Promise<T> {
   if (method !== "GET" && !csrf) await refreshCsrf();
-  const r = await fetch("/api" + path, {
+  const r = await customFetch("/api" + path, {
     method,
     keepalive: path === "/media/leave",
     headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf },
@@ -73,7 +95,7 @@ export async function api<T = void>(
 // Raw upload (avatars): same CSRF and error handling as api().
 export async function upload<T>(path: string, blob: Blob): Promise<T> {
   if (!csrf) await refreshCsrf();
-  const r = await fetch("/api" + path, {
+  const r = await customFetch("/api" + path, {
     method: "POST",
     headers: { "Content-Type": blob.type, "X-CSRF-TOKEN": csrf },
     body: blob,

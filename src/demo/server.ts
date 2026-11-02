@@ -3,7 +3,7 @@
 import { demoOutlook } from "./outlook";
 import { demoParty } from "./party";
 import { demoGames } from "./games";
-import type { Message } from "../api";
+import { setCustomFetch, setWebSocketCreator, type Message } from "../api";
 import { setAvatarResolver } from "../ui";
 import {
   addMessage,
@@ -124,7 +124,10 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
     if (route === "POST /music/queue") {
       const videoId = (body as { videoId: string }).videoId;
       const item = {
-        id: crypto.randomUUID(),
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : Math.random().toString(36).slice(2) + Date.now().toString(36),
         videoId,
         title: `Música de demonstração · ${videoId}`,
         duration: 180,
@@ -383,8 +386,12 @@ async function handle(url: URL, init: RequestInit = {}): Promise<Response> {
   return fail(404, "Rota não simulada no modo demo.");
 }
 
-const realFetch = window.fetch.bind(window);
-window.fetch = async (input, init) => {
+const realFetch =
+  typeof window !== "undefined" && window.fetch
+    ? window.fetch.bind(window)
+    : (...args: Parameters<typeof fetch>) => fetch(...args);
+
+export const demoFetch: typeof window.fetch = async (input, init) => {
   const url = new URL(
     input instanceof Request ? input.url : String(input),
     location.href,
@@ -396,8 +403,23 @@ window.fetch = async (input, init) => {
   return handle(url, init);
 };
 
+setCustomFetch(demoFetch);
+try {
+  window.fetch = demoFetch;
+} catch {
+  try {
+    Object.defineProperty(window, "fetch", {
+      value: demoFetch,
+      writable: true,
+      configurable: true,
+    });
+  } catch {
+    // Window fetch is read-only; handled via setCustomFetch
+  }
+}
+
 // Chat and presence events, in place of the server's /ws.
-class DemoSocket extends EventTarget {
+export class DemoSocket extends EventTarget {
   static readonly OPEN = 1;
   readonly OPEN = 1;
   readyState = 0;
@@ -445,11 +467,33 @@ class DemoSocket extends EventTarget {
     this.onclose?.(new CloseEvent("close"));
   }
 }
-window.WebSocket = DemoSocket as unknown as typeof WebSocket;
+
+setWebSocketCreator((_url: string) => new DemoSocket() as unknown as WebSocket);
+try {
+  window.WebSocket = DemoSocket as unknown as typeof WebSocket;
+} catch {
+  try {
+    Object.defineProperty(window, "WebSocket", {
+      value: DemoSocket,
+      writable: true,
+      configurable: true,
+    });
+  } catch {
+    // Window WebSocket is read-only; handled via setWebSocketCreator
+  }
+}
 
 setAvatarResolver((m) => avatars.get(m.id) ?? "");
 
-const badge = document.createElement("div");
-badge.className = "demo-badge";
-badge.textContent = "MODO DEMO · nada sai deste navegador";
-document.body.append(badge);
+try {
+  const badge = document.createElement("div");
+  badge.className = "demo-badge";
+  badge.textContent = "MODO DEMO · nada sai deste navegador";
+  if (document.body) {
+    document.body.append(badge);
+  } else {
+    window.addEventListener("DOMContentLoaded", () => document.body?.append(badge));
+  }
+} catch {
+  // DOM badge silently skipped if DOM not accessible
+}

@@ -1,0 +1,9 @@
+# Opcional: TURN/TLS em 5349; não disputa 443 com Caddy.
+# Antes, habilite turn no arquivo gerado conforme docs/NETWORKING.md.
+services:
+  livekit:
+    ports:
+      - "5349:5349/tcp"
+      - "3478:3478/udp"
+    volumes:
+      - ./generated/turn-certs:/etc/turn-certs:ro

@@ -72,7 +72,10 @@ export function addMessage(
   const isUser = "username" in author;
   const message: Message = {
     id: nextId++,
-    clientId: crypto.randomUUID(),
+    clientId:
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36),
     authorId: author.id,
     author: isUser ? author.displayName : author.name,
     body,

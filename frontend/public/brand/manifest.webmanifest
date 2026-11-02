@@ -1,0 +1,14 @@
+{
+  "name": "VGH — Virtual Gaming House",
+  "short_name": "VGH",
+  "description": "Um espaço para jogar, conversar e assistir com os amigos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080916",
+  "theme_color": "#7d3cff",
+  "icons": [
+    { "src": "/brand/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/android-chrome-maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

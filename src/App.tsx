@@ -18,6 +18,7 @@ import {
   ApiError,
   api,
   login,
+  createWebSocket,
   type Member,
   type User,
   type Message,
@@ -375,7 +376,7 @@ function Workspace({
       } while (rows.length === 100);
     };
     const connect = () => {
-      ws = new WebSocket(
+      ws = createWebSocket(
         `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`,
       );
       ws.onopen = () => {
