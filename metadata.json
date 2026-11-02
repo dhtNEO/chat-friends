@@ -1,0 +1,7 @@
+{
+  "name": "Virtual Gaming House",
+  "description": "Voz, tela ao vivo, jogos, música e chat num espaço só de vocês.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
