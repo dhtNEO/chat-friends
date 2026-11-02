@@ -1,46 +1,52 @@
 # Chat Friends (v2.0)
 
-Aplicação enxuta e de alta performance para chamadas de voz, chat em tempo real e compartilhamento de tela opt-in com visual minimalista estilo Discord.
+Aplicação enxuta para chamadas de voz, chat em tempo real e compartilhamento de tela opt-in com visual estilo Discord, projetada para operar com baixo consumo de recursos (`e2-small` no GCP, ~120 MB de RAM).
 
-Projetada para operar de forma extremamente econômica em uma máquina virtual `e2-small` (1 vCPU, 2 GB RAM) no Google Cloud Platform (~120 MB de RAM total).
+## Arquitetura
 
----
+- **Backend (`backend/`) — Rust + Axum + SQLx + SQLite (WAL):**
+  - Autenticação com Argon2id e código de convite (`SERVER_INVITE_CODE`).
+  - Chat persistente e eventos em tempo real via WebSocket (`/ws`).
+  - Emissão de tokens JWT LiveKit (HS256, validade de 12h).
+  - Atualização automática de IP no DuckDNS a cada 5 minutos e limpeza horária de sessões expiradas.
 
-## 🚀 Arquitetura v2.0
+- **Frontend (`frontend/`) — Bun + SolidJS + LiveKit Client + Web Audio API:**
+  - Compartilhamento de tela opt-in (`autoSubscribe: false` para vídeo) com presets `720p@30fps` e `1080p@60fps`.
+  - Controle de volume independente por usuário (Voz 0–200%, Live 0–100%) com curva perceptual quadrática.
+  - Ganho de microfone com limiter suave (-3 dB), VU Meter em tempo real e efeitos sonoros via Web Audio API.
 
-- **Backend Rust (`Axum` + `Tokio` + `SQLx` + `SQLite WAL`):**
-  - Autenticação com Argon2id e código de convite do servidor (`SERVER_INVITE_CODE`).
-  - Sem MFA ou limites artificiais de compartilhamento de tela.
-  - Chat persistente com histórico e canal `broadcast` para eventos via WebSocket (`/ws`).
-  - Geração de tokens JWT LiveKit (HS256) com 12 horas de validade.
-  - Task em background que atualiza o IP no DuckDNS a cada 5 minutos.
-  - Purga automática horária de sessões expiradas.
+- **Infraestrutura (`infra/`):**
+  - 3 contêineres em produção (`infra/compose/compose.yml`): `caddy` (TLS DNS-01 DuckDNS), `app` (Rust + SPA estática) e `livekit` (SFU WebRTC).
+  - Provisionamento GCP via Terraform (`infra/gcp/`) com Secret Manager e Artifact Registry.
 
-- **Frontend SolidJS (`SolidJS` + `LiveKit Client` + `Web Audio API`):**
-  - Zero Virtual DOM para máxima economia de CPU e renderização instantânea.
-  - **Compartilhamento de Tela Opt-In:** Transmissões de vídeo de tela nunca são inscritas automaticamente, poupando banda e bateria.
-  - **Presets de Transmissão:** 720p @ 30 FPS (Econômico) ou 1080p @ 60 FPS (Fluido).
-  - **Áudio Avançado:** Curva perceptual quadrática para volumes independentes de voz (0-200%) e live (0-100%).
-  - **Calibração de Microfone:** Brickwall Limiter suave (-3 dB) e VU Meter em tempo real a 60 FPS.
-  - **Efeitos Sonoros:** Sons suaves estilo Discord via Web Audio API e arquivos de entrada/saída.
+## Desenvolvimento Local
 
-- **Infraestrutura e DevOps:**
-  - Apenas 3 contêineres: `caddy` (TLS DNS-01 DuckDNS), `app` (Rust + SolidJS) e `livekit` (SFU WebRTC).
-  - Gerenciamento de segredos com **Google Cloud Secret Manager**.
-  - Imagens de contêiner armazenadas no **Google Artifact Registry**.
-  - Provisionamento automatizado com **Terraform** e **GitHub Actions**.
-
----
-
-## 🛠️ Desenvolvimento Local
-
+### 1. Apenas Frontend (com Mock Server integrado no Vite)
 ```bash
-# Frontend (SolidJS + Vite)
-npm --prefix frontend install
-npm --prefix frontend run dev
-
-# Compilação para produção
-npm --prefix frontend run build
+cd frontend
+bun install
+bun run dev
 ```
 
-Consulte `docs/REFACTOR_PLAN.md` para detalhes aprofundados sobre a arquitetura e diretrizes de governança.
+### 2. Backend Rust (SQLite) + Frontend com Proxy
+```bash
+# Terminal 1 — Backend Rust (porta 8080)
+cd backend
+DATABASE_URL="sqlite://chatfriends.db?mode=rwc" \
+SERVER_INVITE_CODE="123456" \
+LIVEKIT_API_KEY="devkey" \
+LIVEKIT_API_SECRET="secret_de_desenvolvimento_com_32_bytes" \
+LIVEKIT_URL="ws://localhost:7880" \
+cargo run
+
+# Terminal 2 — Frontend com Proxy para o Backend (porta 3000)
+cd frontend
+USE_BACKEND_PROXY=true bun run dev
+```
+
+## Build de Produção (Docker)
+
+```bash
+docker build -t chat-friends-app:latest .
+docker build -t chat-friends-caddy:latest ./infra/caddy
+```

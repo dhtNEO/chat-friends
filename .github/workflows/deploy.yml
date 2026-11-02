@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - refactor
   workflow_dispatch:
 
 permissions:
@@ -53,7 +52,6 @@ jobs:
           echo "CADDY_IMAGE=${PREFIX}/caddy" >> "$GITHUB_ENV"
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
-      # 1. Build and Push App (Rust Backend + SolidJS Frontend SPA)
       - name: Build & Push App Image
         uses: docker/build-push-action@v6
         with:
@@ -66,7 +64,6 @@ jobs:
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
 
-      # 2. Build and Push Caddy with DuckDNS DNS-01 provider
       - name: Build & Push Caddy Image
         uses: docker/build-push-action@v6
         with:

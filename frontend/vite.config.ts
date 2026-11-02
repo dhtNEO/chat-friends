@@ -295,24 +295,25 @@ function devBackendPlugin(): Plugin {
   };
 }
 
+const useBackendProxy = process.env.USE_BACKEND_PROXY === "true";
+
 export default defineConfig({
-  plugins: [solid(), devBackendPlugin()],
+  plugins: [solid(), ...(!useBackendProxy ? [devBackendPlugin()] : [])],
   server: {
     host: "0.0.0.0",
     port: 3000,
-    proxy:
-      process.env.USE_BACKEND_PROXY === "true"
-        ? {
-            "/api": {
-              target: "http://localhost:8080",
-              changeOrigin: true,
-            },
-            "/ws": {
-              target: "ws://localhost:8080",
-              ws: true,
-            },
-          }
-        : undefined,
+    proxy: useBackendProxy
+      ? {
+          "/api": {
+            target: "http://localhost:8080",
+            changeOrigin: true,
+          },
+          "/ws": {
+            target: "ws://localhost:8080",
+            ws: true,
+          },
+        }
+      : undefined,
   },
   build: {
     target: "esnext",
